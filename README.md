@@ -38,9 +38,9 @@ The static production output is written to \`dist/\` and can be deployed to Verc
 
 ## How detection works
 
-GridSplit samples luminance across the image and scores each row and column for local contrast and dark separator-like pixels. Candidate lines are smoothed, thresholded, ranked, and used to build a set of crop rectangles. It is a heuristic, not a semantic image understanding system: textured artwork, thin borders, merged cells, and uneven layouts can require manual correction. Review the tile gallery and deselect non-frame cells before exporting.
+GridSplit first finds horizontal image bands, then analyses each band independently. For each row it builds a luminance/contrast projection, estimates the repeated tile pitch through normalized autocorrelation, and uses a spacing-constrained dynamic program to select likely vertical separators. This allows neighbouring rows to have different widths and different numbers of tiles. It is traditional image processing, not semantic image understanding: textured artwork, missing borders, merged cells, and very irregular layouts can still require manual correction.
 
-The "Apply even grid" option is a fallback for regular sheets where you know the number of rows and columns. Auto-detected boundaries are retained as independent positions, so uneven row heights can still be used.
+The "Apply uniform grid" option is a fallback for sheets with a known regular layout. In automatic mode, each row keeps its own detected boundaries. Use "Split" to divide a wide tile in half, "Merge" to join it with the next tile in the same row, or click a tile to include/exclude it.
 
 ## Privacy
 
@@ -48,7 +48,7 @@ All processing happens in the browser tab. GridSplit does not transmit images to
 
 ## Current scope
 
-This first release supports one contact sheet per session. Manual correction currently focuses on row/column count and per-tile inclusion; direct dragging of individual separator lines and batch upload are planned improvements.
+This release processes one contact sheet per session. Manual correction currently includes per-tile inclusion, horizontal split, and merge-with-next actions. Direct dragging of separator lines, batch upload, and deeper validation fixtures remain planned.
 
 ## License
 

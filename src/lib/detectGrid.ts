@@ -1,11 +1,31 @@
-export type GridLines = {
-  vertical: number[];
-  horizontal: number[];
-  verticalConfidence: number;
+export type GridCell = {
+  row: number;
+  column: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+};
+
+export type GridRow = {
+  row: number;
+  top: number;
+  bottom: number;
+  period: number;
+  confidence: number;
+  boundaries: number[];
+};
+
+export type ContactSheetLayout = {
+  rows: GridRow[];
+  cells: GridCell[];
   horizontalConfidence: number;
+  verticalConfidence: number;
 };
 
 type Peak = { position: number; score: number };
+type Candidate = { position: number; zScore: number };
 
 function luminance(data: Uint8ClampedArray, width: number, x: number, y: number): number {
   const index = (y * width + x) * 4;
@@ -34,9 +54,13 @@ function axisProfile(
   width: number,
   height: number,
   vertical: boolean,
+  top = 0,
+  bottom = height,
 ): Float32Array {
   const axisLength = vertical ? width : height;
-  const crossLength = vertical ? height : width;
+  const crossStart = vertical ? top : 0;
+  const crossEnd = vertical ? bottom : width;
+  const crossLength = Math.max(1, crossEnd - crossStart);
   const scores = new Float32Array(axisLength);
   const sampleStep = Math.max(1, Math.floor(crossLength / 700));
 
@@ -45,7 +69,7 @@ function axisProfile(
     let darkBorderHits = 0;
     let samples = 0;
 
-    for (let cross = 1; cross < crossLength - 1; cross += sampleStep) {
+    for (let cross = crossStart + 1; cross < crossEnd - 1; cross += sampleStep) {
       const left = vertical
         ? luminance(data, width, axis - 1, cross)
         : luminance(data, width, cross, axis - 1);
@@ -80,7 +104,7 @@ function median(values: number[]): number {
     : sorted[middle];
 }
 
-function findPeaks(profile: Float32Array, axisLength: number): Peak[] {
+function findHorizontalPeaks(profile: Float32Array, axisLength: number): Peak[] {
   const interior = Array.from(profile).slice(
     Math.floor(axisLength * 0.015),
     Math.ceil(axisLength * 0.985),
@@ -112,48 +136,259 @@ function findPeaks(profile: Float32Array, axisLength: number): Peak[] {
   return selected.sort((a, b) => a.position - b.position);
 }
 
-function pruneCrowdedLines(lines: number[], scores: Float32Array, axisLength: number): number[] {
-  if (lines.length < 3) return lines;
-  const targetMax = Math.min(34, Math.max(3, Math.floor(axisLength / 24)));
-  if (lines.length <= targetMax) return lines;
-
-  const ranked = lines
-    .map((position) => ({ position, score: scores[position] ?? 0 }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, targetMax)
-    .map((item) => item.position);
-
-  return ranked.sort((a, b) => a - b);
-}
-
-function detectAxis(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  vertical: boolean,
-): { lines: number[]; confidence: number } {
-  const axisLength = vertical ? width : height;
-  const profile = axisProfile(data, width, height, vertical);
-  const peaks = findPeaks(profile, axisLength);
-  const interior = peaks.map((peak) => peak.position);
-  const pruned = pruneCrowdedLines(interior, profile, axisLength);
-  const lines = [0, ...pruned.filter((line) => line > 3 && line < axisLength - 3), axisLength];
-  const meanStrength = pruned.length
-    ? pruned.reduce((sum, position) => sum + profile[position], 0) / pruned.length
+function detectHorizontalBoundaries(imageData: ImageData): { boundaries: number[]; confidence: number } {
+  const profile = axisProfile(
+    imageData.data,
+    imageData.width,
+    imageData.height,
+    false,
+  );
+  const peaks = findHorizontalPeaks(profile, imageData.height);
+  const lines = [
+    0,
+    ...peaks
+      .map((peak) => peak.position)
+      .filter((line) => line > 3 && line < imageData.height - 3),
+    imageData.height,
+  ];
+  const meanStrength = peaks.length
+    ? peaks.reduce((sum, peak) => sum + peak.score, 0) / peaks.length
     : 0;
-  const confidence = Math.max(0, Math.min(100, Math.round((meanStrength / 72) * 100)));
-  return { lines: Array.from(new Set(lines)).sort((a, b) => a - b), confidence };
-}
-
-export function detectGrid(imageData: ImageData): GridLines {
-  const vertical = detectAxis(imageData.data, imageData.width, imageData.height, true);
-  const horizontal = detectAxis(imageData.data, imageData.width, imageData.height, false);
 
   return {
-    vertical: vertical.lines,
-    horizontal: horizontal.lines,
-    verticalConfidence: vertical.confidence,
+    boundaries: Array.from(new Set(lines)).sort((a, b) => a - b),
+    confidence: Math.max(0, Math.min(100, Math.round((meanStrength / 72) * 100))),
+  };
+}
+
+function estimateTilePeriod(profile: Float32Array): number {
+  let mean = 0;
+  for (const value of profile) mean += value;
+  mean /= profile.length;
+  const centered = Array.from(profile, (value) => value - mean);
+  const minLag = 65;
+  const maxLag = Math.min(130, Math.floor(profile.length / 3));
+  let bestLag = 96;
+  let bestCorrelation = -Infinity;
+
+  for (let lag = minLag; lag <= maxLag; lag += 1) {
+    let dot = 0;
+    let leftEnergy = 0;
+    let rightEnergy = 0;
+
+    for (let index = 0; index < centered.length - lag; index += 1) {
+      const left = centered[index];
+      const right = centered[index + lag];
+      dot += left * right;
+      leftEnergy += left * left;
+      rightEnergy += right * right;
+    }
+
+    const denominator = Math.sqrt(leftEnergy * rightEnergy);
+    const correlation = denominator > 0 ? dot / denominator : -1;
+    if (correlation > bestCorrelation) {
+      bestCorrelation = correlation;
+      bestLag = lag;
+    }
+  }
+
+  return bestLag;
+}
+
+function findVerticalCandidates(profile: Float32Array): Candidate[] {
+  const interior = Array.from(profile).slice(4, -4);
+  const baseline = median(interior);
+  const mad = Math.max(1, median(interior.map((value) => Math.abs(value - baseline))));
+  const threshold = baseline + mad * 1.8;
+  const candidates: Candidate[] = [];
+
+  for (let x = 4; x < profile.length - 4; x += 1) {
+    const score = profile[x];
+    if (score < threshold) continue;
+    if (score < profile[x - 1] || score < profile[x + 1]) continue;
+    if (score < profile[x - 2] || score < profile[x + 2]) continue;
+    candidates.push({ position: x, zScore: (score - baseline) / mad });
+  }
+
+  return candidates
+    .filter((candidate) => candidate.position >= 8 && candidate.position <= profile.length - 8)
+    .sort((a, b) => b.zScore - a.zScore)
+    .slice(0, 80)
+    .sort((a, b) => a.position - b.position);
+}
+
+function selectBoundaries(
+  candidates: Candidate[],
+  width: number,
+  period: number,
+): { boundaries: number[]; confidence: number } {
+  type Node = {
+    position: number;
+    zScore: number;
+    isEdge: boolean;
+  };
+
+  const nodes: Node[] = [
+    { position: 0, zScore: 0, isEdge: true },
+    ...candidates.map((candidate) => ({
+      position: candidate.position,
+      zScore: candidate.zScore,
+      isEdge: false,
+    })),
+    { position: width, zScore: 0, isEdge: true },
+  ].sort((a, b) => a.position - b.position);
+
+  const scores = new Array<number>(nodes.length).fill(Number.NEGATIVE_INFINITY);
+  const previous = new Array<number>(nodes.length).fill(-1);
+  scores[0] = 0;
+
+  for (let current = 1; current < nodes.length; current += 1) {
+    for (let prior = 0; prior < current; prior += 1) {
+      const gap = nodes[current].position - nodes[prior].position;
+      if (gap < period * 0.6 || gap > period * 2.5) continue;
+
+      const multiple = Math.max(1, Math.round(gap / period));
+      const residual = Math.abs(gap - multiple * period);
+      if (residual > Math.max(24, period * 0.45)) continue;
+
+      const residualPenalty = (residual / (period * 0.14)) ** 2 * 0.25;
+      const skippedCellPenalty = (multiple - 1) * 2.3;
+      const lineReward = nodes[current].isEdge
+        ? 0
+        : Math.min(nodes[current].zScore, 14) * 0.8;
+      const candidateScore = scores[prior] + lineReward - residualPenalty - skippedCellPenalty;
+
+      if (candidateScore > scores[current]) {
+        scores[current] = candidateScore;
+        previous[current] = prior;
+      }
+    }
+  }
+
+  const lastIndex = nodes.length - 1;
+  if (previous[lastIndex] === -1) {
+    const fallback = candidates
+      .filter((candidate) => candidate.zScore >= 4.5)
+      .map((candidate) => candidate.position);
+    const boundaries = [0, ...fallback, width]
+      .filter((value, index, all) => index === 0 || value - all[index - 1] >= 18);
+    return { boundaries, confidence: 25 };
+  }
+
+  const path: number[] = [];
+  let cursor = lastIndex;
+  while (cursor !== -1) {
+    path.push(cursor);
+    cursor = previous[cursor];
+  }
+  path.reverse();
+
+  const selected = path
+    .filter((index) => !nodes[index].isEdge)
+    .map((index) => nodes[index].position);
+  const confidence = selected.length
+    ? Math.max(0, Math.min(100, Math.round(
+      selected.reduce((sum, position) => {
+        const candidate = candidates.find((item) => item.position === position);
+        return sum + Math.min(candidate?.zScore ?? 0, 14);
+      }, 0) / selected.length / 14 * 100,
+    )))
+    : 0;
+
+  return {
+    boundaries: [0, ...selected, width],
+    confidence,
+  };
+}
+
+function isBlankFooterBand(
+  data: Uint8ClampedArray,
+  width: number,
+  top: number,
+  bottom: number,
+): boolean {
+  let total = 0;
+  let darkPixels = 0;
+  let samples = 0;
+
+  for (let y = top; y < bottom; y += 2) {
+    for (let x = 0; x < width; x += 4) {
+      const value = luminance(data, width, x, y);
+      total += value;
+      if (value < 25) darkPixels += 1;
+      samples += 1;
+    }
+  }
+
+  if (samples === 0) return true;
+  const average = total / samples;
+  const darkRatio = darkPixels / samples;
+  return average < 22 && darkRatio > 0.78;
+}
+
+export function detectContactSheet(imageData: ImageData): ContactSheetLayout {
+  const horizontal = detectHorizontalBoundaries(imageData);
+  const rows: GridRow[] = [];
+  const cells: GridCell[] = [];
+  const rowConfidences: number[] = [];
+
+  for (let rowIndex = 0; rowIndex < horizontal.boundaries.length - 1; rowIndex += 1) {
+    const top = horizontal.boundaries[rowIndex];
+    const bottom = horizontal.boundaries[rowIndex + 1];
+    if (bottom - top < 18) continue;
+    if (isBlankFooterBand(imageData.data, imageData.width, top, bottom)) continue;
+
+    const profile = axisProfile(
+      imageData.data,
+      imageData.width,
+      imageData.height,
+      true,
+      top,
+      bottom,
+    );
+    const period = estimateTilePeriod(profile);
+    const candidates = findVerticalCandidates(profile);
+    const selected = selectBoundaries(candidates, imageData.width, period);
+    const boundaries = selected.boundaries;
+
+    const row: GridRow = {
+      row: rows.length,
+      top,
+      bottom,
+      period,
+      confidence: selected.confidence,
+      boundaries,
+    };
+    rows.push(row);
+    rowConfidences.push(selected.confidence);
+
+    for (let column = 0; column < boundaries.length - 1; column += 1) {
+      const x = boundaries[column];
+      const right = boundaries[column + 1];
+      const cellWidth = right - x;
+      const cellHeight = bottom - top;
+      if (cellWidth < 14 || cellHeight < 14) continue;
+      cells.push({
+        row: row.row,
+        column,
+        x,
+        y: top,
+        width: cellWidth,
+        height: cellHeight,
+        confidence: selected.confidence,
+      });
+    }
+  }
+
+  const verticalConfidence = rowConfidences.length
+    ? Math.round(rowConfidences.reduce((sum, value) => sum + value, 0) / rowConfidences.length)
+    : 0;
+
+  return {
+    rows,
+    cells,
     horizontalConfidence: horizontal.confidence,
+    verticalConfidence,
   };
 }
 

@@ -4,56 +4,66 @@ Last updated: 2026-11-09
 
 ## Current checkpoint
 
-**MVP foundation committed on \`main\`.**
+**Row-aware extraction and manual tile correction committed on `main`.**
 
-Latest implementation commit before this checkpoint: \`f42caa4a17df40c9640270e1c75903ac6302d7ed\` — Improve separator detection and sanitize ZIP filenames.
+Latest implementation commit: pending this commit.
 
 ## Product goal
 
-A static, browser-only utility that converts storyboard contact sheets and image grids into individual image crops. The product must not use generative AI, machine learning, OCR, remote image-processing APIs, or an image-upload backend.
+A static, browser-only utility that converts storyboard contact sheets and image grids into individual image crops. Do not use generative AI, machine learning, OCR, remote image-processing APIs, or an image-upload backend.
 
 ## Implemented
 
-- React 18 + TypeScript + Vite application shell.
-- Dark responsive UI for upload and extraction review.
+- React 18 + TypeScript + Vite application shell and responsive dark interface.
 - Local image loading through the browser File API.
-- Traditional pixel-intensity / contrast projection for likely horizontal and vertical separators.
-- Separate crop rectangles based on detected boundaries.
+- Traditional luminance / contrast projection for horizontal row-band detection.
+- Per-row vertical separator analysis rather than one shared global column grid.
+- Normalized autocorrelation to estimate the tile pitch in each row.
+- Spacing-constrained dynamic programming to select plausible separators.
+- Dark, nearly uniform footer-band suppression.
 - Tile gallery with include/exclude selection.
-- Evenly spaced manual row/column fallback.
+- Manual per-tile split and merge-with-next controls.
+- Uniform row/column fallback.
 - Adjustable border trim.
 - Custom filename prefix, start number, and zero-padding.
 - Sequential PNG cropping with JSZip download.
-- CSV manifest and ZIP README.
-- Filename-prefix sanitization.
-- Project README, MIT license, and GitHub Actions build workflow.
+- CSV crop manifest and ZIP README.
+- Local-only image processing and filename-prefix sanitization.
+- MIT license and GitHub Actions build workflow.
+
+## Sample-sheet investigation
+
+The supplied storyboard sheet is 1536 × 864 pixels. A Python reference implementation of the row-wise scoring and boundary-selection logic found 13 image-bearing horizontal bands and identified the final 32-pixel strip as a dark footer rather than another image row.
+
+The reference probe produced approximately 210 candidate crop rectangles before manual review. This is a preliminary segmentation result, **not** proof that the requested final total of 196 has been achieved. The contact sheet contains title/continuation panels, repeated or irregular borders, and uneven row layouts. The app now provides per-tile split/merge and include/exclude controls for correction.
+
+The TypeScript application itself has not yet been run through a dependency install, TypeScript build, or browser end-to-end test in this environment. Do not mark the 196-image sample target complete until the website build runs and the exported ZIP is inspected.
 
 ## Current limitations
 
-- The detector is heuristic. It can mistake strong artwork edges for separators or miss faint / interrupted borders.
-- The review UI supports selecting and excluding tiles, but not dragging individual boundaries.
-- The even-grid fallback assumes equal cell dimensions.
-- Merged panels are currently split by detected global boundaries and must be excluded manually when they are not individual frames.
+- Separator detection remains heuristic and may select artwork edges or miss faint / interrupted borders.
+- Row-wise pitch estimation can be less reliable on short rows or highly irregular layouts.
+- Split divides a tile at its horizontal midpoint; Merge joins a tile to the next tile in the same row.
+- The current editor does not provide freehand boundary dragging or arbitrary crop handles.
 - One contact sheet is processed per session.
-- A full dependency install, TypeScript build, and browser end-to-end test have not yet been confirmed in this environment.
+- Production build and browser download flow still need verification.
 
 ## Next milestones
 
-1. Run \`npm install\`, \`npm run typecheck\`, and \`npm run build\`; fix any compile issues.
-2. Test the supplied 1536 × 864 storyboard contact sheet and compare the generated tile count against the expected 196 frames.
-3. Improve local separator continuity so merged title panels and interrupted lines are handled more accurately.
-4. Add draggable boundary editing and per-row / per-column corrections.
-5. Add a crop-edge / grid overlay on the source image.
-6. Add test fixtures for regular grids, uneven rows, dark contact sheets, and merged cells.
-7. Add multi-file batch processing and deployment configuration after extraction accuracy is stable.
+1. Verify `npm install`, `npm run typecheck`, and `npm run build` in a Node 22 environment.
+2. Run the website against the supplied contact sheet; inspect the detected row bands and the 210 preliminary regions.
+3. Correct the segmentation to reach the expected 196 individual images, then export and inspect all files.
+4. Add automated fixtures for regular grids, merged title panels, variable row widths, footer strips, and dark fantasy images.
+5. Add draggable crop-boundary editing and batch upload.
+6. Configure Vercel deployment after the extraction workflow is verified.
 
 ## Local development
 
-\`\`\`bash
+```bash
 npm install
 npm run dev
 npm run typecheck
 npm run build
-\`\`\`
+```
 
-No checkpoint should be marked complete until its implementation and verification are both done.
+No milestone should be marked complete until implementation and verification are both done.

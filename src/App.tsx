@@ -16,12 +16,14 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { countCells, detectGrid, makeEvenBoundaries } from "./lib/detectGrid";
+import { countCells, detectContactSheet, makeEvenBoundaries } from "./lib/detectGrid";
+import type { ContactSheetLayout } from "./lib/detectGrid";
 import { createImageZip, type ExportCell } from "./lib/exportZip";
 
 type Cell = ExportCell & {
   id: string;
   selected: boolean;
+  confidence: number;
 };
 
 type LoadedImage = {
@@ -30,30 +32,96 @@ type LoadedImage = {
   image: HTMLImageElement;
 };
 
+type Analysis = {
+  layout: ContactSheetLayout;
+  scaleX: number;
+  scaleY: number;
+};
+
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
-function createCells(vertical: number[], horizontal: number[]): Cell[] {
+function makeCellId(row: number, column: number, x: number, y: number): string {
+  return [row, column, x, y].join("-");
+}
+
+function createCellsFromLayout(layout: ContactSheetLayout): Cell[] {
+  return layout.cells.map((cell) => ({
+    ...cell,
+    id: makeCellId(cell.row, cell.column, cell.x, cell.y),
+    selected: true,
+  }));
+}
+
+function createUniformCells(width: number, height: number, columns: number, rows: number): Cell[] {
+  const vertical = makeEvenBoundaries(width, columns);
+  const horizontal = makeEvenBoundaries(height, rows);
   const cells: Cell[] = [];
-  for (let row = 0; row < horizontal.length - 1; row += 1) {
-    for (let column = 0; column < vertical.length - 1; column += 1) {
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
       const x = vertical[column];
       const y = horizontal[row];
-      const width = vertical[column + 1] - x;
-      const height = horizontal[row + 1] - y;
-      if (width < 12 || height < 12) continue;
+      const cellWidth = vertical[column + 1] - x;
+      const cellHeight = horizontal[row + 1] - y;
       cells.push({
-        id: row + "-" + column,
+        id: makeCellId(row, column, x, y),
         row,
         column,
         x,
         y,
-        width,
-        height,
+        width: cellWidth,
+        height: cellHeight,
+        confidence: 0,
         selected: true,
       });
     }
   }
   return cells;
+}
+
+function renumberCells(cells: Cell[]): Cell[] {
+  const sorted = [...cells].sort((a, b) =>
+    a.row - b.row || a.x - b.x || a.y - b.y,
+  );
+  const columnsByRow = new Map<number, number>();
+
+  return sorted.map((cell) => {
+    const column = columnsByRow.get(cell.row) ?? 0;
+    columnsByRow.set(cell.row, column + 1);
+    return {
+      ...cell,
+      column,
+      id: makeCellId(cell.row, column, cell.x, cell.y),
+    };
+  });
+}
+
+function analyseImage(image: HTMLImageElement): Analysis {
+  const analysisScale = Math.min(1, 1800 / image.naturalWidth, 1400 / image.naturalHeight);
+  const analysisWidth = Math.max(1, Math.round(image.naturalWidth * analysisScale));
+  const analysisHeight = Math.max(1, Math.round(image.naturalHeight * analysisScale));
+  const canvas = document.createElement("canvas");
+  canvas.width = analysisWidth;
+  canvas.height = analysisHeight;
+
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("Your browser could not analyse this image.");
+
+  context.drawImage(image, 0, 0, analysisWidth, analysisHeight);
+  return {
+    layout: detectContactSheet(context.getImageData(0, 0, analysisWidth, analysisHeight)),
+    scaleX: image.naturalWidth / analysisWidth,
+    scaleY: image.naturalHeight / analysisHeight,
+  };
+}
+
+function typicalColumns(layout: ContactSheetLayout): number {
+  const counts = layout.rows.map((row) => countCells(row.boundaries));
+  if (counts.length === 0) return 1;
+
+  const frequencies = new Map<number, number>();
+  for (const count of counts) frequencies.set(count, (frequencies.get(count) ?? 0) + 1);
+  return [...frequencies.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0][0];
 }
 
 function CropPreview({
@@ -91,8 +159,8 @@ function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loaded, setLoaded] = useState<LoadedImage | null>(null);
   const [cells, setCells] = useState<Cell[]>([]);
-  const [columnsInput, setColumnsInput] = useState("15");
-  const [rowsInput, setRowsInput] = useState("12");
+  const [columnsInput, setColumnsInput] = useState("16");
+  const [rowsInput, setRowsInput] = useState("13");
   const [gutter, setGutter] = useState(2);
   const [prefix, setPrefix] = useState("frame-");
   const [startNumber, setStartNumber] = useState(1);
@@ -102,6 +170,7 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confidence, setConfidence] = useState({ x: 0, y: 0 });
+  const [detectedRows, setDetectedRows] = useState(0);
 
   const selectedCells = useMemo(() => cells.filter((cell) => cell.selected), [cells]);
 
@@ -116,13 +185,35 @@ function App() {
     if (loaded) URL.revokeObjectURL(loaded.url);
   }, [loaded]);
 
+  const applyAnalysis = (image: HTMLImageElement): ContactSheetLayout => {
+    const analysis = analyseImage(image);
+    const scaledLayout: ContactSheetLayout = {
+      ...analysis.layout,
+      rows: analysis.layout.rows.map((row) => ({
+        ...row,
+        top: Math.round(row.top * analysis.scaleY),
+        bottom: Math.round(row.bottom * analysis.scaleY),
+        boundaries: row.boundaries.map((line) => Math.round(line * analysis.scaleX)),
+        period: Math.round(row.period * analysis.scaleX),
+      })),
+      cells: analysis.layout.cells.map((cell) => ({
+        ...cell,
+        x: Math.round(cell.x * analysis.scaleX),
+        y: Math.round(cell.y * analysis.scaleY),
+        width: Math.round(cell.width * analysis.scaleX),
+        height: Math.round(cell.height * analysis.scaleY),
+      })),
+    };
+    return scaledLayout;
+  };
+
   const processFile = useCallback((file?: File) => {
     if (!file) return;
     setError("");
     setNotice("");
 
     if (!file.type.startsWith("image/")) {
-      setError("Choose a PNG, JPG, WebP, GIF, or other browser-supported image.");
+      setError("Choose an image format supported by your browser, such as PNG, JPG, or WebP.");
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
@@ -133,33 +224,32 @@ function App() {
     const url = URL.createObjectURL(file);
     const image = new Image();
     image.onload = () => {
-      const analysisScale = Math.min(1, 1800 / image.naturalWidth, 1400 / image.naturalHeight);
-      const analysisWidth = Math.max(1, Math.round(image.naturalWidth * analysisScale));
-      const analysisHeight = Math.max(1, Math.round(image.naturalHeight * analysisScale));
-      const canvas = document.createElement("canvas");
-      canvas.width = analysisWidth;
-      canvas.height = analysisHeight;
-      const context = canvas.getContext("2d", { willReadFrequently: true });
+      try {
+        const layout = applyAnalysis(image);
+        const nextCells = createCellsFromLayout(layout);
+        if (nextCells.length === 0) {
+          URL.revokeObjectURL(url);
+          setError("No usable image tiles were found. Try a clearer contact sheet or use the uniform-grid controls.");
+          return;
+        }
 
-      if (!context) {
+        setLoaded({ file, url, image });
+        setCells(nextCells);
+        setColumnsInput(String(typicalColumns(layout)));
+        setRowsInput(String(layout.rows.length));
+        setDetectedRows(layout.rows.length);
+        setConfidence({
+          x: layout.verticalConfidence,
+          y: layout.horizontalConfidence,
+        });
+        setNotice(
+          "Detected " + layout.rows.length + " image rows and " + nextCells.length +
+          " tiles. Column counts can vary by row; split or merge tiles when needed.",
+        );
+      } catch (analysisError) {
         URL.revokeObjectURL(url);
-        setError("Your browser could not analyse this image. Try another browser.");
-        return;
+        setError(analysisError instanceof Error ? analysisError.message : "The image could not be analysed.");
       }
-
-      context.drawImage(image, 0, 0, analysisWidth, analysisHeight);
-      const result = detectGrid(context.getImageData(0, 0, analysisWidth, analysisHeight));
-      const scaleX = image.naturalWidth / analysisWidth;
-      const scaleY = image.naturalHeight / analysisHeight;
-      const xLines = result.vertical.map((line) => Math.round(line * scaleX));
-      const yLines = result.horizontal.map((line) => Math.round(line * scaleY));
-
-      setLoaded({ file, url, image });
-      setCells(createCells(xLines, yLines));
-      setColumnsInput(String(countCells(xLines)));
-      setRowsInput(String(countCells(yLines)));
-      setConfidence({ x: result.verticalConfidence, y: result.horizontalConfidence });
-      setNotice("Detected layout boundaries. Review the tiles and deselect any title panels or empty cells before exporting.");
     };
     image.onerror = () => {
       URL.revokeObjectURL(url);
@@ -196,34 +286,92 @@ function App() {
       return;
     }
 
-    const xLines = makeEvenBoundaries(loaded.image.naturalWidth, requestedColumns);
-    const yLines = makeEvenBoundaries(loaded.image.naturalHeight, requestedRows);
-    setCells(createCells(xLines, yLines));
+    setCells(createUniformCells(
+      loaded.image.naturalWidth,
+      loaded.image.naturalHeight,
+      requestedColumns,
+      requestedRows,
+    ));
+    setDetectedRows(requestedRows);
     setConfidence({ x: 0, y: 0 });
     setError("");
-    setNotice("Applied an evenly spaced " + requestedColumns + " × " + requestedRows + " grid. Deselect any cells that are not individual frames.");
+    setNotice("Applied an evenly spaced " + requestedColumns + " × " + requestedRows + " grid. Switch back to boundary detection to restore row-specific crops.");
   };
 
   const redetect = () => {
     if (!loaded) return;
-    const scale = Math.min(1, 1800 / loaded.image.naturalWidth, 1400 / loaded.image.naturalHeight);
-    const width = Math.max(1, Math.round(loaded.image.naturalWidth * scale));
-    const height = Math.max(1, Math.round(loaded.image.naturalHeight * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) return;
-    context.drawImage(loaded.image, 0, 0, width, height);
-    const result = detectGrid(context.getImageData(0, 0, width, height));
-    const xLines = result.vertical.map((line) => Math.round(line * loaded.image.naturalWidth / width));
-    const yLines = result.horizontal.map((line) => Math.round(line * loaded.image.naturalHeight / height));
-    setCells(createCells(xLines, yLines));
-    setColumnsInput(String(countCells(xLines)));
-    setRowsInput(String(countCells(yLines)));
-    setConfidence({ x: result.verticalConfidence, y: result.horizontalConfidence });
-    setNotice("Re-scanned the image for continuous horizontal and vertical separator lines.");
-    setError("");
+    try {
+      const layout = applyAnalysis(loaded.image);
+      setCells(createCellsFromLayout(layout));
+      setColumnsInput(String(typicalColumns(layout)));
+      setRowsInput(String(layout.rows.length));
+      setDetectedRows(layout.rows.length);
+      setConfidence({ x: layout.verticalConfidence, y: layout.horizontalConfidence });
+      setNotice("Re-detected row-specific boundaries from the image.");
+      setError("");
+    } catch (analysisError) {
+      setError(analysisError instanceof Error ? analysisError.message : "The image could not be analysed.");
+    }
+  };
+
+  const splitCell = (id: string) => {
+    setCells((current) => {
+      const index = current.findIndex((cell) => cell.id === id);
+      if (index < 0) return current;
+      const cell = current[index];
+      if (cell.width < 36) return current;
+
+      const leftWidth = Math.floor(cell.width / 2);
+      const left: Cell = {
+        ...cell,
+        width: leftWidth,
+        selected: cell.selected,
+      };
+      const right: Cell = {
+        ...cell,
+        x: cell.x + leftWidth,
+        width: cell.width - leftWidth,
+        selected: cell.selected,
+      };
+      return renumberCells([
+        ...current.slice(0, index),
+        left,
+        right,
+        ...current.slice(index + 1),
+      ]);
+    });
+  };
+
+  const mergeWithNext = (id: string) => {
+    setCells((current) => {
+      const sorted = [...current].sort((a, b) => a.row - b.row || a.x - b.x);
+      const index = sorted.findIndex((cell) => cell.id === id);
+      if (index < 0 || index === sorted.length - 1) return current;
+
+      const left = sorted[index];
+      const right = sorted[index + 1];
+      if (left.row !== right.row || Math.abs((left.x + left.width) - right.x) > 8) return current;
+
+      const merged: Cell = {
+        ...left,
+        width: right.x + right.width - left.x,
+        height: Math.max(left.height, right.height),
+        selected: left.selected || right.selected,
+        confidence: Math.min(left.confidence, right.confidence),
+      };
+      return renumberCells([
+        ...sorted.slice(0, index),
+        merged,
+        ...sorted.slice(index + 2),
+      ]);
+    });
+  };
+
+  const canMergeWithNext = (cell: Cell): boolean => {
+    const next = cells
+      .filter((candidate) => candidate.row === cell.row && candidate.x > cell.x)
+      .sort((a, b) => a.x - b.x)[0];
+    return !!next && Math.abs((cell.x + cell.width) - next.x) <= 8;
   };
 
   const exportZip = async () => {
@@ -248,7 +396,7 @@ function App() {
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(downloadUrl);
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1500);
       setNotice("ZIP created with " + selectedCells.length + " selected image" + (selectedCells.length === 1 ? "" : "s") + ".");
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "The ZIP could not be created.");
@@ -262,6 +410,8 @@ function App() {
     setCells([]);
     setNotice("");
     setError("");
+    setDetectedRows(0);
+    setConfidence({ x: 0, y: 0 });
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -311,7 +461,7 @@ function App() {
 
           <div className="landing-features">
             <div><ScanLine size={18} /><span><b>Pixel-based detection</b><small>Finds visible grid separators</small></span></div>
-            <div><SlidersHorizontal size={18} /><span><b>Manual control</b><small>Adjust rows, columns and crops</small></span></div>
+            <div><SlidersHorizontal size={18} /><span><b>Manual control</b><small>Split, merge and adjust crops</small></span></div>
             <div><ShieldCheck size={18} /><span><b>Private by design</b><small>Your image stays on your device</small></span></div>
           </div>
           <div className="landing-footnote">No AI models · No OCR · No account required · No image upload</div>
@@ -332,18 +482,19 @@ function App() {
               <div className="panel-title"><Settings2 size={17} /> Extraction settings</div>
 
               <div className="setting-section">
-                <label className="setting-label">GRID DIMENSIONS</label>
+                <label className="setting-label">FALLBACK GRID SIZE</label>
                 <div className="dimension-fields">
-                  <label><span>Columns</span><input type="number" min="1" max="60" value={columnsInput} onChange={(event) => setColumnsInput(event.target.value)} /></label>
+                  <label><span>Typical columns</span><input type="number" min="1" max="60" value={columnsInput} onChange={(event) => setColumnsInput(event.target.value)} /></label>
                   <label><span>Rows</span><input type="number" min="1" max="60" value={rowsInput} onChange={(event) => setRowsInput(event.target.value)} /></label>
                 </div>
-                <button className="button button-secondary full-button" onClick={applyEvenGrid}>Apply even grid</button>
-                <button className="text-button" onClick={redetect}><ScanLine size={14} /> Detect boundaries again</button>
+                <button className="button button-secondary full-button" onClick={applyEvenGrid}>Apply uniform grid</button>
+                <button className="text-button" onClick={redetect}><ScanLine size={14} /> Detect row boundaries again</button>
                 <div className="confidence-row">
-                  <span>Vertical lines <b>{confidence.x ? confidence.x + "%" : "manual"}</b></span>
-                  <span>Horizontal lines <b>{confidence.y ? confidence.y + "%" : "manual"}</b></span>
+                  <span>Column confidence <b>{confidence.x ? confidence.x + "%" : "manual"}</b></span>
+                  <span>Row confidence <b>{confidence.y ? confidence.y + "%" : "manual"}</b></span>
+                  <span>Detected rows <b>{detectedRows}</b></span>
                 </div>
-                <p className="helper-copy">Auto-detection looks for continuous contrast and dark separator lines. Even-grid mode is available when the sheet uses regular spacing.</p>
+                <p className="helper-copy">Automatic mode detects each row separately, so different rows can contain different numbers of tiles. Uniform grid is a manual fallback.</p>
               </div>
 
               <div className="setting-section">
@@ -370,7 +521,7 @@ function App() {
               <div className="results-toolbar">
                 <div className="results-stats">
                   <div className="stat-number">{cells.length}<span> detected</span></div>
-                  <div className="stat-selected"><Check size={14} /> {selectedCells.length} selected for export</div>
+                  <div className="stat-selected"><Check size={14} /> {selectedCells.length} selected for export · {detectedRows} rows</div>
                 </div>
                 <div className="toolbar-actions">
                   <button className="text-button" onClick={() => setAllSelected(true)}>Select all</button>
@@ -387,27 +538,39 @@ function App() {
               {notice && <div className="notice success-notice"><Check size={15} /> {notice}</div>}
               {error && <div className="notice error-notice"><X size={15} /> {error}</div>}
 
-              <div className="review-hint"><CircleHelp size={15} /> Click a tile to include or exclude it. Deselect title cards, labels, or empty cells.</div>
+              <div className="review-hint"><CircleHelp size={15} /> Click a tile to include or exclude it. Use Split to divide a wide tile or Merge → to join it with the next tile in the same row.</div>
 
               <div className="image-grid">
                 {cells.map((cell, index) => (
-                  <button
-                    type="button"
+                  <div
                     className={"image-card" + (cell.selected ? " image-card-selected" : " image-card-muted")}
                     key={cell.id}
-                    onClick={() => toggleCell(cell.id)}
-                    aria-pressed={cell.selected}
-                    aria-label={(cell.selected ? "Exclude " : "Include ") + "row " + (cell.row + 1) + ", column " + (cell.column + 1)}
                   >
-                    <div className="image-card-preview">
-                      <CropPreview image={loaded.image} cell={cell} gutter={gutter} />
-                      <span className={"selection-indicator" + (cell.selected ? " is-selected" : "")}>{cell.selected ? <Check size={12} /> : <X size={12} />}</span>
+                    <button
+                      type="button"
+                      className="image-card-select"
+                      onClick={() => toggleCell(cell.id)}
+                      aria-pressed={cell.selected}
+                      aria-label={(cell.selected ? "Exclude " : "Include ") + "row " + (cell.row + 1) + ", column " + (cell.column + 1)}
+                    >
+                      <div className="image-card-preview">
+                        <CropPreview image={loaded.image} cell={cell} gutter={gutter} />
+                        <span className={"selection-indicator" + (cell.selected ? " is-selected" : "")}>{cell.selected ? <Check size={12} /> : <X size={12} />}</span>
+                      </div>
+                      <div className="image-card-meta">
+                        <b>{String(index + startNumber).padStart(digits, "0")}</b>
+                        <span>R{String(cell.row + 1).padStart(2, "0")} · C{String(cell.column + 1).padStart(2, "0")}</span>
+                      </div>
+                    </button>
+                    <div className="image-card-actions">
+                      <button type="button" onClick={() => splitCell(cell.id)} disabled={cell.width < 36} title="Split this tile in half">
+                        <span aria-hidden="true">÷</span> Split
+                      </button>
+                      <button type="button" onClick={() => mergeWithNext(cell.id)} disabled={!canMergeWithNext(cell)} title="Merge with the next tile in this row">
+                        <span aria-hidden="true">↔</span> Merge →
+                      </button>
                     </div>
-                    <div className="image-card-meta">
-                      <b>{String(index + startNumber).padStart(digits, "0")}</b>
-                      <span>R{String(cell.row + 1).padStart(2, "0")} · C{String(cell.column + 1).padStart(2, "0")}</span>
-                    </div>
-                  </button>
+                  </div>
                 ))}
               </div>
 

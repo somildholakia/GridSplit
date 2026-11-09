@@ -201,3 +201,57 @@ a { color: inherit; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Row-specific crop cards and manual corrections */
+.image-card {
+  overflow: hidden;
+  padding: 0;
+  cursor: default;
+}
+.image-card-select {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.image-card-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+.image-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(177, 190, 218, .1);
+  background: rgba(10, 15, 24, .45);
+}
+.image-card-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 2px;
+  border: 0;
+  color: #96a4ba;
+  background: transparent;
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.image-card-actions button:hover:not(:disabled) {
+  color: var(--accent);
+}
+.image-card-actions button:disabled {
+  opacity: .25;
+}
+@media (max-width: 640px) {
+  .image-card-actions { padding: 7px 6px; }
+  .image-card-actions button { font-size: 8px; }
+}
