@@ -89,7 +89,7 @@ function findPeaks(profile: Float32Array, axisLength: number): Peak[] {
   const deviations = interior.map((value) => Math.abs(value - baseline));
   const mad = median(deviations);
   const threshold = baseline + Math.max(2.2, mad * 1.35);
-  const minDistance = Math.max(5, Math.round(axisLength * 0.012));
+  const minDistance = Math.max(5, Math.round(axisLength * 0.045));
   const candidates: Peak[] = [];
 
   for (let i = 3; i < profile.length - 3; i += 1) {

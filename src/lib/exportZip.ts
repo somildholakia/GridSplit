@@ -38,6 +38,7 @@ export async function createImageZip(options: ExportOptions): Promise<Blob> {
   const folder = zip.folder("gridsplit-images");
   if (!folder) throw new Error("Could not create the ZIP folder.");
 
+  const safePrefix = options.prefix.trim().replace(/[^a-zA-Z0-9_.-]/g, "-") || "frame-";
   const manifestRows = [
     ["filename", "row", "column", "x", "y", "width", "height"].join(","),
   ];
@@ -60,8 +61,8 @@ export async function createImageZip(options: ExportOptions): Promise<Blob> {
 
     context.drawImage(options.image, x, y, width, height, 0, 0, width, height);
     const blob = await canvasToPng(canvas);
-    const number = String(options.startNumber + index).padStart(options.digits, "0");
-    const filename = (options.prefix.trim() ? options.prefix.trim() : "frame-") + number + ".png";
+    const number = String(Math.floor(options.startNumber) + index).padStart(options.digits, "0");
+    const filename = safePrefix + number + ".png";
     folder.file(filename, blob);
 
     manifestRows.push([
