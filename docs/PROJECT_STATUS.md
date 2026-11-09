@@ -6,7 +6,7 @@ Last updated: 2026-11-09
 
 **Row-aware extraction and manual tile correction committed on `main`.**
 
-Latest implementation commit: `8fb2305f8ab2e3e92e6adbdc5c0fda815e9cd00c`.
+Current implementation is on `main`; use the repository history for the exact revision.
 
 ## Product goal
 

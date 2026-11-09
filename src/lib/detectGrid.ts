@@ -267,12 +267,27 @@ function selectBoundaries(
 
   const lastIndex = nodes.length - 1;
   if (previous[lastIndex] === -1) {
-    const fallback = candidates
+    const rankedFallback = candidates
       .filter((candidate) => candidate.zScore >= 4.5)
-      .map((candidate) => candidate.position);
-    const boundaries = [0, ...fallback, width]
-      .filter((value, index, all) => index === 0 || value - all[index - 1] >= 18);
-    return { boundaries, confidence: 25 };
+      .sort((a, b) => b.zScore - a.zScore);
+    const selectedFallback: Candidate[] = [];
+
+    for (const candidate of rankedFallback) {
+      if (selectedFallback.every((selected) =>
+        Math.abs(selected.position - candidate.position) >= Math.max(18, period * 0.55)
+      )) {
+        selectedFallback.push(candidate);
+      }
+    }
+
+    const interior = selectedFallback
+      .map((candidate) => candidate.position)
+      .filter((position) => position > 8 && position < width - 8)
+      .sort((a, b) => a - b);
+    return {
+      boundaries: [0, ...interior, width],
+      confidence: 25,
+    };
   }
 
   const path: number[] = [];
@@ -304,9 +319,14 @@ function selectBoundaries(
 function isBlankFooterBand(
   data: Uint8ClampedArray,
   width: number,
+  imageHeight: number,
   top: number,
   bottom: number,
 ): boolean {
+  // Only treat a short, dark strip touching the very bottom as footer padding.
+  // Dark fantasy frames inside the sheet must remain eligible image rows.
+  if (bottom !== imageHeight || bottom - top > 64) return false;
+
   let total = 0;
   let darkPixels = 0;
   let samples = 0;
@@ -336,7 +356,7 @@ export function detectContactSheet(imageData: ImageData): ContactSheetLayout {
     const top = horizontal.boundaries[rowIndex];
     const bottom = horizontal.boundaries[rowIndex + 1];
     if (bottom - top < 18) continue;
-    if (isBlankFooterBand(imageData.data, imageData.width, top, bottom)) continue;
+    if (isBlankFooterBand(imageData.data, imageData.width, imageData.height, top, bottom)) continue;
 
     const profile = axisProfile(
       imageData.data,
