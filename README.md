@@ -7,9 +7,9 @@ GridSplit turns storyboard contact sheets and image grids into separate, sequent
 ## Features
 
 - Upload PNG, JPG, WebP, GIF, and other formats supported by the browser (up to 100 MB).
-- Detect likely horizontal and vertical separators from pixel contrast and dark border continuity.
+- Detect horizontal row bands, then estimate vertical separators independently for each row.
 - Preview every detected tile before export.
-- Select or deselect individual tiles to omit title cards, empty cells, and merged panels.
+- Select or deselect individual tiles; split wide tiles or merge adjacent tiles in the same row.
 - Apply a manually specified, evenly spaced row/column grid when automatic detection needs help.
 - Configure border trim, filename prefix, starting number, and zero-padding.
 - Export selected tiles as lossless PNG crops in a ZIP, alongside a CSV manifest.
