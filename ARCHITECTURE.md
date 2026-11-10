@@ -1,6 +1,6 @@
 # GridSplit Studio — Architecture and Processing Design
 
-**Document status:** M03 decisions recorded  
+**Document status:** M03 architecture baseline with M22–M25 implementation notes  
 **Last reviewed:** 2026-11-10  
 **Requirements baseline:** [PRODUCT_REQUIREMENTS.md](PRODUCT_REQUIREMENTS.md) v1.0.0  
 **Audited code baseline:** commit `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
@@ -155,10 +155,10 @@ A provider must not claim unsupported capabilities. A segment job is idempotent 
 
 ### 5.2 Engine decisions
 
-- **Evaluation candidate, not yet integrated:** Kokoro-82M ONNX with ONNX Runtime Web or a native ONNX Runtime host. The ONNX Community model card currently declares Apache-2.0 for the v1.0 ONNX model. The runtime, tokenizer/phonemizer dependencies, and each voice asset still require their own license/provenance review and offline compatibility testing.
+- **M03 evaluation candidate; M14 optional adapter now implemented:** Kokoro ONNX is connected through the separately installed `kokoro-onnx==0.6.1` Python sidecar, not bundled ONNX Runtime Web weights. The model/voice files remain user-supplied. The model, package, phonemizer/runtime dependencies, and each voice asset require separate license/provenance review and offline target-hardware testing.
 - **Optional external-provider candidate:** Piper's current OHF-Voice repository is GPL-3.0. The engine and each voice package must be assessed separately. Do not bundle it into the MIT app by default.
 - **Optional lightweight external-provider candidate:** eSpeak NG is GPL-3.0-or-later. It may be evaluated as an optional separately installed engine, but is not included in the default distribution until the product's copyleft policy and notices are reviewed.
-- **Decision:** Do not make a final TTS engine commitment in M03. M13/M14 must benchmark quality, language coverage, speed, memory, CPU/GPU support, alignment support, and model/voice license provenance on target hardware before adding a runtime or weights.
+- **M14 implementation boundary:** Kokoro is the first optional local adapter, not a universal/default runtime. Before treating it as release-ready, benchmark quality, language coverage, speed, memory, CPU/GPU support, and model/voice license provenance on target hardware. No model weights or voice packs are bundled.
 - **Decision:** The TTS interface itself remains engine-agnostic and free of network-provider dependencies.
 
 ## 6. Local rendering architecture
@@ -185,7 +185,7 @@ A provider must not claim unsupported capabilities. A segment job is idempotent 
 
 | Component/candidate | Upstream license/status observed | Project rule |
 |---|---|---|
-| Kokoro-82M v1.0 ONNX model | Apache-2.0 on the ONNX Community model card | Evaluation candidate; audit voices and preprocessing/runtime dependencies separately |
+| Kokoro-82M ONNX model | Apache-2.0 on the ONNX Community model card | Used by the optional M14 sidecar when user-installed; verify exact model/voice revisions and all runtime/phonemizer licenses |
 | ONNX Runtime Web | Browser inference runtime; source repository is MIT-licensed | Pin a reviewed version and check the runtime license/third-party notices during integration |
 | Piper (OHF-Voice) | GPL-3.0 | Do not bundle by default; engine and voice assets need separate review |
 | eSpeak NG | GPL-3.0-or-later | Do not bundle by default; review redistribution/compliance before optional integration |
@@ -231,3 +231,51 @@ The first post-move CI attempt caught a stale relative type import. That import 
 ## 12. M05 validation status
 
 The repository now commits `package-lock.json` (npm lockfile v3). GitHub Actions run #15 on 2026-11-10 completed `npm ci`, ESLint, 3 Vitest files / 11 tests, TypeScript typecheck, Vite production build, and static artifact upload successfully. This establishes a working CI and build-artifact delivery baseline; it does not claim browser E2E, contact-sheet sample acceptance, live deployment, TTS, or rendering validation.
+
+## 13. M12–M16 audio vertical slice
+
+Project records may carry optional `characters`, `audioSegments`, and `ttsEndpoint` fields while retaining the existing v1 local project contract. Stable speaker identities are project-local. Segment fingerprints include speech text and voice/language/speed settings so a targeted edit does not invalidate unrelated ready audio.
+
+The browser defines an engine-agnostic `LocalTtsProvider`. The current adapter talks only to a loopback service. It validates the RIFF/WAVE response and derives duration from actual sample frames divided by sample rate. Word alignment is not assumed.
+
+The optional Python sidecar uses `kokoro-onnx==0.6.1` and user-supplied model/voice assets. It binds to `127.0.0.1`; model and voice files are excluded from Git and never downloaded by GridSplit. A configurable explicit CORS allowlist is used for users opening the static frontend from a trusted deployed origin. The model license does not replace licenses for runtime, phonemizer, or voice assets.
+
+Generated WAV blobs are stored in IndexedDB under project/segment keys; project metadata retains only status and audio facts. Duplicating a project creates new IDs and remaps scene/block references, then resets generated segment output. Audio binaries are not included in the v1 JSON project backup; media-inclusive portable packaging is M30.
+
+## 14. M22–M25 production image and timeline implementation
+
+The current browser implementation introduces optional production fields on the existing `StudioProject` record:
+- `imageAssets[]`: stable image ID, filename and relative path, MIME type, byte size, detected/corrected frame number, manual order, dimensions, and content fingerprint.
+- `imageMappings[]`: scene ID and an ordered array of image asset IDs. Both one-to-many and many-to-many reuse are supported.
+- `timelineClips[]`: clip ID, image/audio track, scene ID, optional image/audio asset reference, start/duration in seconds, and order.
+
+The current persistence boundary is transitional:
+- Project metadata is stored with the existing local `localStorage` project record and validated by `projectStore.ts`.
+- Original image Blobs are stored in IndexedDB database `gridsplit-studio-images`, object store `image-blobs`, keyed by stable image asset ID. The UI creates/revokes browser object URLs for thumbnail/frame previews.
+- Duplicated projects retain the same image asset IDs (sharing the underlying source Blob) while remapping scene IDs, mapping rows, timeline clip IDs, and audio-segment references. Cleanup checks other saved project references before deleting a shared Blob.
+- JSON project backup carries image metadata and edit state, not the IndexedDB image or generated-audio Blobs. A media-inclusive ZIP remains M30 work.
+
+Sequence import natural-sorts relative paths and parses a trailing one-to-eight-digit frame token. The Production Workspace caps a project at 500 image assets and reports frame gaps, duplicate frame numbers, duplicate content fingerprints, and unnumbered files for human review. The user can correct frame numbers and manually reorder assets. Scene mappings follow that manual order; schedule generation uses each scene's mapped image sequence.
+
+M24 rebuilds an initial image/audio schedule from local WAV files re-read from their real sample count and sample rate. Each scene duration is measured from its ready segments, and its available images share that duration evenly. Missing/unreadable WAVs and scenes without mapped images are reported. Rebuild is explicit so it does not overwrite manual edits silently.
+
+M25 renders image and audio lanes on a proportional time ruler. It provides playhead seek, play/pause/stop, the image under the playhead, editable clip start/duration values, and half-second nudges. Local narration/dialogue WAV blobs are decoded and scheduled with the Web Audio API against scene audio clip positions.
+
+**Important boundary:** the live Production Workspace currently persists timeline start/duration values as decimal seconds. The separate `src/lib/productionTimeline.ts` rational-time domain helper remains tested but is not yet wired as the live editor's canonical timeline storage. Music/SFX track mixing, track levels, fades, transitions, pan/zoom effects, render jobs, MP4 output, and portable media archives remain later milestones. GitHub Actions run #182 passed lint, 76 tests across 15 files, typecheck, build, sidecar syntax, and artifact upload (https://github.com/somildholakia/GridSplit/actions/runs/42826679257). A passing CI build does not replace a manual browser playback and synchronization review.
+
+
+## M26–M31: audio mix, effects, rendering and portable archives
+
+The active feature branch now adds the following optional local production layer:
+
+- Project metadata may include audioMixTracks, mixAssets, videoClipEdits and renderProfile. The project schema validates every new record and bounded setting.
+- Music/SFX source blobs live in the project-scoped gridsplit-studio-project-media IndexedDB store. The original image and generated WAV stores remain compatible with M22 and M15.
+- Audio preview uses Web Audio to schedule speech and imported audio against the timeline, applying per-track volume, mute/solo and fades.
+- Per-image motion and transition choices are stored by timeline clip ID. The local renderer maps these choices into FFmpeg filter chains.
+- The optional Python sidecar binds only to 127.0.0.1. The browser posts a portable project archive, and the sidecar validates the ZIP manifest, path safety and SHA-256 values before rendering. Its jobs expose status/progress and cancellation. FFmpeg and ffprobe are installed by the user; the sidecar is not a cloud or LAN service.
+- MP4 rendering outputs H.264/AAC with a selected landscape, portrait or square profile, then runs ffprobe validation before returning the output.
+- Portable archives include project.json, original image bytes, ready generated speech WAVs, imported music/SFX, measured synchronization JSON, SRT/VTT subtitles, a README and a SHA-256 manifest. Restore creates a new project, remaps IDs and stores media back into local IndexedDB. JSON backup remains metadata-only.
+
+The renderer is capability-driven: the local FFmpeg build must include libx264 and AAC support. GridSplit neither downloads nor distributes FFmpeg. The precise codec availability and licensing depend on the exact user-installed build and its linked libraries. See docs/M26-M31.md and local-render/README.md.
+
+The M26–M31 CI workflow installs FFmpeg on the ephemeral runner and runs a small real MP4 smoke fixture plus archive safety/checksum tests. GitHub Actions run #195 passed 6 Python tests, lint, 89 Vitest tests across 17 files, typecheck, production build and static artifact upload. [Run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430). This CI fixture does not replace local target-device acceptance or the remaining M14–M16/M22–M25 manual reviews.

@@ -33,6 +33,20 @@ jobs:
         run: npm ci --no-audit --no-fund
 
 
+      - name: Install FFmpeg for local-render smoke test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Check Python sidecars and local renderer
+        run: |
+          python -m py_compile local-tts/server.py local-render/server.py
+          python -m unittest discover -s local-tts -p 'test_*.py'
+          python -m unittest discover -s local-render -p 'test_*.py'
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Lint
         run: npm run lint
 

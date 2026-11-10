@@ -1,31 +1,47 @@
 # Continuous Integration and Build Artifacts
 
-**Status:** M05 pipeline implemented and verified  
-**Runner:** GitHub Actions, Ubuntu, Node.js 22
+**Workflow:** `.github/workflows/build.yml`  
+**Runner:** GitHub Actions, Ubuntu, Node.js 22, Python 3  
+**Current validated feature head:** `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`
 
-## Checks on pushes and pull requests to main
+## Automated checks
 
-1. Install dependencies with `npm ci --no-audit --no-fund` using the committed npm lockfile.
-2. Run ESLint on the TypeScript source tree.
-3. Run Vitest unit tests.
-4. Run TypeScript project typecheck.
-5. Run the Vite production build.
-6. Upload the `dist/` folder as a commit-specific workflow artifact for 14 days.
+For pull requests to `main`, pushes to `main`, and manual dispatch, CI:
 
-The workflow is also manually dispatchable. It uses read-only repository permissions, npm cache, and cancels superseded runs on the same ref. A successful run #15 is recorded at https://github.com/somildholakia/GridSplit/actions/runs/42775014351.
+1. Installs the locked JavaScript dependency graph with `npm ci`.
+2. Installs FFmpeg for the deterministic local-render integration fixture.
+3. Compiles the optional TTS and renderer Python sidecars.
+4. Runs the TTS Host-header security tests and local renderer tests, including HTTP ZIP upload → FFmpeg render → MP4 download.
+5. Audits production npm dependencies using `npm audit --omit=dev --audit-level=high`.
+6. Runs ESLint, Vitest, TypeScript typecheck and the Vite production build.
+7. Uploads the static `dist/` artifact for 14 days.
 
-## Delivery boundary
+The workflow has read-only repository permissions, npm caching, and cancels superseded runs on the same ref.
 
-The uploaded artifact is the continuous-delivery output for this milestone. It contains the commit-specific static `dist/` build and is retained for 14 days. It is not a production deployment. A public deployment is intentionally held for M35, after the studio's real workflows, privacy, model distribution, and production readiness have been validated.
+## Latest verified run
 
-## Dependency reproducibility
+**GitHub Actions run #199 passed** on feature branch commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`.
 
-The initial repository audit found no lockfile. M05 generated and committed `package-lock.json` (lockfile version 3); the pipeline now uses `npm ci` and npm caching so the dependency graph is pinned for clean installs.
+- Python syntax compilation: passed for both sidecars.
+- TTS security suite: **2 tests passed**.
+- Renderer suite: **7 tests passed**, including a real local HTTP workflow using FFmpeg/ffprobe.
+- Production npm dependency audit: **0 vulnerabilities** at the configured high-severity threshold.
+- ESLint: passed.
+- Vitest: **18 test files, 91 tests passed**.
+- TypeScript typecheck: passed.
+- Vite production build: passed.
+- Static build artifact upload: passed.
 
-## Current test coverage (run #15: 3 files, 11 tests passed)
+[View GitHub Actions run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750).
 
-- Rational-time normalization, sample-derived time, frame-derived time, addition, comparison, and invalid input.
-- Project schema-version gate behavior.
-- Existing GridSplit boundary helper invariants and featureless-image fallback geometry.
+The performance regression test parses and schedules a 500-scene/500-image project with 1,000 timeline clips under a 10-second CI ceiling. This is a synthetic baseline, not a hardware benchmark of actual image blobs, local TTS model inference or long-form rendering.
 
-Browser interaction, crop accuracy against the outstanding 196-image sample, ZIP byte inspection, audio engine, and rendering remain future test work; the current test suite does not claim those workflows are validated.
+## Delivery and verification boundaries
+
+The uploaded artifact is the static frontend build, not a production deployment. A READY Vercel preview exists for the current feature branch, but `main` remains at the M01–M05 baseline and PR #1 remains a draft. Production promotion is M35 and has not been performed.
+
+CI's HTTP render fixture validates the sidecar API and MP4 output using a tiny generated image archive. It does not automate every browser screen or prove that a real GridSplit UI export containing the user's images, generated Kokoro audio, music/SFX and local codecs is complete. That full target-device package acceptance remains M36.
+
+The workflow audits production npm dependencies. The optional Python sidecar's dependency graph is installed by users separately; it is not bundled or yet covered by a pinned Python lockfile/audit in CI. Likewise, model weights, voice files, FFmpeg binaries and codecs are user-installed and must be assessed by exact revision/build before redistribution.
+
+Real Kokoro model/voice synthesis, playback and WAV download remain open acceptance checks (M14–M16). Manual browser review of image import, mapping persistence, timeline playback/seek, audio synchronization, and the 196-image sample remains open (M22–M25). Selectable-text PDF import is supported; scanned-image PDF OCR is out of scope.
