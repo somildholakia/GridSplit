@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-10 — Production UI acceptance and local sidecar setup
+
+- Recorded a second public production UI acceptance sweep with 16 passing checks across script parsing, image sequence and mapping states, timeline prerequisites, mixing, effects, render profiles, and ZIP export/restore controls. Real media operations remain unverified.
+- Corrected the Audio Studio setup link to point to the current `main/local-tts` directory rather than an obsolete feature branch.
+- Clarified how to use the public Vercel frontend with strictly loopback-only Kokoro and FFmpeg sidecars by allowlisting the exact production origin. Updated the in-app setup instructions and sidecar READMEs; no remote renderer or cloud TTS was introduced.
+
 ## Unreleased — M22–M25 production workflow (verified by CI)
 
 - Added WAV-header remeasurement from locally stored audio blobs and exact rational sample-derived durations.
