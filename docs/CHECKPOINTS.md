@@ -15,12 +15,12 @@ A milestone is complete only when its implementation exists, required tests or v
 - [x] **M03 — Architecture and processing design.** Recorded shared web/optional Tauri architecture, versioned project schema, sample/rational timebases, local storage, TTS/render adapters, and upstream license gates in `ARCHITECTURE.md` and `docs/decisions/ADRs.md`.
 - [x] **M04 — Repository restructuring.** Moved the existing extractor screen under `src/features/image-extraction/`, kept `src/App.tsx` as the composition entry, and added v1 project/time domain types. Node 22 typecheck and production build passed on the corrected commit.
 - [x] **M05 — CI/CD.** Added a committed npm lockfile and `npm ci`, ESLint, 11 Vitest unit tests, TypeScript typecheck, production build, and a 14-day commit-specific static build artifact. GitHub Actions run #15 passed all steps. Production deployment remains correctly deferred to M35.
-- [x] **M06 — Design system.** Added studio design tokens, reusable `StudioButton` and `StudioPanelHeader` components, workspace navigation, and responsive behavior. CI run #40 passed.
-- [x] **M07 — Dashboard.** Added project statistics, searchable project cards, active/archive views, and create/open/delete/backup actions. CI run #40 passed.
-- [x] **M08 — Project management.** Implemented local create/rename/duplicate/archive/restore/autosave plus versioned JSON backup import/export; validation tests and CI run #40 passed.
+- [x] **M06 — Design system.** Added studio design tokens, reusable `StudioButton` and `StudioPanelHeader` components, workspace navigation, and responsive behavior. CI run #65 passed.
+- [x] **M07 — Dashboard.** Added project statistics, searchable project cards, active/archive views, and create/open/delete/backup actions. CI run #65 passed.
+- [x] **M08 — Project management.** Implemented local create/rename/duplicate/archive/restore/autosave plus versioned JSON backup import/export; validation tests and CI run #65 passed.
 - [x] **M09 — Script editor.** Supports paste, TXT, local DOCX, and selectable-text PDF import with original-source preservation. PDF.js and its worker are bundled locally; unit tests cover selectable text, text-free/scanned PDFs, and invalid input. OCR for scanned PDFs is explicitly out of scope.
-- [x] **M10 — Deterministic script parser.** Parses chapter/scene headings, paragraphs, narration, character, SFX, and music directives; source-line tracking is tested. CI run #40 passed.
-- [x] **M11 — Scene segmentation.** Added editable chapter/scene labels and blocks, scene/block reordering, cross-scene block moves, split/merge controls, and add/remove actions. Unit tests and CI run #40 passed.
+- [x] **M10 — Deterministic script parser.** Parses chapter/scene headings, paragraphs, narration, character, SFX, and music directives; source-line tracking is tested. CI run #65 passed.
+- [x] **M11 — Scene segmentation.** Added editable chapter/scene labels and blocks, scene/block reordering, cross-scene block moves, split/merge controls, and add/remove actions. Unit tests and CI run #65 passed.
 - [ ] **M12 — Character management.** Manage speakers and stable voice assignments.
 - [ ] **M13 — Offline TTS provider abstraction.** Define capability-aware local engine contracts.
 - [ ] **M14 — Local TTS integration.** Integrate approved offline engines and voice packages with verified licenses.
