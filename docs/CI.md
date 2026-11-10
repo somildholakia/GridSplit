@@ -1,6 +1,6 @@
 # Continuous Integration and Build Artifacts
 
-**Current workflow:** M05 baseline plus M12–M16 validation steps  
+**Current workflow:** M05 baseline plus M12–M21 validation steps  
 **Runner:** GitHub Actions, Ubuntu, Node.js 22
 
 ## Automated checks
@@ -19,18 +19,18 @@ The workflow has read-only repository permissions, npm caching, and cancels supe
 
 ## Latest verified run
 
-**GitHub Actions run #100 passed** on final PR head `4bc195b7201e2d170a3f6d32667db7b885478b46`.
+**GitHub Actions run #115 passed** on PR head `f611f937dccc158501a71ef592557a5630e9cbd9`.
 
 - Python sidecar syntax compilation: passed.
 - ESLint: passed.
-- Vitest: **9 test files, 42 tests passed**.
+- Vitest: **12 test files, 53 tests passed**.
 - TypeScript typecheck: passed.
 - Production build: passed.
 - Static build artifact upload: passed.
 
-[View GitHub Actions run #100](https://github.com/somildholakia/GridSplit/actions/runs/42810564795)
+[View GitHub Actions run #115](https://github.com/somildholakia/GridSplit/actions/runs/42810564795)
 
-Audio-specific automated coverage includes WAV header/sample metadata parsing, local endpoint loopback/privacy validation, stable character reconciliation, voice/text fingerprint invalidation, copied-project segment reference remapping, and interrupted-generation recovery.
+Audio-specific automated coverage includes WAV header/sample metadata parsing, local endpoint loopback/privacy validation, stable character reconciliation, voice/text fingerprint invalidation, copied-project segment reference remapping, and interrupted-generation recovery. M17–M19 coverage adds mixed-rate rational timeline accumulation, sync metadata, and SRT/VTT generation; M20–M21 coverage adds extractor fallback/grid regression fixtures and image intake validation/natural sorting.
 
 ## Delivery and verification boundaries
 
