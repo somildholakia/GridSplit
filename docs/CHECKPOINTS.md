@@ -49,7 +49,7 @@ A milestone is complete only when its implementation exists, required tests or v
 
 ## Current branch validation
 
-M06–M25 implementation is committed on the feature branch in draft PR #1 and is not merged into `main`. **GitHub Actions run #164 passed on the current code head:** Python sidecar syntax check, `npm ci`, ESLint, **75 tests across 15 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #164](https://github.com/somildholakia/GridSplit/actions/runs/42825453586). The earlier run #131 remains the historical M17–M21 validation baseline.
+M06–M25 implementation is committed on the feature branch in draft PR #1 and is not merged into `main`. **GitHub Actions run #177 passed on the current code head:** Python sidecar syntax check, `npm ci`, ESLint, **76 tests across 15 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #164](https://github.com/somildholakia/GridSplit/actions/runs/42826406478). The earlier run #131 remains the historical M17–M21 validation baseline.
 
 The additional M17–M19 tests cover sub-second SRT/VTT cue boundaries. The additional M21 tests cover natural ordering across nested folder paths and the 500-image cap. These are automated tests, not a substitute for visual acceptance of a real contact sheet.
 
@@ -69,7 +69,7 @@ Do not check a box until all required evidence is available.
 
 ## M22–M25 implementation and validation
 
-Implementation and automated validation are complete for M22–M25 on the feature branch (run #164). Implementation notes and current manual acceptance gaps are in [docs/M22-M25.md](M22-M25.md). The live timeline uses project-local second-based clip positions; the separate rational-time timeline helper is not yet the live editor's canonical storage format. The timeline preview schedules saved narration/dialogue WAV segments in the browser and does not mix music/SFX or render video. JSON backups keep image metadata but do not include IndexedDB media blobs.
+Implementation and automated validation are complete for M22–M25 on the feature branch (run #177). Implementation notes and current manual acceptance gaps are in [docs/M22-M25.md](M22-M25.md). The live timeline uses project-local second-based clip positions; the separate rational-time timeline helper is not yet the live editor's canonical storage format. The timeline preview schedules saved narration/dialogue WAV segments in the browser and does not mix music/SFX or render video. JSON backups keep image metadata but do not include IndexedDB media blobs.
 
 Manual browser review of image import, mapping persistence, playback/seek, actual WAV synchronization, and the 196-image contact sheet remains open. M14–M16 also remain open for real Kokoro model/voice generate → playback → download acceptance.
 
