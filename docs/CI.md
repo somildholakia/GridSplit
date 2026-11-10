@@ -1,31 +1,41 @@
 # Continuous Integration and Build Artifacts
 
-**Status:** M05 pipeline implemented and verified  
+**Current workflow:** M05 baseline plus M12–M16 validation steps  
 **Runner:** GitHub Actions, Ubuntu, Node.js 22
 
-## Checks on pushes and pull requests to main
+## Automated checks
 
-1. Install dependencies with `npm ci --no-audit --no-fund` using the committed npm lockfile.
-2. Run ESLint on the TypeScript source tree.
-3. Run Vitest unit tests.
-4. Run TypeScript project typecheck.
-5. Run the Vite production build.
-6. Upload the `dist/` folder as a commit-specific workflow artifact for 14 days.
+For pull requests to `main`, pushes to `main`, and manual dispatch, CI performs:
 
-The workflow is also manually dispatchable. It uses read-only repository permissions, npm cache, and cancels superseded runs on the same ref. A successful run #15 is recorded at https://github.com/somildholakia/GridSplit/actions/runs/42775014351.
+1. Install JavaScript dependencies with `npm ci --no-audit --no-fund` from the committed lockfile.
+2. Compile-check the optional Python TTS sidecar with `python -m py_compile local-tts/server.py`.
+3. Run ESLint on the TypeScript source tree.
+4. Run Vitest unit tests.
+5. Run the TypeScript project typecheck.
+6. Run the Vite production build.
+7. Upload the commit-specific `dist/` artifact for 14 days.
 
-## Delivery boundary
+The workflow has read-only repository permissions, npm caching, and cancels superseded runs on the same ref.
 
-The uploaded artifact is the continuous-delivery output for this milestone. It contains the commit-specific static `dist/` build and is retained for 14 days. It is not a production deployment. A public deployment is intentionally held for M35, after the studio's real workflows, privacy, model distribution, and production readiness have been validated.
+## Latest verified run
 
-## Dependency reproducibility
+**GitHub Actions run #100 passed** on final PR head `4bc195b7201e2d170a3f6d32667db7b885478b46`.
 
-The initial repository audit found no lockfile. M05 generated and committed `package-lock.json` (lockfile version 3); the pipeline now uses `npm ci` and npm caching so the dependency graph is pinned for clean installs.
+- Python sidecar syntax compilation: passed.
+- ESLint: passed.
+- Vitest: **9 test files, 42 tests passed**.
+- TypeScript typecheck: passed.
+- Production build: passed.
+- Static build artifact upload: passed.
 
-## Current test coverage (run #15: 3 files, 11 tests passed)
+[View GitHub Actions run #100](https://github.com/somildholakia/GridSplit/actions/runs/42810564795)
 
-- Rational-time normalization, sample-derived time, frame-derived time, addition, comparison, and invalid input.
-- Project schema-version gate behavior.
-- Existing GridSplit boundary helper invariants and featureless-image fallback geometry.
+Audio-specific automated coverage includes WAV header/sample metadata parsing, local endpoint loopback/privacy validation, stable character reconciliation, voice/text fingerprint invalidation, copied-project segment reference remapping, and interrupted-generation recovery.
 
-Browser interaction, crop accuracy against the outstanding 196-image sample, ZIP byte inspection, audio engine, and rendering remain future test work; the current test suite does not claim those workflows are validated.
+## Delivery and verification boundaries
+
+The uploaded artifact is the static frontend build, not a production deployment. Production deployment remains M35.
+
+Python compilation does not install the optional Kokoro model/runtime or prove real speech synthesis. The CI runner does not contain the user-supplied model/voice files. M14–M16 remain open in the milestone checklist until a target machine runs the sidecar and completes a real generate → playback → WAV-download smoke test.
+
+Browser interaction testing of the protected Vercel preview and the 196-image contact-sheet acceptance test are also still unverified.
