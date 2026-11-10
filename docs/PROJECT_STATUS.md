@@ -2,50 +2,50 @@
 
 **Last updated:** 2026-11-10  
 **Repository:** `somildholakia/GridSplit`  
-**Baseline branch:** `main` (M01–M05)  
-**Active development branch:** `feat/m06-m11-studio-script-workflow` (M06–M34 automated scope)  
-**Open pull request:** https://github.com/somildholakia/GridSplit/pull/1  
+**Main branch:** `main` — M01–M34 implementation merged via PR #1  
+**Release work branch:** `chore/reconcile-release-status` (documentation reconciliation)  
+**Merged pull request:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
 
-M01–M05 remain the verified baseline on `main`. The Studio implementation for M06–M31 is on the feature branch in draft PR #1 and has **not** been merged into `main`.
+M06–M34 implementation is now merged into `main` by PR #1 at commit `0f6bb317508f028627d02bcece7b414598438399` (merged 2026-11-10 16:57:47 UTC). M01–M05 remain the original baseline milestones; they are not the current main-branch code state.
 
 **Latest code validation: GitHub Actions run #199 passed on commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`.** The workflow compiled both Python sidecars, passed **9 Python tests** (including an HTTP upload → local FFmpeg render → MP4 download test), ESLint, **91 Vitest tests across 18 files**, TypeScript typecheck, Vite production build, static artifact upload and production npm dependency audit (**0 vulnerabilities at the high-severity threshold**). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750).
 
 ## Milestone state
 
 - **M01–M05:** Complete on `main` — repository audit, product requirements, architecture/ADRs, source restructuring, and CI baseline.
-- **M06:** Complete on PR #1 — design tokens, reusable studio components, responsive workspace navigation.
-- **M07:** Complete on PR #1 — dashboard, statistics, project search, active/archive views, project actions.
-- **M08:** Complete on PR #1 — local project create/rename/duplicate/archive/restore, autosave, validated versioned JSON backups.
-- **M09:** Complete on PR #1 for paste, TXT, DOCX, and selectable-text PDF import. Scanned/image-only PDF OCR is not included.
-- **M10:** Complete on PR #1 — deterministic chapter/scene/paragraph parser with narration, dialogue, SFX, and music markers.
-- **M11:** Complete on PR #1 — editable scenes/blocks, reorder, cross-scene moves, split, merge, add, and remove.
-- **M12:** Complete on PR #1 — stable narrator/dialogue identities and per-character voice/language/speed.
-- **M13:** Complete on PR #1 — local TTS provider contract, voice/health checks, abortable requests, WAV metadata parsing, and loopback endpoint guard.
+- **M06:** Complete on main (merged via PR #1) — design tokens, reusable studio components, responsive workspace navigation.
+- **M07:** Complete on main (merged via PR #1) — dashboard, statistics, project search, active/archive views, project actions.
+- **M08:** Complete on main (merged via PR #1) — local project create/rename/duplicate/archive/restore, autosave, validated versioned JSON backups.
+- **M09:** Complete on main (merged via PR #1) for paste, TXT, DOCX, and selectable-text PDF import. Scanned/image-only PDF OCR is not included.
+- **M10:** Complete on main (merged via PR #1) — deterministic chapter/scene/paragraph parser with narration, dialogue, SFX, and music markers.
+- **M11:** Complete on main (merged via PR #1) — editable scenes/blocks, reorder, cross-scene moves, split, merge, add, and remove.
+- **M12:** Complete on main (merged via PR #1) — stable narrator/dialogue identities and per-character voice/language/speed.
+- **M13:** Complete on main (merged via PR #1) — local TTS provider contract, voice/health checks, abortable requests, WAV metadata parsing, and loopback endpoint guard.
 - **M14:** Implemented; real Kokoro ONNX model/voice synthesis smoke test remains pending.
 - **M15:** Implemented; live generation with an installed model remains pending.
 - **M16:** Implemented; real generated WAV playback and download review remains pending.
-- **M17:** Complete on PR #1 — read stored WAV headers and derive duration from real sample frames/sample rate.
-- **M18:** Complete on PR #1 — deterministic versioned synchronization JSON with rational segment and scene timing.
-- **M19:** Complete on PR #1 — segment-level SRT/VTT export from measured timing, without invented word alignment.
-- **M20:** Complete on PR #1 — flat-image fallback and even-grid boundary regression fixtures; original detector/crop/export behavior retained. The 196-image sample remains unverified.
-- **M21:** Complete on PR #1 — multi-file/folder intake, natural relative-path ordering, duplicate/type/size validation, 500-image cap, removable queue, and local ordered ZIP/CSV bundle.
-- **M22:** Complete on PR #1 — project-local image assets and thumbnails, 500-image project cap, frame-number correction, manual order, gap/duplicate/unnumbered review, IndexedDB originals, and shared-asset-safe cleanup.
-- **M23:** Complete on PR #1 — many-to-many scene/image mapping, normalization, persistence, and duplicate-project reference remapping.
-- **M24:** Complete on PR #1 — rebuildable image/audio schedule using actual WAV sample-derived durations and explicit missing-media warnings.
-- **M25:** Complete on PR #1 — visual image/audio timeline, time ruler, playhead, image preview, seek/play/pause/stop, clip start/duration editing, nudging, and Web Audio scheduling of locally saved speech segments. Manual browser playback review remains open.
-- **M26:** Complete on the feature branch — four local narration/dialogue/music/SFX mix tracks, persisted levels, mute/solo/fades, local music/SFX assets and Web Audio preview; automated validation passed in CI run #195.
-- **M27:** Complete on the feature branch — per-image transitions and static/Ken Burns/pan/zoom effects persist by timeline clip ID and are consumed by the renderer; automated render fixture passed in run #195.
-- **M28:** Complete on the feature branch — loopback-only Python renderer with exact-origin/Host checks, archive validation, progress and cancellation; Python syntax, archive and render tests passed in run #195.
-- **M29:** Complete on the feature branch — aspect-ratio profiles and local H.264/AAC MP4 export with ffprobe validation; real FFmpeg/ffprobe fixture passed in run #195.
-- **M30:** Complete on the feature branch — media-inclusive portable ZIP with editable project, source images, generated speech, imported music/SFX, checksums, synchronization JSON and SRT/VTT; validation passed in run #195.
-- **M31:** Complete on the feature branch — archive verification and new-project restore with ID/reference remapping and rollback of failed media writes; automated validation passed in run #195.
+- **M17:** Complete on main (merged via PR #1) — read stored WAV headers and derive duration from real sample frames/sample rate.
+- **M18:** Complete on main (merged via PR #1) — deterministic versioned synchronization JSON with rational segment and scene timing.
+- **M19:** Complete on main (merged via PR #1) — segment-level SRT/VTT export from measured timing, without invented word alignment.
+- **M20:** Complete on main (merged via PR #1) — flat-image fallback and even-grid boundary regression fixtures; original detector/crop/export behavior retained. The 196-image sample remains unverified.
+- **M21:** Complete on main (merged via PR #1) — multi-file/folder intake, natural relative-path ordering, duplicate/type/size validation, 500-image cap, removable queue, and local ordered ZIP/CSV bundle.
+- **M22:** Complete on main (merged via PR #1) — project-local image assets and thumbnails, 500-image project cap, frame-number correction, manual order, gap/duplicate/unnumbered review, IndexedDB originals, and shared-asset-safe cleanup.
+- **M23:** Complete on main (merged via PR #1) — many-to-many scene/image mapping, normalization, persistence, and duplicate-project reference remapping.
+- **M24:** Complete on main (merged via PR #1) — rebuildable image/audio schedule using actual WAV sample-derived durations and explicit missing-media warnings.
+- **M25:** Complete on main (merged via PR #1) — visual image/audio timeline, time ruler, playhead, image preview, seek/play/pause/stop, clip start/duration editing, nudging, and Web Audio scheduling of locally saved speech segments. Manual browser playback review remains open.
+- **M26:** Complete on main (merged via PR #1) — four local narration/dialogue/music/SFX mix tracks, persisted levels, mute/solo/fades, local music/SFX assets and Web Audio preview; automated validation passed in CI run #195.
+- **M27:** Complete on main (merged via PR #1) — per-image transitions and static/Ken Burns/pan/zoom effects persist by timeline clip ID and are consumed by the renderer; automated render fixture passed in run #195.
+- **M28:** Complete on main (merged via PR #1) — loopback-only Python renderer with exact-origin/Host checks, archive validation, progress and cancellation; Python syntax, archive and render tests passed in run #195.
+- **M29:** Complete on main (merged via PR #1) — aspect-ratio profiles and local H.264/AAC MP4 export with ffprobe validation; real FFmpeg/ffprobe fixture passed in run #195.
+- **M30:** Complete on main (merged via PR #1) — media-inclusive portable ZIP with editable project, source images, generated speech, imported music/SFX, checksums, synchronization JSON and SRT/VTT; validation passed in run #195.
+- **M31:** Complete on main (merged via PR #1) — archive verification and new-project restore with ID/reference remapping and rollback of failed media writes; automated validation passed in run #195.
 - **M32:** Automated integration slice complete — script/sync/subtitle/mapping/timeline test and HTTP ZIP-to-MP4 local render test passed in run #199. Full browser-driven project export is still M36.
 - **M33:** Performance regression baseline complete — 500 scenes, 500 images, 1,000 clips under a 10-second test ceiling; renderer bounded to two active jobs/eight retained finished jobs. Real target-device/media profiling is still open.
 - **M34:** Application security/privacy review documented in [SECURITY_REVIEW.md](SECURITY_REVIEW.md); Host/Origin/archive checks and 0-production-npm-vulnerability audit passed. Python dependency audit and exact licenses for externally installed model/voice/FFmpeg assets remain external release checks.
-- **M35:** Open — feature preview is READY, but main still serves M01–M05 and PR #1 is still a draft/unmerged.
+- **M35:** Open — Vercel production deployment for merged main commit `0f6bb317` was rejected with HTTP 402 `api-deployments-free-per-day` after the Hobby team exceeded 100 deployments in 24 hours. The current production alias still points to the M01–M05 baseline deployment; see [M32–M36](M32-M36.md).
 - **M36:** Open — no real browser-generated full project package has yet been produced and inspected on a target device.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
@@ -68,7 +68,7 @@ The CI result verifies the code and smoke fixture on GitHub's runner. A user-dev
 
 ## Current next steps
 
-M26–M34 automated implementation and CI validation are complete on the feature branch (run #199). M35 production promotion and M36 representative browser-generated package inspection remain open. Local renderer setup and target-device browser acceptance remain manual checks; install FFmpeg/ffprobe and run the sidecar using [local-render/README.md](../local-render/README.md). M22–M25 browser playback review and M14–M16 real Kokoro model/voice synthesis acceptance also remain open.
+M26–M34 automated implementation is merged into main. CI run #199 passed on feature validation SHA `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`; a separate post-merge run on `0f6bb317` remains to be recorded. M35 production promotion and M36 representative browser-generated package inspection remain open. Local renderer setup and target-device browser acceptance remain manual checks; install FFmpeg/ffprobe and run the sidecar using [local-render/README.md](../local-render/README.md). M22–M25 browser playback review and M14–M16 real Kokoro model/voice synthesis acceptance also remain open.
 
 ## Operating rules
 

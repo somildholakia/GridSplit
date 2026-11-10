@@ -68,7 +68,7 @@ Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). 
 - A synthetic performance regression covers 500 scenes, 500 images and 1,000 timeline clips with a 10-second CI ceiling. The local renderer allows at most two active jobs and retains at most eight finished jobs for up to six hours.
 - The TTS sidecar validates loopback Host headers, and both sidecars validate their local request boundaries. Production npm dependencies are audited in CI. See [the security review](docs/SECURITY_REVIEW.md).
 
-**Release boundary:** M32–M34 automated checks pass on the feature branch. M14–M16 still need a real installed Kokoro model/voice generate → playback → WAV-download check; M22–M25 still need target-browser image/timeline/audio acceptance. M35 (promoting the Studio to production) and M36 (inspecting a full package exported from the browser using real media) are not yet complete. See [the milestone checklist](docs/CHECKPOINTS.md).
+**Release boundary:** M06–M34 implementation is merged into `main` via PR #1. CI run #199 passed on pre-merge validation SHA `0ba72cc`; a separate post-merge CI run remains to be recorded. M35 production deployment is blocked by the Vercel Hobby daily deployment API quota; M14–M16 and M22–M25 still need target-device acceptance, and M36 still needs a real browser-exported media package. See [the milestone checklist](docs/CHECKPOINTS.md) and [release gates](docs/M32-M36.md).
 
 ## Run locally
 
@@ -103,7 +103,7 @@ Images, scripts and imported media are processed locally. Studio project metadat
 
 ## Scope and roadmap
 
-This feature branch extends GridSplit Studio through M34 automated validation: design system, dashboard and project manager; script import/parsing/editing; optional local Kokoro TTS; measured WAV timing and captions; the original image splitter; image sequence management and scene mapping; a visual timeline; four-track audio mixing; transitions and image motion; optional loopback-only FFmpeg/MP4 rendering; and checksum-verified portable project export/restore. GitHub Actions validates TypeScript, 91 frontend tests, 9 Python tests, production npm dependency security, the production build, Python archive safety and a small HTTP-to-MP4 FFmpeg integration fixture. Target-device Kokoro synthesis, real-browser timeline acceptance, production promotion and complete browser-generated package inspection remain open.
+The main branch now includes GridSplit Studio through M34 automated implementation: design system, dashboard and project manager; script import/parsing/editing; optional local Kokoro TTS; measured WAV timing and captions; the original image splitter; image sequence management and scene mapping; a visual timeline; four-track audio mixing; transitions and image motion; optional loopback-only FFmpeg/MP4 rendering; and checksum-verified portable project export/restore. GitHub Actions validates TypeScript, 91 frontend tests, 9 Python tests, production npm dependency security, the production build, Python archive safety and a small HTTP-to-MP4 FFmpeg integration fixture. Target-device Kokoro synthesis, real-browser timeline acceptance, production promotion and complete browser-generated package inspection remain open.
 
 ## License
 

@@ -13,10 +13,13 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 
 ### Verified
 - GitHub Actions run #15 passed dependency installation, lint, 11 tests, TypeScript typecheck, Vite production build, and static artifact upload.
-- M06–M11 studio implementation and the M12–M16 local audio workflow are recorded in the feature-branch history and detailed milestone notes.
+- M06–M34 Studio implementation is merged into `main` via PR #1 (merge commit `0f6bb317`). See `docs/PROJECT_STATUS.md` and `docs/M32-M36.md` for the current release gates.
 
 ### Delivery boundary
 - CI build artifacts are downloadable static web builds, not production deployments.
+- PR #1 merged the M06–M34 implementation into `main` on 2026-11-10.
+- M35 production promotion is still open because Vercel's Hobby team exceeded the 100-deployments-per-24-hours API limit; the failed attempt returned HTTP 402. No billing or plan settings were changed.
+- M14–M16 real Kokoro acceptance, M22–M25 target-browser acceptance and M36 full-media archive acceptance remain open.
 - Real Kokoro model/voice synthesis, playback, and WAV download remain a target-device acceptance test.
 - No model, voice pack, TTS binary, FFmpeg binary, or native desktop runtime is bundled.
 

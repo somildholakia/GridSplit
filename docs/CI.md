@@ -2,7 +2,8 @@
 
 **Workflow:** `.github/workflows/build.yml`  
 **Runner:** GitHub Actions, Ubuntu, Node.js 22, Python 3  
-**Current validated feature head:** `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`
+**Pre-merge validation SHA:** `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`  
+**Merged main SHA:** `0f6bb317508f028627d02bcece7b414598438399`
 
 ## Automated checks
 
@@ -20,7 +21,7 @@ The workflow has read-only repository permissions, npm caching, and cancels supe
 
 ## Latest verified run
 
-**GitHub Actions run #199 passed** on feature branch commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`.
+**GitHub Actions run #199 passed** on pre-merge feature commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`. The implementation was subsequently merged into `main` at `0f6bb317508f028627d02bcece7b414598438399`; a separate post-merge run on that merge commit is not yet recorded.
 
 - Python syntax compilation: passed for both sidecars.
 - TTS security suite: **2 tests passed**.
@@ -38,7 +39,7 @@ The performance regression test parses and schedules a 500-scene/500-image proje
 
 ## Delivery and verification boundaries
 
-The uploaded artifact is the static frontend build, not a production deployment. A READY Vercel preview exists for the current feature branch, but `main` remains at the M01–M05 baseline and PR #1 remains a draft. Production promotion is M35 and has not been performed.
+The uploaded artifact is the static frontend build, not a production deployment. A READY Vercel preview exists at `gridsplit-5alhvnqz3-somildholakias-projects.vercel.app` from the pre-merge validation SHA. The preview redirects to Vercel SSO before the app loads, so browser smoke testing was blocked; deployment protection was not changed. PR #1 is merged, but production promotion (M35) remains open: the current production alias `gridsplit-kappa.vercel.app` still serves the older M01–M05 deployment. Vercel rejected a production deployment request with HTTP 402 `api-deployments-free-per-day` after the Hobby team exceeded 100 deployments in 24 hours; retry is available after the quota window resets.
 
 CI's HTTP render fixture validates the sidecar API and MP4 output using a tiny generated image archive. It does not automate every browser screen or prove that a real GridSplit UI export containing the user's images, generated Kokoro audio, music/SFX and local codecs is complete. That full target-device package acceptance remains M36.
 
