@@ -9,9 +9,9 @@
 
 ## Current checkpoint
 
-M01–M05 remain the verified baseline on `main`. The Studio implementation for M06–M25 is on the feature branch in draft PR #1 and has **not** been merged into `main`. M22–M25 are implemented in code; final automated validation is pending a clean rerun after correcting a stale test expectation in the existing timeline suite.
+M01–M05 remain the verified baseline on `main`. The Studio implementation for M06–M25 is on the feature branch in draft PR #1 and has **not** been merged into `main`.
 
-**Latest code validation: GitHub Actions run #131 passed.** The workflow completed the optional Python sidecar syntax check, npm clean install, ESLint, 58 Vitest tests across 12 files, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #131](https://github.com/somildholakia/GridSplit/actions/runs/42817826847).
+**Latest code validation: GitHub Actions run #164 passed on the current implementation head.** The workflow completed the optional Python sidecar syntax check, npm clean install, ESLint, **75 Vitest tests across 15 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #164](https://github.com/somildholakia/GridSplit/actions/runs/42825453586).
 
 ## Milestone state
 
@@ -32,17 +32,17 @@ M01–M05 remain the verified baseline on `main`. The Studio implementation for 
 - **M19:** Complete on PR #1 — segment-level SRT/VTT export from measured timing, without invented word alignment.
 - **M20:** Complete on PR #1 — flat-image fallback and even-grid boundary regression fixtures; original detector/crop/export behavior retained. The 196-image sample remains unverified.
 - **M21:** Complete on PR #1 — multi-file/folder intake, natural relative-path ordering, duplicate/type/size validation, 500-image cap, removable queue, and local ordered ZIP/CSV bundle.
-- **M22:** Implemented on PR #1 — project-local image assets and thumbnails, frame-number correction, manual order, gap/duplicate/unnumbered review, IndexedDB originals, and shared-asset-safe cleanup. Latest full CI rerun is pending.
-- **M23:** Implemented on PR #1 — many-to-many scene/image mapping, normalization, and duplicate-project reference remapping. Latest full CI rerun is pending.
-- **M24:** Implemented on PR #1 — rebuildable image/audio schedule using actual WAV sample-derived durations and explicit missing-media warnings. Latest full CI rerun is pending.
-- **M25:** Implemented on PR #1 — visual image/audio timeline, time ruler, playhead, image preview, seek/play/pause/stop, clip start/duration editing, nudging, and Web Audio scheduling of locally saved speech segments. Latest full CI rerun is pending.
+- **M22:** Complete on PR #1 — project-local image assets and thumbnails, 500-image project cap, frame-number correction, manual order, gap/duplicate/unnumbered review, IndexedDB originals, and shared-asset-safe cleanup.
+- **M23:** Complete on PR #1 — many-to-many scene/image mapping, normalization, persistence, and duplicate-project reference remapping.
+- **M24:** Complete on PR #1 — rebuildable image/audio schedule using actual WAV sample-derived durations and explicit missing-media warnings.
+- **M25:** Complete on PR #1 — visual image/audio timeline, time ruler, playhead, image preview, seek/play/pause/stop, clip start/duration editing, nudging, and Web Audio scheduling of locally saved speech segments. Manual browser playback review remains open.
 - **M26–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
 ## Validation and delivery boundaries
 
-The earlier run #131 test summary was **12 test files passed and 58 tests passed**. The first M22–M25 CI attempt (run #154) failed in a pre-existing timeline test whose expectation tried to move a video clip to an audio track, while the helper correctly rejects cross-media moves. The test was updated to move an audio clip between compatible audio tracks; a clean full CI rerun is pending. Lint, typecheck, production build, optional sidecar syntax check, and artifact upload also passed. The static web artifact is a CI build output; it is not a production deployment.
+GitHub Actions run #164 passed on the current implementation head: **15 test files / 75 tests passed**, plus lint, typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run #164](https://github.com/somildholakia/GridSplit/actions/runs/42825453586). Lint, typecheck, production build, optional sidecar syntax check, and artifact upload also passed. The static web artifact is a CI build output; it is not a production deployment.
 
 The Vercel status check on the current PR head reports a deployment failure due to the free-tier daily deployment quota. This is separate from the passing GitHub CI workflow. Interactive browser QA also remains unverified because a preview requires Vercel Authentication. No end-to-end browser acceptance pass is claimed. The 196-image contact-sheet sample and its preliminary region count are not treated as verified output.
 
@@ -58,7 +58,7 @@ The Vercel status check on the current PR head reports a deployment failure due 
 
 ## Next development milestone
 
-**M26 — Audio mixing:** introduce independent narration/dialogue/music/SFX lanes with track levels, mute/solo, and fades. Before treating M22–M25 as release-accepted, complete the manual browser smoke test documented in [docs/M22-M25.md](M22-M25.md). The separate M14–M16 device acceptance test remains open until real model/voice files are installed and a generate → playback → WAV-download cycle is verified.
+**M26 — Audio mixing:** introduce independent narration/dialogue/music/SFX lanes with track levels, mute/solo, and fades. M22–M25 code and CI acceptance are complete; the manual browser smoke test documented in [docs/M22-M25.md](M22-M25.md) remains a release-acceptance task. The separate M14–M16 device acceptance test remains open until real model/voice files are installed and a generate → playback → WAV-download cycle is verified.
 
 ## Operating rules
 
