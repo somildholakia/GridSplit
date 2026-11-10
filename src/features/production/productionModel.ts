@@ -26,6 +26,9 @@ export function analyseSequence(items: SequenceAsset[]): SequenceIssue[] {
   const seen = new Map<number, SequenceAsset[]>();
   for (const item of numbered) seen.set(item.sequenceNumber!, [...(seen.get(item.sequenceNumber!) ?? []), item]);
   for (const [number, group] of seen) if (group.length > 1) issues.push({kind:"duplicate",message:`Frame ${number} is used by ${group.length} files.`,assetIds:group.map(x=>x.id)});
+  const fingerprints = new Map<string, SequenceAsset[]>();
+  for (const item of items) fingerprints.set(item.fingerprint, [...(fingerprints.get(item.fingerprint) ?? []), item]);
+  for (const group of fingerprints.values()) if (group.length > 1) issues.push({kind:"duplicate",message:`Identical image content appears in ${group.length} files.`,assetIds:group.map(x=>x.id)});
   for (let i=1;i<numbered.length;i++) {
     const previous=numbered[i-1].sequenceNumber!, current=numbered[i].sequenceNumber!;
     if (current-previous>1) issues.push({kind:"gap",message:`Missing frame(s) ${previous+1}${current-previous>2?`–${current-1}`:""} before ${numbered[i].name}.`,assetIds:[numbered[i-1].id,numbered[i].id]});
