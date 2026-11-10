@@ -6,6 +6,7 @@ import {
   imageClipAtTime,
   moveTimelineClip,
   normalizeMappings,
+  orderMappingsByAssetOrder,
   sortSequence,
   timelineDurationSeconds,
   type SequenceAsset,
@@ -61,6 +62,18 @@ describe("image sequence management", () => {
 });
 
 describe("many-to-many scene mapping", () => {
+  it("keeps mapped image order aligned with manual sequence order", () => {
+    const mappings = [{ sceneId: "scene-a", imageIds: ["frame-3", "frame-1", "frame-2"] }];
+    const assets = [
+      { id: "frame-1", order: 0 },
+      { id: "frame-2", order: 1 },
+      { id: "frame-3", order: 2 },
+    ];
+    expect(orderMappingsByAssetOrder(mappings, assets)[0].imageIds)
+      .toEqual(["frame-1", "frame-2", "frame-3"]);
+    expect(mappings[0].imageIds).toEqual(["frame-3", "frame-1", "frame-2"]);
+  });
+
   it("merges repeated scene mappings and removes stale or duplicate references", () => {
     expect(normalizeMappings(
       [
