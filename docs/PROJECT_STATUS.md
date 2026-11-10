@@ -5,7 +5,6 @@
 **Baseline branch:** `main` (M01–M05)  
 **Active development branch:** `feat/m06-m11-studio-script-workflow` (M06–M21)  
 **Open pull request:** https://github.com/somildholakia/GridSplit/pull/1  
-**Current PR head:** `f7baeb77a4bdc93fa7f2ed20767c9d126fcf83f2`  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
