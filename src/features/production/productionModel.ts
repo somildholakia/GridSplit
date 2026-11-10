@@ -140,6 +140,20 @@ export function normalizeMappings(
   return [...merged].map(([sceneId, imageIds]) => ({ sceneId, imageIds }));
 }
 
+/** Keep each scene's image order aligned with the manually ordered asset sequence. */
+export function orderMappingsByAssetOrder(
+  mappings: SceneImageMapping[],
+  assets: Array<Pick<SequenceAsset, "id" | "order">>,
+): SceneImageMapping[] {
+  const rank = new Map(assets.map((asset) => [asset.id, asset.order]));
+  return mappings.map((mapping) => ({
+    ...mapping,
+    imageIds: [...mapping.imageIds].sort((left, right) =>
+      (rank.get(left) ?? Number.MAX_SAFE_INTEGER) - (rank.get(right) ?? Number.MAX_SAFE_INTEGER),
+    ),
+  }));
+}
+
 /** Build sequential image and scene-audio clips from actual measured scene durations. */
 export function buildTimeline(
   inputs: SceneTimingInput[],
