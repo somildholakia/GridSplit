@@ -117,12 +117,14 @@ function cueText(segment: SyncSegment): string {
 
 /** Segment-level captions only; this intentionally does not invent word alignment. */
 export function toSrt(metadata: SynchronizationMetadata): string {
-  return metadata.segments.flatMap((segment, index) => {
+  let cueIndex = 0;
+  return metadata.segments.flatMap((segment) => {
     const text = cueText(segment);
     if (!text) return [];
     const startMs = Math.floor(rationalTimeToSeconds(segment.start) * 1000);
     const endMs = Math.ceil(rationalTimeToSeconds(segment.end) * 1000);
-    return [`${index + 1}\n${timestamp(startMs, ",")} --> ${timestamp(Math.max(startMs + 1, endMs), ",")}\n${text}`];
+    cueIndex += 1;
+    return [`${cueIndex}\n${timestamp(startMs, ",")} --> ${timestamp(Math.max(startMs + 1, endMs), ",")}\n${text}`];
   }).join("\n\n") + (metadata.segments.some((segment) => cueText(segment)) ? "\n" : "");
 }
 
