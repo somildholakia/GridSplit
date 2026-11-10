@@ -177,7 +177,7 @@ export interface ProjectDocument {
   jobs: ProjectJob[];
 }
 
-export function isSupportedProjectSchema(value: unknown): value is ProjectDocument {
+export function hasSupportedProjectSchemaVersion(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   return "schemaVersion" in value &&
     (value as { schemaVersion?: unknown }).schemaVersion === PROJECT_SCHEMA_VERSION;
