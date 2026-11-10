@@ -66,9 +66,9 @@ Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). 
 
 - Integration tests cover script parsing → measured synchronization → captions → image mapping → production timeline, plus a real local HTTP archive-upload → FFmpeg render-job → validated MP4 download.
 - A synthetic performance regression covers 500 scenes, 500 images and 1,000 timeline clips with a 10-second CI ceiling. The local renderer allows at most two active jobs and retains at most eight finished jobs for up to six hours.
-- The TTS sidecar validates loopback Host headers, and both sidecars validate their local request boundaries. Production npm dependencies are audited in CI. See [the security review](docs/SECURITY_REVIEW.md).
+- The TTS sidecar validates loopback Host headers, and both sidecars validate their local request boundaries. The optional local TTS Python graph is pinned in `local-tts/uv.lock`; CI checks the lock with `uv lock --check` and audits the synchronized environment with `pip-audit --strict` (`pip-audit` remains dev-only). See [the security review](docs/SECURITY_REVIEW.md).
 
-**Release boundary:** M06–M34 implementation is merged into `main` via PR #1. CI run #199 passed on pre-merge validation SHA `0ba72cc`; a separate post-merge CI run remains to be recorded. M35 production deployment is blocked by the Vercel Hobby daily deployment API quota; M14–M16 and M22–M25 still need target-device acceptance, and M36 still needs a real browser-exported media package. See [the milestone checklist](docs/CHECKPOINTS.md) and [release gates](docs/M32-M36.md).
+**Release boundary:** M06–M34 implementation is merged into `main` via PR #1. PR #3 adds the pinned local TTS dependency graph and vulnerability audit; run #217 passed the committed lock check, `pip-audit --strict`, Python/frontend tests, lint, typecheck and build on the PR branch. This security addition is pending merge. M35 production deployment is blocked by the Vercel Hobby daily deployment API quota; M14–M16 and M22–M25 still need target-device acceptance, and M36 still needs a real browser-exported media package. See [the milestone checklist](docs/CHECKPOINTS.md) and [release gates](docs/M32-M36.md).
 
 ## Run locally
 
