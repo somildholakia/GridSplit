@@ -28,7 +28,7 @@ The workflow has read-only repository permissions, npm caching, and cancels supe
 - Production build: passed.
 - Static build artifact upload: passed.
 
-[View GitHub Actions run #115](https://github.com/somildholakia/GridSplit/actions/runs/42810564795)
+[View GitHub Actions run #115](https://github.com/somildholakia/GridSplit/actions/runs/42815634774)
 
 Audio-specific automated coverage includes WAV header/sample metadata parsing, local endpoint loopback/privacy validation, stable character reconciliation, voice/text fingerprint invalidation, copied-project segment reference remapping, and interrupted-generation recovery. M17–M19 coverage adds mixed-rate rational timeline accumulation, sync metadata, and SRT/VTT generation; M20–M21 coverage adds extractor fallback/grid regression fixtures and image intake validation/natural sorting.
 
