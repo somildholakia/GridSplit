@@ -25,7 +25,8 @@ For another local Vite address or an explicitly trusted static deployment, pass 
 - Requests with an unexpected Host header or non-allowlisted browser Origin are rejected.
 - The browser sends a complete .gridsplit.zip archive to the local process. The sidecar validates archive paths, entry counts, expanded size, and SHA-256 hashes before rendering.
 - Jobs remain on the local machine. No telemetry or media upload is implemented.
-- Stop the sidecar with Ctrl+C. Remove temporary gridsplit-render-* folders when you no longer need prior job outputs.
+- At most two render jobs run concurrently. Completed/failed/cancelled job metadata is bounded to the eight most recent jobs and a six-hour retention window; expired/overflow temporary directories are pruned when another API request arrives.
+- Stop the sidecar with Ctrl+C. If the process is stopped before a later request triggers cleanup, remove any remaining `gridsplit-render-*` temporary folders manually.
 
 ## Render behavior
 
@@ -36,4 +37,5 @@ A renderer job can be cancelled from the Studio UI. FFmpeg and ffprobe must supp
 ## Validate the sidecar
 
     python -m py_compile local-tts/server.py local-render/server.py
+    python -m unittest discover -s local-tts -p 'test_*.py'
     python -m unittest discover -s local-render -p 'test_*.py'

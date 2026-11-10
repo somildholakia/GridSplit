@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-11-10  
 **Audited baseline branch:** `main` (M01–M05)  
-**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M31 scope)  
+**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M34 automated scope)  
 **Open draft PR:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
@@ -41,15 +41,15 @@ A milestone is complete only when its implementation exists, required tests or v
 - [x] **M29 — MP4 export.** Landscape/portrait/square profiles; local H.264/AAC render; ffprobe checks container, codecs, dimensions, frame rate and duration. The real FFmpeg fixture passed in run #195.
 - [x] **M30 — Complete ZIP export.** Media-inclusive versioned archive with editable project data, original images, ready speech WAVs, music/SFX, sample-derived sync JSON, SRT/VTT, README and SHA-256 manifest. Archive validation and export/restore unit tests passed in run #195.
 - [x] **M31 — Project restoration.** Local ZIP restore validates paths, sizes and checksums, stores media in IndexedDB, remaps project/scene/block/image/segment/track/clip IDs and creates a separate project. Remapping and archive tests passed in run #195.
-- [ ] **M32 — Integration testing.** Test the script-to-render workflow end to end.
-- [ ] **M33 — Performance optimization.** Profile large scripts, images, models, timelines, and renders.
-- [ ] **M34 — Security and privacy review.** Verify local-only behavior, file handling, cleanup, dependency safety, and asset/model licenses.
+- [x] **M32 — Integration testing (automated slice).** Added a script → parsed scenes → measured synchronization → captions → scene/image map → production timeline test, plus a real HTTP archive upload → FFmpeg job → MP4 download test. GitHub Actions run #199 passed both suites. Browser-driven export from a real project remains in M36.
+- [x] **M33 — Performance regression baseline.** Added a 500-scene / 500-image / 1,000-clip construction smoke test with a 10-second regression ceiling and bounded renderer concurrency/retention (2 active jobs; 8 finished jobs retained for up to 6 hours). Run #199 passed. Real image decoding, local model inference and target-device render profiling remain manual.
+- [x] **M34 — Application security and privacy review.** Recorded the renderer/TTS threat boundaries, loopback Host/Origin checks, archive validation, bounded job retention, local storage and license boundaries in [SECURITY_REVIEW.md](SECURITY_REVIEW.md). Added TTS Host-header regression tests and `npm audit --omit=dev --audit-level=high`; run #199 passed with 0 production npm vulnerabilities. User-installed Python packages, model/voice files and FFmpeg builds remain outside the repository's redistribution scope and need exact-version review before bundling.
 - [ ] **M35 — Production deployment.** Deploy the static frontend without making hosted processing mandatory.
 - [ ] **M36 — End-to-end validation.** Complete and inspect a representative exported production package.
 
 ## Current branch validation
 
-M06–M31 implementation is committed on the feature branch in draft PR #1 and is not merged into `main`. **GitHub Actions run #195 passed on the current feature head:** Python sidecar compilation and **6 Python tests**, ESLint, **89 Vitest tests across 17 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430). The earlier run #131 remains the historical M17–M21 validation baseline.
+M06–M34 automated implementation is committed on the feature branch in draft PR #1 and is not merged into `main`. **GitHub Actions run #199 passed on commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`:** Python sidecar compilation, **9 Python tests** (2 TTS Host-validation tests and 7 renderer tests, including HTTP upload → FFmpeg render → MP4 download), ESLint, **91 Vitest tests across 18 files**, TypeScript typecheck, Vite production build, static artifact upload, and `npm audit --omit=dev --audit-level=high` (**0 production npm vulnerabilities**). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). Run #195 remains the earlier M26–M31 implementation validation baseline; run #131 remains the historical M17–M21 baseline.
 
 The additional M17–M19 tests cover sub-second SRT/VTT cue boundaries. The additional M21 tests cover natural ordering across nested folder paths and the 500-image cap. These are automated tests, not a substitute for visual acceptance of a real contact sheet.
 
@@ -80,3 +80,16 @@ All six milestones are implemented on the feature branch and the CI workflow pas
 ## M12–M16 implementation and validation
 
 Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md), [docs/M17-M19.md](M17-M19.md), and [docs/M20-M21.md](M20-M21.md). M12–M13 satisfy their automated completion evidence. M14–M16 implementation is committed and browser CI passes, but their checkboxes remain open pending a real local model/voice generate → playback → WAV-download smoke test. M17–M21 have automated implementation and CI evidence from run #131.
+
+
+## M32–M36 integration and release gates
+
+M32's automated vertical slice now covers the deterministic script parser, measured sample-based sync, SRT/VTT captions, scene/image mapping and timeline construction. A separate Python HTTP integration test uploads a manifest-verified ZIP to the local renderer, polls the job, verifies H.264/AAC output and downloads the MP4. This exercises the renderer API end to end, but it is not a browser automation run through every React screen or a user-created project archive.
+
+M33 adds a 500-scene, 500-image, 1,000-clip timeline performance regression test with a generous 10-second ceiling. The local renderer now limits simultaneous work to two jobs and prunes old completed jobs (eight retained, six-hour TTL) on subsequent API requests. These are regression controls, not device-specific benchmarks of 500 actual image blobs, TTS inference, or long-form MP4 rendering.
+
+M34's code-scope review is documented in [SECURITY_REVIEW.md](SECURITY_REVIEW.md). The production JavaScript dependency audit reports zero vulnerabilities at the configured high-severity threshold. The TTS and render sidecars remain loopback-only and reject unexpected Host/Origin headers; archive validation and local job cleanup are tested. Python runtime dependency advisories and exact versions/licenses for user-installed models, voices, FFmpeg builds and codecs remain external release checks because those assets are not bundled.
+
+M35 is still open: the feature branch has a READY Vercel preview, but `main` still points to the M01–M05 baseline. The draft PR has not been merged or promoted to production. M36 is still open: the HTTP test uses a deterministic minimal fixture, not a complete archive exported from the actual browser UI using a real script, generated Kokoro speech, numbered images, music/SFX, and target-device FFmpeg.
+
+M14–M16 remain open for real local Kokoro model/voice generation → playback → WAV download. M22–M25 still require manual target-browser validation of image import, mapping persistence, preview/seek/audio synchronization, and the recorded 196-image contact-sheet sample. Do not treat automated CI or a preview HTTP 200 as proof of those acceptance checks.

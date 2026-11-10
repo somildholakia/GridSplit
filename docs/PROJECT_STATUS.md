@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-10  
 **Repository:** `somildholakia/GridSplit`  
 **Baseline branch:** `main` (M01–M05)  
-**Active development branch:** `feat/m06-m11-studio-script-workflow` (M06–M31)  
+**Active development branch:** `feat/m06-m11-studio-script-workflow` (M06–M34 automated scope)  
 **Open pull request:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
@@ -11,7 +11,7 @@
 
 M01–M05 remain the verified baseline on `main`. The Studio implementation for M06–M31 is on the feature branch in draft PR #1 and has **not** been merged into `main`.
 
-**Latest code validation: GitHub Actions run #195 passed on the current feature-branch head.** The workflow compiled both Python sidecars, passed **6 Python tests** including an FFmpeg/ffprobe render fixture, ESLint, **89 Vitest tests across 17 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430).
+**Latest code validation: GitHub Actions run #199 passed on commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`.** The workflow compiled both Python sidecars, passed **9 Python tests** (including an HTTP upload → local FFmpeg render → MP4 download test), ESLint, **91 Vitest tests across 18 files**, TypeScript typecheck, Vite production build, static artifact upload and production npm dependency audit (**0 vulnerabilities at the high-severity threshold**). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750).
 
 ## Milestone state
 
@@ -42,13 +42,17 @@ M01–M05 remain the verified baseline on `main`. The Studio implementation for 
 - **M29:** Complete on the feature branch — aspect-ratio profiles and local H.264/AAC MP4 export with ffprobe validation; real FFmpeg/ffprobe fixture passed in run #195.
 - **M30:** Complete on the feature branch — media-inclusive portable ZIP with editable project, source images, generated speech, imported music/SFX, checksums, synchronization JSON and SRT/VTT; validation passed in run #195.
 - **M31:** Complete on the feature branch — archive verification and new-project restore with ID/reference remapping and rollback of failed media writes; automated validation passed in run #195.
-- **M32–M36:** Not started.
+- **M32:** Automated integration slice complete — script/sync/subtitle/mapping/timeline test and HTTP ZIP-to-MP4 local render test passed in run #199. Full browser-driven project export is still M36.
+- **M33:** Performance regression baseline complete — 500 scenes, 500 images, 1,000 clips under a 10-second test ceiling; renderer bounded to two active jobs/eight retained finished jobs. Real target-device/media profiling is still open.
+- **M34:** Application security/privacy review documented in [SECURITY_REVIEW.md](SECURITY_REVIEW.md); Host/Origin/archive checks and 0-production-npm-vulnerability audit passed. Python dependency audit and exact licenses for externally installed model/voice/FFmpeg assets remain external release checks.
+- **M35:** Open — feature preview is READY, but main still serves M01–M05 and PR #1 is still a draft/unmerged.
+- **M36:** Open — no real browser-generated full project package has yet been produced and inspected on a target device.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
 ## Validation and delivery boundaries
 
-GitHub Actions run #195 passed on the current feature-branch head: **6 Python tests** (including a real FFmpeg/ffprobe transition + audio-mix MP4 smoke test), ESLint, **89 Vitest tests across 17 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430). The static web artifact is a CI build output; it is not by itself proof of a production release or target-device compatibility.
+GitHub Actions run #199 passed on the current feature-branch head: **9 Python tests** (including a real HTTP ZIP upload → local FFmpeg/ffprobe render → MP4 download), ESLint, **91 Vitest tests across 18 files**, TypeScript typecheck, Vite production build, static artifact upload, and npm production dependency audit (**0 vulnerabilities at the high-severity threshold**). [Run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). The static web artifact and Vercel preview are not a production release or proof of target-device compatibility.
 
 The CI result verifies the code and smoke fixture on GitHub's runner. A user-device browser acceptance pass with representative images, generated Kokoro WAVs, imported music/SFX and the user's installed FFmpeg/ffprobe remains open. M14–M16 model/voice synthesis and M22–M25 real browser timeline/playback review also remain separate manual acceptance checks. The 196-image contact-sheet sample remains unverified; no manual pass is claimed.
 
@@ -60,11 +64,11 @@ The CI result verifies the code and smoke fixture on GitHub's runner. A user-dev
 - Folder selection is progressive enhancement; multi-file selection remains available.
 - M21 exports the selected original images with an ordered manifest. M22 adds project-local image assets, IndexedDB originals, thumbnails, sequence review and correction. M23 adds scene mapping. JSON backups preserve image metadata but do not bundle IndexedDB image binaries; the portable media archive remains M30.
 - M17–M19 provide segment-level timing and captions; word/phoneme alignment is not claimed.
-- M25 provides editable image/audio lanes and synchronized local speech playback. M26–M31 add local mixing, transitions/effects, FFmpeg/MP4 rendering, media-inclusive project ZIP export and restore. CI run #195 validates these six implementation milestones; end-to-end target-device acceptance and broader release testing remain open.
+- M25 provides editable image/audio lanes and synchronized local speech playback. M26–M31 add local mixing, transitions/effects, FFmpeg/MP4 rendering, media-inclusive project ZIP export and restore. M32–M34 add automated integration/performance regressions and the application security review. CI run #199 validates this automated scope; target-device acceptance, production promotion and full browser-generated package inspection remain open.
 
 ## Current next steps
 
-M26–M31 implementation and automated CI validation are complete on the feature branch (run #195). Local renderer setup and target-device browser acceptance remain manual checks; install FFmpeg/ffprobe and run the sidecar using [local-render/README.md](../local-render/README.md). M22–M25 browser playback review and M14–M16 real Kokoro model/voice synthesis acceptance also remain open.
+M26–M34 automated implementation and CI validation are complete on the feature branch (run #199). M35 production promotion and M36 representative browser-generated package inspection remain open. Local renderer setup and target-device browser acceptance remain manual checks; install FFmpeg/ffprobe and run the sidecar using [local-render/README.md](../local-render/README.md). M22–M25 browser playback review and M14–M16 real Kokoro model/voice synthesis acceptance also remain open.
 
 ## Operating rules
 

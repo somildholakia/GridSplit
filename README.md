@@ -50,7 +50,7 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 - Export media-inclusive `.gridsplit.zip` packages with project metadata, original images, generated WAVs, imported music/SFX, checksums, measured synchronization JSON, SRT/VTT subtitles and README.
 - Restore an archive as a new editable project, remapping IDs and restoring media into browser-local IndexedDB.
 
-Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). GitHub Actions [run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430) passed Python sidecar compilation and 6 Python tests, lint, 89 Vitest tests across 17 files, typecheck, production build and static artifact upload. Browser/device acceptance remains a separate release check.
+Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). GitHub Actions [run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750) passed 9 Python tests (including HTTP ZIP upload → local FFmpeg render → MP4 download), lint, 91 Vitest tests across 18 files, typecheck, production build, static artifact upload and production npm audit (0 vulnerabilities at the high-severity threshold). Browser/device acceptance remains a separate release check.
 
 **Local rendering:** FFmpeg and ffprobe must be installed separately. GridSplit does not bundle binaries/codecs or use a hosted renderer. Follow [local-render/README.md](local-render/README.md) to start the loopback-only renderer. The installed build must provide H.264 (libx264) and AAC encoders.
 ### Image Splitter
@@ -61,6 +61,14 @@ Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). 
 - Apply a manually specified, evenly spaced row/column grid as a fallback.
 - Configure border trim, filename prefix, starting number, and zero-padding.
 - Export selected tiles as PNG crops in a ZIP, alongside a CSV manifest.
+
+### Integration, performance and security checks (M32–M34)
+
+- Integration tests cover script parsing → measured synchronization → captions → image mapping → production timeline, plus a real local HTTP archive-upload → FFmpeg render-job → validated MP4 download.
+- A synthetic performance regression covers 500 scenes, 500 images and 1,000 timeline clips with a 10-second CI ceiling. The local renderer allows at most two active jobs and retains at most eight finished jobs for up to six hours.
+- The TTS sidecar validates loopback Host headers, and both sidecars validate their local request boundaries. Production npm dependencies are audited in CI. See [the security review](docs/SECURITY_REVIEW.md).
+
+**Release boundary:** M32–M34 automated checks pass on the feature branch. M14–M16 still need a real installed Kokoro model/voice generate → playback → WAV-download check; M22–M25 still need target-browser image/timeline/audio acceptance. M35 (promoting the Studio to production) and M36 (inspecting a full package exported from the browser using real media) are not yet complete. See [the milestone checklist](docs/CHECKPOINTS.md).
 
 ## Run locally
 
@@ -95,7 +103,7 @@ Images, scripts and imported media are processed locally. Studio project metadat
 
 ## Scope and roadmap
 
-This feature branch extends GridSplit Studio through M31: design system, dashboard and project manager; script import/parsing/editing; optional local Kokoro TTS; measured WAV timing and captions; the original image splitter; image sequence management and scene mapping; a visual timeline; four-track audio mixing; transitions and image motion; optional loopback-only FFmpeg/MP4 rendering; and checksum-verified portable project export/restore. GitHub Actions validates TypeScript, unit tests, the production build, Python archive safety and a small FFmpeg render fixture. Target-device Kokoro synthesis and a complete browser-driven production remain manual acceptance tasks.
+This feature branch extends GridSplit Studio through M34 automated validation: design system, dashboard and project manager; script import/parsing/editing; optional local Kokoro TTS; measured WAV timing and captions; the original image splitter; image sequence management and scene mapping; a visual timeline; four-track audio mixing; transitions and image motion; optional loopback-only FFmpeg/MP4 rendering; and checksum-verified portable project export/restore. GitHub Actions validates TypeScript, 91 frontend tests, 9 Python tests, production npm dependency security, the production build, Python archive safety and a small HTTP-to-MP4 FFmpeg integration fixture. Target-device Kokoro synthesis, real-browser timeline acceptance, production promotion and complete browser-generated package inspection remain open.
 
 ## License
 

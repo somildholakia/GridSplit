@@ -41,7 +41,7 @@ Local development origins are allowed by default. To use a separately hosted sta
 GRIDSPLIT_ALLOWED_ORIGINS=https://your-exact-gridsplit-domain.example uv run uvicorn server:app --host 127.0.0.1 --port 8765
 ```
 
-Do not use wildcard origins or expose this server to a LAN/public network. The process must remain bound to loopback. There is no authentication because this is a same-device workflow. The service acknowledges browser private-network preflight only for those permitted origins.
+Do not use wildcard origins or expose this server to a LAN/public network. The process must remain bound to loopback. The sidecar also validates the HTTP Host header and rejects names other than `localhost`, `127.0.0.1` or `[::1]` (with an optional port). There is no authentication because this is a same-device workflow; this service must never be exposed to a LAN/public network. The service acknowledges browser private-network preflight only for those permitted origins.
 
 ## Limits
 
@@ -49,3 +49,14 @@ Do not use wildcard origins or expose this server to a LAN/public network. The p
 - SFX/music cue blocks are not sent through TTS.
 - Duration is derived from WAV sample count and sample rate. Word-level alignment is not claimed.
 - This sidecar is optional; script editing and voice assignment work without the Python runtime or model files.
+
+
+## Security regression tests
+
+From this directory, run:
+
+```bash
+python -m unittest discover -s . -p 'test_*.py'
+```
+
+The tests cover accepted loopback Host forms and reject remote, ambiguous and malformed Host values. The GitHub workflow runs this suite alongside renderer integration tests.

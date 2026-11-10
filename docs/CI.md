@@ -1,41 +1,47 @@
 # Continuous Integration and Build Artifacts
 
-**Current workflow:** M05 baseline plus M12–M21 validation steps  
-**Runner:** GitHub Actions, Ubuntu, Node.js 22
+**Workflow:** `.github/workflows/build.yml`  
+**Runner:** GitHub Actions, Ubuntu, Node.js 22, Python 3  
+**Current validated feature head:** `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`
 
 ## Automated checks
 
-For pull requests to `main`, pushes to `main`, and manual dispatch, CI performs:
+For pull requests to `main`, pushes to `main`, and manual dispatch, CI:
 
-1. Install JavaScript dependencies with `npm ci --no-audit --no-fund` from the committed lockfile.
-2. Compile-check the optional Python TTS sidecar with `python -m py_compile local-tts/server.py`.
-3. Run ESLint on the TypeScript source tree.
-4. Run Vitest unit tests.
-5. Run the TypeScript project typecheck.
-6. Run the Vite production build.
-7. Upload the commit-specific `dist/` artifact for 14 days.
+1. Installs the locked JavaScript dependency graph with `npm ci`.
+2. Installs FFmpeg for the deterministic local-render integration fixture.
+3. Compiles the optional TTS and renderer Python sidecars.
+4. Runs the TTS Host-header security tests and local renderer tests, including HTTP ZIP upload → FFmpeg render → MP4 download.
+5. Audits production npm dependencies using `npm audit --omit=dev --audit-level=high`.
+6. Runs ESLint, Vitest, TypeScript typecheck and the Vite production build.
+7. Uploads the static `dist/` artifact for 14 days.
 
 The workflow has read-only repository permissions, npm caching, and cancels superseded runs on the same ref.
 
 ## Latest verified run
 
-**GitHub Actions run #121 passed** on PR head `7694345f7604c6aaf365b4b8602e563cf7611cd8`.
+**GitHub Actions run #199 passed** on feature branch commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`.
 
-- Python sidecar syntax compilation: passed.
+- Python syntax compilation: passed for both sidecars.
+- TTS security suite: **2 tests passed**.
+- Renderer suite: **7 tests passed**, including a real local HTTP workflow using FFmpeg/ffprobe.
+- Production npm dependency audit: **0 vulnerabilities** at the configured high-severity threshold.
 - ESLint: passed.
-- Vitest: **12 test files, 55 tests passed**.
+- Vitest: **18 test files, 91 tests passed**.
 - TypeScript typecheck: passed.
-- Production build: passed.
+- Vite production build: passed.
 - Static build artifact upload: passed.
 
-[View GitHub Actions run #121](https://github.com/somildholakia/GridSplit/actions/runs/42816007974)
+[View GitHub Actions run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750).
 
-Audio-specific automated coverage includes WAV header/sample metadata parsing, local endpoint loopback/privacy validation, stable character reconciliation, voice/text fingerprint invalidation, copied-project segment reference remapping, and interrupted-generation recovery. M17–M19 coverage adds mixed-rate rational timeline accumulation, sync metadata, and SRT/VTT generation; M20–M21 coverage adds extractor fallback/grid regression fixtures and image intake validation/natural sorting.
+The performance regression test parses and schedules a 500-scene/500-image project with 1,000 timeline clips under a 10-second CI ceiling. This is a synthetic baseline, not a hardware benchmark of actual image blobs, local TTS model inference or long-form rendering.
 
 ## Delivery and verification boundaries
 
-The uploaded artifact is the static frontend build, not a production deployment. Production deployment remains M35.
+The uploaded artifact is the static frontend build, not a production deployment. A READY Vercel preview exists for the current feature branch, but `main` remains at the M01–M05 baseline and PR #1 remains a draft. Production promotion is M35 and has not been performed.
 
-Python compilation does not install the optional Kokoro model/runtime or prove real speech synthesis. The CI runner does not contain the user-supplied model/voice files. M14–M16 remain open in the milestone checklist until a target machine runs the sidecar and completes a real generate → playback → WAV-download smoke test.
+CI's HTTP render fixture validates the sidecar API and MP4 output using a tiny generated image archive. It does not automate every browser screen or prove that a real GridSplit UI export containing the user's images, generated Kokoro audio, music/SFX and local codecs is complete. That full target-device package acceptance remains M36.
 
-Browser interaction testing of the protected Vercel preview and the 196-image contact-sheet acceptance test are also still unverified.
+The workflow audits production npm dependencies. The optional Python sidecar's dependency graph is installed by users separately; it is not bundled or yet covered by a pinned Python lockfile/audit in CI. Likewise, model weights, voice files, FFmpeg binaries and codecs are user-installed and must be assessed by exact revision/build before redistribution.
+
+Real Kokoro model/voice synthesis, playback and WAV download remain open acceptance checks (M14–M16). Manual browser review of image import, mapping persistence, timeline playback/seek, audio synchronization, and the 196-image sample remains open (M22–M25). Selectable-text PDF import is supported; scanned-image PDF OCR is out of scope.

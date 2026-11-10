@@ -84,3 +84,14 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 - Added archive restoration with project/scene/block/asset/segment/track/clip ID remapping; imported media is stored locally and the source project remains untouched.
 - Added audio-mix/profile/effect unit tests, archive safety/checksum tests, and a real FFmpeg transition + audio-mix render fixture to CI. GitHub Actions run #195 passed: 6 Python tests, 89 Vitest tests across 17 files, lint, typecheck, production build and static artifact upload. [Run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430).
 - The local FFmpeg executable and codecs are user-installed and not bundled. Target-device browser/renderer acceptance remains separate.
+
+
+## M32–M34 — Integration, performance and security baseline
+
+- Added a script-to-timeline integration test covering scene parsing, sample-derived synchronization, SRT/VTT captions, scene/image mapping and production timeline creation.
+- Added a loopback HTTP integration test that uploads a manifest-validated project ZIP, submits and polls a local render job, then downloads and verifies the generated H.264/AAC MP4.
+- Added a 500-scene/500-image/1,000-clip performance regression with a 10-second CI ceiling.
+- Limited simultaneous local render jobs to two and bounded finished-job retention to eight results/six hours, with temporary-directory pruning.
+- Added local TTS Host-header validation and regression tests. CI now audits production npm dependencies; run #199 passed with 0 vulnerabilities at the configured high-severity threshold.
+- GitHub Actions run #199 passed 9 Python tests, 91 Vitest tests across 18 files, ESLint, typecheck, Vite build, production npm audit and static artifact upload. [Run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750).
+- Production deployment (M35), real target-device Kokoro/timeline acceptance (M14–M16 and M22–M25), and inspection of a full package exported from the browser using representative media (M36) remain open.
