@@ -97,6 +97,11 @@ export function parseStoredProjects(raw: string | null): StudioProject[] {
     return value.filter(isStudioProject).map((project) => ({
       ...project,
       archived: project.archived ?? false,
+      // A generating state cannot survive a page/process restart. If the last
+      // saved audio metadata exists, keep its previous preview playable.
+      audioSegments: project.audioSegments?.map((segment) => segment.status === "generating"
+        ? { ...segment, status: segment.sampleCount && segment.sampleRate ? "ready" as const : "pending" as const }
+        : segment),
     }));
   } catch {
     return [];
@@ -146,6 +151,35 @@ export function duplicateProject(
   now = new Date().toISOString(),
   namePrefix = "Copy of ",
 ): StudioProject {
+  const sceneIds = new Map<string, string>();
+  const blockIds = new Map<string, string>();
+  const scenes = project.scenes.map((scene) => {
+    const sceneId = makeId();
+    sceneIds.set(scene.id, sceneId);
+    const blocks = scene.blocks.map((block) => {
+      const id = makeId();
+      blockIds.set(block.id, id);
+      return { ...block, id };
+    });
+    return { ...scene, id: sceneId, blocks };
+  });
+  const audioSegments = project.audioSegments?.flatMap((segment) => {
+    const sceneId = sceneIds.get(segment.sceneId);
+    const blockId = blockIds.get(segment.blockId);
+    if (!sceneId || !blockId) return [];
+    return [{
+      ...segment,
+      id: makeId(),
+      sceneId,
+      blockId,
+      status: "pending" as const,
+      sampleCount: undefined,
+      sampleRate: undefined,
+      channels: undefined,
+      durationSeconds: undefined,
+      error: undefined,
+    }];
+  });
   return {
     ...project,
     id: makeId(),
@@ -153,17 +187,9 @@ export function duplicateProject(
     createdAt: now,
     updatedAt: now,
     archived: false,
-    scenes: project.scenes.map((scene) => ({
-      ...scene,
-      id: makeId(),
-      blocks: scene.blocks.map((block) => ({ ...block, id: makeId() })),
-    })),
+    scenes,
     characters: project.characters?.map((character) => ({ ...character, id: makeId() })),
-    audioSegments: project.audioSegments?.map((segment) => ({
-      ...segment, id: makeId(), status: "pending" as const,
-      sampleCount: undefined, sampleRate: undefined, channels: undefined,
-      durationSeconds: undefined, error: undefined,
-    })),
+    audioSegments,
   };
 }
 
