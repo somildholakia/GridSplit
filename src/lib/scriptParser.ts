@@ -18,7 +18,7 @@ export function parseScript(source:string):ParsedScene[]{
   current!.sourceText+=(current!.sourceText?"\n\n":"")+raw;
  };
  for(const line of lines){const v=line.trim();
-  if(chapterHeading.test(v)){flush();chapter=v;if(current&&!current.blocks.length)current.chapter=chapter;continue;}
+  if(chapterHeading.test(v)){flush();chapter=v;const previousScene=scenes[scenes.length-1];if(previousScene&&!previousScene.blocks.length)previousScene.chapter=chapter;continue;}
   if(sceneHeading.test(v)||/^#{1,3}\s+\S/.test(v)){flush();start(v.replace(/^#+\s*/,""));continue;}
   if(!v){flush();continue;}paragraph.push(line);
  }
