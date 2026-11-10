@@ -1,0 +1,155 @@
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, RefreshCw, Trash2 } from "lucide-react";
+import type { StudioProject } from "../../lib/projectStore";
+import { readGeneratedAudio } from "../../audio/audioStore";
+import { measureWavBlob } from "../../lib/mediaTimeline";
+import { analyseSequence, buildTimeline, extractSequenceNumber, moveTimelineClip, normalizeMappings, sortSequence, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
+import "./production-workspace.css";
+
+type ProductionProject = StudioProject & { imageAssets?: SequenceAsset[]; imageMappings?: SceneImageMapping[]; timelineClips?: TimelineClip[] };
+type Props = { project: StudioProject; onUpdate: (patch: Partial<StudioProject>) => void };
+const DB = "gridsplit-studio-images", STORE = "image-blobs", VERSION = 1;
+function openImageDb(): Promise<IDBDatabase> {
+  return new Promise((resolve,reject) => {
+    const request=indexedDB.open(DB,VERSION);
+    request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains(STORE))request.result.createObjectStore(STORE,{keyPath:"id"});};
+    request.onsuccess=()=>resolve(request.result); request.onerror=()=>reject(request.error ?? new Error("Could not open local image storage."));
+  });
+}
+async function saveImage(id:string,blob:Blob):Promise<void>{
+  const db=await openImageDb(); await new Promise<void>((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put({id,blob});tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);}).finally(()=>db.close());
+}
+async function readImage(id:string):Promise<Blob|null>{
+  const db=await openImageDb();return new Promise<Blob|null>((resolve,reject)=>{const tx=db.transaction(STORE,"readonly"),req=tx.objectStore(STORE).get(id);let blob:Blob|null=null;req.onsuccess=()=>{blob=req.result?.blob instanceof Blob?req.result.blob:null;};tx.oncomplete=()=>resolve(blob);tx.onerror=()=>reject(tx.error);}).finally(()=>db.close());
+}
+async function deleteImage(id:string):Promise<void>{
+  const db=await openImageDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);}).finally(()=>db.close());
+}
+async function fingerprint(file:File):Promise<string>{
+  try{const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");}
+  catch{return file.name.toLowerCase()+":"+file.size+":"+file.lastModified;}
+}
+async function dimensions(file:File):Promise<{width:number;height:number}>{
+  try{const bitmap=await createImageBitmap(file);const result={width:bitmap.width,height:bitmap.height};bitmap.close();return result;}catch{return {width:0,height:0};}
+}
+function patchProject(onUpdate:Props["onUpdate"],patch:Partial<ProductionProject>){onUpdate({...patch} as Partial<StudioProject>);}
+function seconds(value:number){return Math.floor(value/60)+":"+((value%60).toFixed(1)).padStart(4,"0");}
+
+export default function ProductionWorkspace({project,onUpdate}:Props){
+  const data=project as ProductionProject;
+  const assets=data.imageAssets??[], mappings=data.imageMappings??[], clips=data.timelineClips??[];
+  const [thumbs,setThumbs]=useState<Record<string,string>>({});
+  const [audioUrls,setAudioUrls]=useState<Record<string,string>>({});
+  const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
+  const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline">("sequence");
+  const issues=useMemo(()=>analyseSequence(assets),[assets]);
+  useEffect(()=>{
+    let alive=true;const urls:Record<string,string>={};
+    void Promise.all(assets.map(async asset=>{const blob=await readImage(asset.id);if(blob)urls[asset.id]=URL.createObjectURL(blob);}))
+      .then(()=>{if(alive)setThumbs(urls);else Object.values(urls).forEach(URL.revokeObjectURL);});
+    return()=>{alive=false;Object.values(urls).forEach(URL.revokeObjectURL);};
+  },[assets.map(a=>a.id).join("|")]);
+  useEffect(()=>{
+    let alive=true;const urls:Record<string,string>={};
+    void Promise.all((project.audioSegments??[]).filter(s=>s.status==="ready").map(async s=>{const blob=await readGeneratedAudio(project.id,s.id);if(blob)urls[s.id]=URL.createObjectURL(blob);}))
+      .then(()=>{if(alive)setAudioUrls(urls);else Object.values(urls).forEach(URL.revokeObjectURL);});
+    return()=>{alive=false;Object.values(urls).forEach(URL.revokeObjectURL);};
+  },[project.id,(project.audioSegments??[]).map(s=>s.id+":"+s.status).join("|")]);
+  const updateAssets=(next:SequenceAsset[])=>patchProject(onUpdate,{imageAssets:next});
+  const updateMappings=(next:SceneImageMapping[])=>patchProject(onUpdate,{imageMappings:normalizeMappings(next,project.scenes.map(s=>s.id),assets.map(a=>a.id))});
+  const addFiles=async(files:FileList|null)=>{
+    if(!files?.length)return;setBusy(true);setMessage("Reading images and storing originals locally…");
+    try{
+      const accepted=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=100*1024*1024);
+      const rejected=files.length-accepted.length;
+      const existing=new Set(assets.map(a=>a.fingerprint));const additions:SequenceAsset[]=[];
+      const ordered=sortSequence(accepted.map(f=>({name:f.name,relativePath:(f as File&{webkitRelativePath?:string}).webkitRelativePath||f.name,file:f})));
+      for(const item of ordered){
+        const file=item.file,id=crypto.randomUUID(),hash=await fingerprint(file);
+        if(existing.has(hash))continue;existing.add(hash);
+        const size=await dimensions(file);await saveImage(id,file);
+        additions.push({id,name:file.name,relativePath:item.relativePath,mimeType:file.type,bytes:file.size,sequenceNumber:extractSequenceNumber(file.name),order:assets.length+additions.length,width:size.width,height:size.height,fingerprint:hash});
+      }
+      updateAssets([...assets,...additions].map((a,index)=>({...a,order:index})));
+      setMessage("Added "+additions.length+" image(s)."+(rejected?" Rejected "+rejected+" unsupported or oversized file(s).":""));
+    }catch(error){setMessage(error instanceof Error?error.message:"Could not import these images.");}finally{setBusy(false);}
+  };
+  const removeAsset=async(id:string)=>{
+    await deleteImage(id);updateAssets(assets.filter(a=>a.id!==id).map((a,index)=>({...a,order:index})));
+    updateMappings(mappings.map(m=>({...m,imageIds:m.imageIds.filter(x=>x!==id)})));
+    patchProject(onUpdate,{timelineClips:clips.filter(c=>c.assetId!==id)});
+  };
+  const moveAsset=(index:number,direction:-1|1)=>{
+    const next=[...assets],target=index+direction;if(target<0||target>=next.length)return;
+    [next[index],next[target]]=[next[target],next[index]];updateAssets(next.map((a,i)=>({...a,order:i})));
+  };
+  const setFrameNumber=(id:string,value:string)=>{
+    const number=value.trim()===""?null:Number(value);
+    if(number!==null&&(!Number.isSafeInteger(number)||number<0)){setMessage("Frame number must be a non-negative whole number.");return;}
+    updateAssets(assets.map(a=>a.id===id?{...a,sequenceNumber:number}:a));
+  };
+  const mappedFor=(sceneId:string)=>mappings.find(m=>m.sceneId===sceneId)?.imageIds??[];
+  const toggleMapping=(sceneId:string,imageId:string)=>{
+    const current=mappedFor(sceneId),next=current.includes(imageId)?current.filter(id=>id!==imageId):[...current,imageId];
+    updateMappings([...mappings.filter(m=>m.sceneId!==sceneId),{sceneId,imageIds:next}]);
+  };
+  const createSchedule=async()=>{
+    setBusy(true);setMessage("Measuring saved WAV audio and building the image schedule…");
+    try{
+      const inputs:{sceneId:string;durationSeconds:number;imageIds:string[]}[]=[];
+      const warnings:string[]=[];
+      for(const scene of project.scenes){
+        const ready=(project.audioSegments??[]).filter(s=>s.sceneId===scene.id&&s.status==="ready");
+        let duration=0;
+        for(const segment of ready){
+          const blob=await readGeneratedAudio(project.id,segment.id);
+          if(!blob){warnings.push(scene.title+": missing audio file for one segment.");continue;}
+          try{duration+=(await measureWavBlob(blob)).durationSeconds;}catch{warnings.push(scene.title+": unreadable WAV segment.");}
+        }
+        if(!ready.length)warnings.push(scene.title+": no generated audio; no timed image clips were created.");
+        const imageIds=mappedFor(scene.id);
+        if(!imageIds.length)warnings.push(scene.title+": no images mapped.");
+        if(duration>0&&imageIds.length)inputs.push({sceneId:scene.id,durationSeconds:duration,imageIds});
+      }
+      const next=buildTimeline(inputs);patchProject(onUpdate,{timelineClips:next});
+      setMessage("Built "+next.filter(c=>c.track==="images").length+" image clips from measured WAV durations. "+(warnings.length?warnings.join(" "):"All scenes with generated audio have mapped images."));
+      setActiveTab("timeline");
+    }catch(error){setMessage(error instanceof Error?error.message:"Could not build the schedule.");}finally{setBusy(false);}
+  };
+  const editClip=(id:string,value:number)=>{
+    if(!Number.isFinite(value)||value<=0)return;
+    patchProject(onUpdate,{timelineClips:clips.map(c=>c.id===id?{...c,durationSeconds:value}:c)});
+  };
+  const reorderClip=(id:string,direction:-1|1)=>patchProject(onUpdate,{timelineClips:moveTimelineClip(clips,id,direction)});
+  const clearAssets=async()=>{for(const asset of assets)await deleteImage(asset.id);updateAssets([]);updateMappings([]);patchProject(onUpdate,{timelineClips:[]});setMessage("Removed all image assets from this project.");};
+  return <section className="production-workspace">
+    <header className="production-head"><div><span className="production-kicker">M22–M25 · PRODUCTION WORKSPACE</span><h2>Images to timeline.</h2><p>Keep source images local, resolve sequence issues, map them to scenes, and schedule them against measured audio.</p></div><Clapperboard size={26}/></header>
+    <nav className="production-tabs" aria-label="Production steps">
+      <button className={activeTab==="sequence"?"active":""} onClick={()=>setActiveTab("sequence")}>1. Image sequence <span>{assets.length}</span></button>
+      <button className={activeTab==="mapping"?"active":""} onClick={()=>setActiveTab("mapping")}>2. Scene mapping <span>{mappings.filter(m=>m.imageIds.length).length}</span></button>
+      <button className={activeTab==="timeline"?"active":""} onClick={()=>setActiveTab("timeline")}>3. Timeline <span>{clips.length}</span></button>
+    </nav>
+    {message&&<p className="production-message" role="status">{message}</p>}
+    {activeTab==="sequence"&&<div className="production-section">
+      <div className="production-actions"><label className="production-button"><ImagePlus size={15}/> Add images<input type="file" accept="image/*" multiple onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/></label><label className="production-button"><ImagePlus size={15}/> Add folder<input type="file" accept="image/*" multiple onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/></label><button className="production-button danger" disabled={!assets.length} onClick={()=>void clearAssets()}><Trash2 size={14}/> Clear all</button><span>{assets.length} images · thumbnails and originals stored locally</span></div>
+      {issues.length>0&&<div className="production-issues"><b><AlertTriangle size={15}/> {issues.length} sequence issue(s) to review</b><ul>{issues.map((issue,i)=><li key={i}>{issue.message}</li>)}</ul></div>}
+      {!assets.length?<div className="production-empty">Add your numbered storyboard images to start sequence management.</div>:<div className="production-assets">{assets.map((asset,index)=><article className="production-asset" key={asset.id}>
+        {thumbs[asset.id]?<img src={thumbs[asset.id]} alt={asset.name}/>:<div className="production-thumb-placeholder">Preview</div>}
+        <div className="production-asset-info"><b>{asset.name}</b><small>{asset.width&&asset.height?asset.width+" × "+asset.height+" · ":""}{(asset.bytes/1024).toFixed(0)} KB</small><label>Frame number<input aria-label={"Frame number for "+asset.name} value={asset.sequenceNumber??""} placeholder="Unnumbered" onChange={e=>setFrameNumber(asset.id,e.target.value)}/></label></div>
+        <div className="production-asset-controls"><button title="Move earlier" disabled={index===0} onClick={()=>moveAsset(index,-1)}><ArrowUp size={14}/></button><button title="Move later" disabled={index===assets.length-1} onClick={()=>moveAsset(index,1)}><ArrowDown size={14}/></button><button title="Remove image" onClick={()=>void removeAsset(asset.id)}><Trash2 size={14}/></button></div>
+      </article>)}</div>}
+      <p className="production-footnote">Duplicate file contents are filtered on import. Sequence numbers can be corrected manually; order is independent of frame numbering. No image is silently discarded after it has been added.</p>
+    </div>}
+    {activeTab==="mapping"&&<div className="production-section"><p className="production-help">Select any number of images for each scene. The same image may be reused in multiple scenes, and each scene may contain multiple images.</p>
+      {!assets.length||!project.scenes.length?<div className="production-empty">Add images and create scenes before mapping.</div>:project.scenes.map(scene=><article className="production-scene-map" key={scene.id}><header><b>{scene.title}</b><span>{mappedFor(scene.id).length} image(s)</span></header><div className="production-map-grid">{assets.map(asset=><label key={asset.id} className={mappedFor(scene.id).includes(asset.id)?"selected":""}>{thumbs[asset.id]?<img src={thumbs[asset.id]} alt=""/>:<span className="production-thumb-placeholder"/>}<input type="checkbox" checked={mappedFor(scene.id).includes(asset.id)} onChange={()=>toggleMapping(scene.id,asset.id)}/><span>{asset.name}</span></label>)}</div></article>)}
+    </div>}
+    {activeTab==="timeline"&&<div className="production-section">
+      <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Rebuild from measured audio"}</button><span>Image and audio tracks · seconds</span></div>
+      {!clips.length?<div className="production-empty">Map images to scenes and generate WAV audio, then build the initial schedule.</div>:<><div className="production-ruler"><span>Track</span><span>Start</span><span>Duration</span><span>Scene / asset</span><span>Controls</span></div>
+        {(["images","audio"] as const).map(track=><section className="production-track" key={track}><h3>{track==="images"?"IMAGE TRACK":"AUDIO TRACK"}</h3>{clips.filter(c=>c.track===track).sort((a,b)=>a.order-b.order).map((clip,index)=><div className="production-clip" key={clip.id}><b>{track==="images"?"IMG":"WAV"}</b><span>{seconds(clip.startSeconds)}</span><label><input type="number" min="0.1" step="0.1" value={Number(clip.durationSeconds.toFixed(2))} onChange={e=>editClip(clip.id,Number(e.target.value))}/> s</label><span>{project.scenes.find(s=>s.id===clip.sceneId)?.title??"Unknown scene"}{clip.assetId?" · "+(assets.find(a=>a.id===clip.assetId)?.name??"Missing image"):""}</span><div><button title="Move earlier on track" disabled={index===0} onClick={()=>reorderClip(clip.id,-1)}><ArrowUp size={13}/></button><button title="Move later on track" disabled={index===clips.filter(c=>c.track===track).length-1} onClick={()=>reorderClip(clip.id,1)}><ArrowDown size={13}/></button></div></div>)}</section>)}
+        <div className="production-audio-preview"><b>Local audio playback</b>{(project.audioSegments??[]).filter(s=>s.status==="ready"&&audioUrls[s.id]).map(s=><label key={s.id}>{project.scenes.find(sc=>sc.id===s.sceneId)?.title??"Scene"}<audio controls preload="none" src={audioUrls[s.id]}/></label>)}</div>
+      </>}
+      <p className="production-footnote">The schedule uses measured WAV sample durations. Rebuild after changing scene audio or mappings. Timeline edits are project-local; this milestone does not render MP4 or mix audio.</p>
+    </div>}
+  </section>;
+}
