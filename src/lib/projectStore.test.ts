@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   createProjectBackup,
   duplicateProject,
+  mergeSceneWithPrevious,
+  moveBlockAcrossScenes,
   moveItem,
+  splitSceneAfterBlock,
   parseProjectBackup,
   type StudioProject,
 } from "./projectStore";
@@ -26,6 +29,23 @@ const fixture: StudioProject = {
     }],
   }],
 };
+
+const twoScenes = [
+  {
+    ...fixture.scenes[0],
+    blocks: [
+      fixture.scenes[0].blocks[0],
+      { id: "b2", kind: "dialogue" as const, speaker: "MAYA", text: "Hello.", sourceLine: 2 },
+    ],
+  },
+  {
+    id: "s2",
+    title: "Street",
+    chapter: "Chapter 1",
+    sourceText: "Thunder.",
+    blocks: [{ id: "b3", kind: "sfx" as const, cue: "THUNDER", text: "", sourceLine: 3 }],
+  },
+];
 
 describe("GridSplit project data", () => {
   it("round-trips projects through a versioned backup", () => {
@@ -53,6 +73,27 @@ describe("GridSplit project data", () => {
     expect(copy.scenes[0].blocks[0].id).toBe("new-3");
     expect(copy.createdAt).toBe("2026-02-01T00:00:00.000Z");
     expect(copy.source).toBe(fixture.source);
+  });
+
+  it("moves blocks between adjacent scenes without losing them", () => {
+    const moved = moveBlockAcrossScenes(twoScenes, 0, 1, 1);
+    expect(moved[0].blocks.map((block) => block.id)).toEqual(["b1"]);
+    expect(moved[1].blocks.map((block) => block.id)).toEqual(["b2", "b3"]);
+  });
+
+  it("splits a scene after a selected block", () => {
+    const split = splitSceneAfterBlock(twoScenes, 0, 0, () => "split-scene");
+    expect(split).toHaveLength(3);
+    expect(split[0].blocks.map((block) => block.id)).toEqual(["b1"]);
+    expect(split[1].id).toBe("split-scene");
+    expect(split[1].blocks.map((block) => block.id)).toEqual(["b2"]);
+  });
+
+  it("merges a scene into the previous scene", () => {
+    const merged = mergeSceneWithPrevious(twoScenes, 1);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].id).toBe("s1");
+    expect(merged[0].blocks.map((block) => block.id)).toEqual(["b1", "b2", "b3"]);
   });
 
   it("reorders items and leaves boundary moves unchanged", () => {
