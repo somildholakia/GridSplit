@@ -1,0 +1,64 @@
+name: Persist local TTS lockfile
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [security/local-tts-locked-dependencies]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  persist-lock:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_branch == 'security/local-tts-locked-dependencies' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the same-repository PR branch without credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          persist-credentials: false
+
+      - name: Download the validated CI lockfile artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: _bootstrap-artifacts
+
+      - name: Commit the generated lock and switch CI to locked mode
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          lock_artifact="$(find _bootstrap-artifacts -type f -name uv.lock -print -quit)"
+          test -n "$lock_artifact"
+          install -D "$lock_artifact" local-tts/uv.lock
+          python - <<'PY'
+          from pathlib import Path
+          path = Path(".github/workflows/build.yml")
+          text = path.read_text(encoding="utf-8")
+          old = "run: uv lock --project local-tts"
+          new = "run: uv lock --check --project local-tts"
+          if old in text:
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          elif new not in text:
+              raise SystemExit("Expected uv lock generation or locked-check command was not found")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add local-tts/uv.lock .github/workflows/build.yml
+          if git diff --cached --quiet; then
+            echo "The lockfile and workflow are already committed."
+            exit 0
+          fi
+          git commit -m "build: commit generated local TTS dependency lock"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${TARGET_BRANCH}"
