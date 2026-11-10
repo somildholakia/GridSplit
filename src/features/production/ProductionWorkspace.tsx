@@ -94,7 +94,8 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
   const addFiles=async(files:FileList|null)=>{
     if(!files?.length)return;setBusy(true);setMessage("Reading images and storing originals locally…");
     try{
-      const accepted=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=100*1024*1024);
+      const valid=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=100*1024*1024);
+      const accepted=valid.slice(0,Math.max(0,500-assets.length));
       const rejected=files.length-accepted.length;
       const additions:SequenceAsset[]=[];
       const ordered=sortSequence(accepted.map(f=>({name:f.name,relativePath:(f as File&{webkitRelativePath?:string}).webkitRelativePath||f.name,file:f})));
@@ -104,7 +105,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
         additions.push({id,name:file.name,relativePath:item.relativePath,mimeType:file.type,bytes:file.size,sequenceNumber:extractSequenceNumber(file.name),order:assets.length+additions.length,width:size.width,height:size.height,fingerprint:hash});
       }
       updateAssets([...assets,...additions].map((a,index)=>({...a,order:index})));
-      setMessage("Added "+additions.length+" image(s)."+(rejected?" Rejected "+rejected+" unsupported or oversized file(s).":""));
+      setMessage("Added "+additions.length+" image(s)."+(rejected?" Rejected "+rejected+" file(s): unsupported, empty, oversized, or beyond the 500-image project limit.":""));
     }catch(error){setMessage(error instanceof Error?error.message:"Could not import these images.");}finally{setBusy(false);}
   };
   const removeAsset=async(id:string)=>{
