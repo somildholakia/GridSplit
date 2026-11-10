@@ -21,11 +21,11 @@ A milestone is complete only when its implementation exists, required tests or v
 - [x] **M09 — Script editor.** Supports paste, TXT, local DOCX, and selectable-text PDF import with original-source preservation. PDF.js and its worker are bundled locally; unit tests cover selectable text, text-free/scanned PDFs, and invalid input. OCR for scanned PDFs is explicitly out of scope.
 - [x] **M10 — Deterministic script parser.** Parses chapter/scene headings, paragraphs, narration, character, SFX, and music directives; source-line tracking is tested. CI run #73 passed.
 - [x] **M11 — Scene segmentation.** Added editable chapter/scene labels and blocks, scene/block reordering, cross-scene block moves, split/merge controls, and add/remove actions. Unit tests and CI run #73 passed.
-- [ ] **M12 — Character management.** Implementation added: stable narrator/dialogue identities and per-character voice/language/speed. CI evidence pending.
-- [ ] **M13 — Offline TTS provider abstraction.** Implementation added: provider contract, health/voice catalog, cancellation, and sample-accurate WAV metadata. CI evidence pending.
-- [ ] **M14 — Local TTS integration.** Optional loopback-only Kokoro ONNX sidecar added; model and voice files remain user-installed. Real model synthesis is not yet verified.
-- [ ] **M15 — Segment generation.** Implementation added: per-block fingerprints, generate/cancel/retry/regenerate, recovery, and IndexedDB WAV storage. CI evidence pending.
-- [ ] **M16 — Audio preview.** Implementation added: native local playback, sample-derived duration, and WAV download. CI evidence pending.
+- [x] **M12 — Character management.** Complete — stable narrator/dialogue identities and per-character voice/language/speed; covered by CI #98.
+- [x] **M13 — Offline TTS provider abstraction.** Complete — provider contracts, health/voice catalog, cancellation, WAV metadata parsing, and loopback privacy tests; covered by CI #98.
+- [ ] **M14 — Local TTS integration.** Implementation added — optional loopback-only Kokoro ONNX sidecar, explicit CORS allowlist, and user-installed model/voice files. Python syntax passes CI; real model/voice synthesis smoke test remains.
+- [ ] **M15 — Segment generation.** Implementation added — per-block fingerprints, generation lifecycle, recovery, and IndexedDB WAV storage. Browser CI passes; live synthesis against an installed model remains to be exercised.
+- [ ] **M16 — Audio preview.** Implementation added — native local playback, sample-derived duration, and WAV download. Browser build/tests pass; review of a real model-generated WAV remains part of the on-device smoke test.
 - [ ] **M17 — Actual duration measurement.** Measure decoded audio durations using sample counts and sample rates.
 - [ ] **M18 — Synchronization metadata engine.** Generate versioned timeline, scene mapping, and project metadata from real media timing.
 - [ ] **M19 — Subtitle generation.** Generate SRT/VTT; support word timing only when alignment is trustworthy.
@@ -67,4 +67,4 @@ Do not check a box until all required evidence is available.
 
 ## M12–M16 implementation candidate
 
-Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md). Do not check these milestones complete until the feature branch passes CI. The optional Python sidecar also requires a real local model/voice setup and synthesis smoke test; that test is not inferred from the browser CI build.
+Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md). CI run #98 passed lint, all 42 unit tests, typecheck, production build, artifact upload, and Python syntax compilation. M14–M16 remain open until the optional local model and matching voice files are installed and one real generate/playback cycle is verified.
