@@ -11,7 +11,7 @@
 
 M01–M05 remain the verified baseline on `main`. The Studio implementation for M06–M25 is on the feature branch in draft PR #1 and has **not** been merged into `main`.
 
-**Latest code validation: GitHub Actions run #164 passed on the current implementation head.** The workflow completed the optional Python sidecar syntax check, npm clean install, ESLint, **75 Vitest tests across 15 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #164](https://github.com/somildholakia/GridSplit/actions/runs/42825453586).
+**Latest code validation: GitHub Actions run #177 passed on the current implementation head.** The workflow completed the optional Python sidecar syntax check, npm clean install, ESLint, **76 Vitest tests across 15 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #164](https://github.com/somildholakia/GridSplit/actions/runs/42826406478).
 
 ## Milestone state
 
@@ -42,7 +42,7 @@ The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPO
 
 ## Validation and delivery boundaries
 
-GitHub Actions run #164 passed on the current implementation head: **15 test files / 75 tests passed**, plus lint, typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run #164](https://github.com/somildholakia/GridSplit/actions/runs/42825453586). Lint, typecheck, production build, optional sidecar syntax check, and artifact upload also passed. The static web artifact is a CI build output; it is not a production deployment.
+GitHub Actions run #177 passed on the current implementation head: **15 test files / 76 tests passed**, plus lint, typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run #164](https://github.com/somildholakia/GridSplit/actions/runs/42826406478). Lint, typecheck, production build, optional sidecar syntax check, and artifact upload also passed. The static web artifact is a CI build output; it is not a production deployment.
 
 The Vercel status check on the current PR head reports a deployment failure due to the free-tier daily deployment quota. This is separate from the passing GitHub CI workflow. Interactive browser QA also remains unverified because a preview requires Vercel Authentication. No end-to-end browser acceptance pass is claimed. The 196-image contact-sheet sample and its preliminary region count are not treated as verified output.
 
