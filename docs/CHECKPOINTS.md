@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-11-10  
 **Audited baseline branch:** `main` (M01–M05)  
-**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M21 scope)  
+**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M25 scope)  
 **Open draft PR:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
@@ -31,10 +31,10 @@ A milestone is complete only when its implementation exists, required tests or v
 - [x] **M19 — Subtitle generation.** Segment-level SRT/VTT export from measured timings; no word-level alignment is invented.
 - [x] **M20 — Preserve and improve GridSplit.** Existing detector/export flow retained; flat-image fallback and even-grid regression fixtures protect existing behavior.
 - [x] **M21 — Multi-image upload.** Multi-file/folder selection, natural folder/filename ordering, duplicate/type/size validation, removable queue, batch cap, and local ordered ZIP/CSV export.
-- [ ] **M22 — Image sequence management.** Add previews, sequence gap detection, duplicate review, and correction tools.
-- [ ] **M23 — Scene-to-image mapping.** Support flexible one-to-many and many-to-one mappings.
-- [ ] **M24 — Automatic synchronization.** Create and recalculate image/audio schedules with explicit warnings.
-- [ ] **M25 — Timeline editor.** Implement editable multitrack timeline and playback.
+- [ ] **M22 — Image sequence management.** Implemented on the feature branch: project-local original image blobs and metadata, thumbnail previews, frame numbering correction, visual reorder, gap/duplicate/unnumbered review, and safe shared-blob cleanup. Automated validation is awaiting the latest CI rerun.
+- [ ] **M23 — Scene-to-image mapping.** Implemented many-to-many mapping, normalization, stale-reference cleanup, project persistence, and duplicate-project scene remapping. Automated validation is awaiting the latest CI rerun.
+- [ ] **M24 — Automatic synchronization.** Implemented schedule creation from measured local WAV sample durations, evenly distributed image spans, and missing audio/image warnings. Automated validation is awaiting the latest CI rerun.
+- [ ] **M25 — Timeline editor.** Implemented visual image/audio lanes, ruler, playhead preview, seek/play/pause/stop, clip start/duration editing, position nudges, and browser Web Audio scheduling for local WAV segments. Automated validation is awaiting the latest CI rerun.
 - [ ] **M26 — Audio mixing.** Support narration, dialogue, music, SFX, levels, mute/solo, and fades.
 - [ ] **M27 — Transitions and image effects.** Implement transitions and pan/zoom/Ken Burns effects.
 - [ ] **M28 — FFmpeg rendering.** Integrate local browser/native rendering with progress and recoverable jobs.
@@ -49,7 +49,7 @@ A milestone is complete only when its implementation exists, required tests or v
 
 ## Current branch validation
 
-M06–M21 are implemented on the feature branch and remain in draft PR #1; they are not merged into `main`. **GitHub Actions run #131 passed** on the PR update: Python sidecar syntax check, `npm ci`, lint, **58 unit tests across 12 files**, TypeScript typecheck, production build, and static artifact upload. The run is available at https://github.com/somildholakia/GridSplit/actions/runs/42817826847.
+M06–M21 have earlier passing CI evidence in draft PR #1. M22–M25 implementation is now committed on the same feature branch but remains unchecked until the latest full CI run passes. The latest known run #154 exposed an older test that attempted to move a video clip onto an audio track, contrary to the helper's same-media-track rule; the test was corrected to move between compatible audio tracks, and a clean rerun is pending. Previous passing baseline: run #131 (58 tests across 12 files, lint, typecheck, production build, sidecar syntax, artifact upload): https://github.com/somildholakia/GridSplit/actions/runs/42817826847.
 
 The additional M17–M19 tests cover sub-second SRT/VTT cue boundaries. The additional M21 tests cover natural ordering across nested folder paths and the 500-image cap. These are automated tests, not a substitute for visual acceptance of a real contact sheet.
 
@@ -66,6 +66,12 @@ For every milestone, record:
 - License/privacy review where assets or engines are introduced
 
 Do not check a box until all required evidence is available.
+
+## M22–M25 implementation and validation
+
+Implementation notes and current manual acceptance gaps are in [docs/M22-M25.md](M22-M25.md). The live timeline uses project-local second-based clip positions; the separate rational-time timeline helper is not yet the live editor's canonical storage format. The timeline preview schedules saved narration/dialogue WAV segments in the browser and does not mix music/SFX or render video. JSON backups keep image metadata but do not include IndexedDB media blobs.
+
+Manual browser review of image import, mapping persistence, playback/seek, actual WAV synchronization, and the 196-image contact sheet remains open. M14–M16 also remain open for real Kokoro model/voice generate → playback → download acceptance.
 
 ## M12–M16 implementation and validation
 
