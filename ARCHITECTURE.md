@@ -278,4 +278,4 @@ The active feature branch now adds the following optional local production layer
 
 The renderer is capability-driven: the local FFmpeg build must include libx264 and AAC support. GridSplit neither downloads nor distributes FFmpeg. The precise codec availability and licensing depend on the exact user-installed build and its linked libraries. See docs/M26-M31.md and local-render/README.md.
 
-The M26–M31 CI workflow installs FFmpeg on the ephemeral runner and runs a small real MP4 smoke fixture plus archive safety/checksum tests. A CI fixture does not replace local target-device acceptance or the remaining M14–M16/M22–M25 manual reviews.
+The M26–M31 CI workflow installs FFmpeg on the ephemeral runner and runs a small real MP4 smoke fixture plus archive safety/checksum tests. GitHub Actions run #195 passed 6 Python tests, lint, 89 Vitest tests across 17 files, typecheck, production build and static artifact upload. [Run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430). This CI fixture does not replace local target-device acceptance or the remaining M14–M16/M22–M25 manual reviews.

@@ -39,17 +39,20 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 - Export an ordered ZIP of unchanged originals with a CSV manifest.
 - In Production Studio, import images into projects, review duplicate content instead of silently dropping it, correct sequence numbers and order, map images to scenes, and build an initial schedule from measured WAV durations.
 
-### Production Studio (M22–M25 implementation)
+### Production Studio (M22–M31 implementation)
 
-- Store numbered storyboard images in a project, with original files in local IndexedDB and browser-generated thumbnails.
-- Review missing frame numbers, sequence gaps, repeated frame numbers, and identical-content fingerprints; correct numbering and reorder images manually.
-- Map multiple images to each scene and reuse one image across different scenes.
-- Build an initial image/audio schedule from the measured duration of locally saved WAV segments, with explicit warnings for missing audio or images.
-- Edit clip start times and durations, nudge clips, view image/audio lanes on a time ruler, and seek a playhead with a live frame preview.
-- Play and pause a timeline while local narration/dialogue WAV segments are scheduled against scene positions using Web Audio.
+- Store numbered storyboard images in a project, review sequence gaps/duplicates, correct frame numbers, and reorder images.
+- Map multiple images to scenes and reuse images across scenes.
+- Build an editable image/audio timeline from measured WAV durations, with playhead, seek, preview, and clip editing.
+- Mix narration, dialogue, music and SFX on four independent tracks with gain, mute/solo and fade controls. Import music/SFX locally.
+- Add per-image Ken Burns, pan/zoom motion and cut/fade/dissolve/wipe transitions.
+- Render H.264/AAC MP4 locally with the optional Python sidecar, using FFmpeg/ffprobe installed on the user's own computer.
+- Export media-inclusive `.gridsplit.zip` packages with project metadata, original images, generated WAVs, imported music/SFX, checksums, measured synchronization JSON, SRT/VTT subtitles and README.
+- Restore an archive as a new editable project, remapping IDs and restoring media into browser-local IndexedDB.
 
-The M22–M25 implementation and automated verification status are tracked in [docs/M22-M25.md](docs/M22-M25.md). GitHub Actions run #182 passed 76 tests across 15 files, lint, typecheck, production build, optional Python sidecar syntax, and static artifact upload. Manual browser acceptance remains open. The live editor uses second-based project timeline positions; it does not yet provide audio mixing, music/SFX processing, transitions, image effects, MP4 rendering, or media-inclusive project packaging.
+Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). GitHub Actions [run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430) passed Python sidecar compilation and 6 Python tests, lint, 89 Vitest tests across 17 files, typecheck, production build and static artifact upload. Browser/device acceptance remains a separate release check.
 
+**Local rendering:** FFmpeg and ffprobe must be installed separately. GridSplit does not bundle binaries/codecs or use a hosted renderer. Follow [local-render/README.md](local-render/README.md) to start the loopback-only renderer. The installed build must provide H.264 (libx264) and AAC encoders.
 ### Image Splitter
 - Upload browser-supported PNG, JPG, WebP, GIF, and other image formats (up to 100 MB).
 - Detect horizontal row bands, then estimate vertical separators independently for each row.

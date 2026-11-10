@@ -9,9 +9,9 @@
 
 ## Current checkpoint
 
-M01–M05 remain the verified baseline on `main`. The Studio implementation for M06–M25 is on the feature branch in draft PR #1 and has **not** been merged into `main`.
+M01–M05 remain the verified baseline on `main`. The Studio implementation for M06–M31 is on the feature branch in draft PR #1 and has **not** been merged into `main`.
 
-**Latest code validation: GitHub Actions run #182 passed on the current implementation head.** The workflow completed the optional Python sidecar syntax check, npm clean install, ESLint, **76 Vitest tests across 15 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #182](https://github.com/somildholakia/GridSplit/actions/runs/42826679257).
+**Latest code validation: GitHub Actions run #195 passed on the current feature-branch head.** The workflow compiled both Python sidecars, passed **6 Python tests** including an FFmpeg/ffprobe render fixture, ESLint, **89 Vitest tests across 17 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430).
 
 ## Milestone state
 
@@ -36,21 +36,21 @@ M01–M05 remain the verified baseline on `main`. The Studio implementation for 
 - **M23:** Complete on PR #1 — many-to-many scene/image mapping, normalization, persistence, and duplicate-project reference remapping.
 - **M24:** Complete on PR #1 — rebuildable image/audio schedule using actual WAV sample-derived durations and explicit missing-media warnings.
 - **M25:** Complete on PR #1 — visual image/audio timeline, time ruler, playhead, image preview, seek/play/pause/stop, clip start/duration editing, nudging, and Web Audio scheduling of locally saved speech segments. Manual browser playback review remains open.
-- **M26:** Implemented on the feature branch — local narration/dialogue/music/SFX mix lanes, volume, mute/solo and fades; automated validation pending.
-- **M27:** Implemented on the feature branch — per-image transition and pan/zoom/Ken Burns settings; automated validation pending.
-- **M28:** Implemented on the feature branch — loopback-only Python FFmpeg sidecar, archive verification, progress and cancellation; CI render fixture pending.
-- **M29:** Implemented on the feature branch — output profiles and ffprobe validation for H.264/AAC, dimensions, frame rate and duration; CI render fixture pending.
-- **M30:** Implemented on the feature branch — portable ZIP with original images, generated WAVs, music/SFX, measured sync JSON, SRT/VTT and SHA-256 manifest; archive validation pending.
-- **M31:** Implemented on the feature branch — checksum-verified local restoration into a new project with ID/reference remapping; archive tests pending.
+- **M26:** Complete on the feature branch — four local narration/dialogue/music/SFX mix tracks, persisted levels, mute/solo/fades, local music/SFX assets and Web Audio preview; automated validation passed in CI run #195.
+- **M27:** Complete on the feature branch — per-image transitions and static/Ken Burns/pan/zoom effects persist by timeline clip ID and are consumed by the renderer; automated render fixture passed in run #195.
+- **M28:** Complete on the feature branch — loopback-only Python renderer with exact-origin/Host checks, archive validation, progress and cancellation; Python syntax, archive and render tests passed in run #195.
+- **M29:** Complete on the feature branch — aspect-ratio profiles and local H.264/AAC MP4 export with ffprobe validation; real FFmpeg/ffprobe fixture passed in run #195.
+- **M30:** Complete on the feature branch — media-inclusive portable ZIP with editable project, source images, generated speech, imported music/SFX, checksums, synchronization JSON and SRT/VTT; validation passed in run #195.
+- **M31:** Complete on the feature branch — archive verification and new-project restore with ID/reference remapping and rollback of failed media writes; automated validation passed in run #195.
 - **M32–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
 ## Validation and delivery boundaries
 
-GitHub Actions run #182 passed on the current implementation head: **15 test files / 76 tests passed**, plus lint, typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run #182](https://github.com/somildholakia/GridSplit/actions/runs/42826679257). Lint, typecheck, production build, optional sidecar syntax check, and artifact upload also passed. The static web artifact is a CI build output; it is not a production deployment.
+GitHub Actions run #195 passed on the current feature-branch head: **6 Python tests** (including a real FFmpeg/ffprobe transition + audio-mix MP4 smoke test), ESLint, **89 Vitest tests across 17 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430). The static web artifact is a CI build output; it is not by itself proof of a production release or target-device compatibility.
 
-The Vercel status check on the current PR head reports a deployment failure due to the free-tier daily deployment quota. This is separate from the passing GitHub CI workflow. Interactive browser QA also remains unverified because a preview requires Vercel Authentication. No end-to-end browser acceptance pass is claimed. The 196-image contact-sheet sample and its preliminary region count are not treated as verified output.
+The CI result verifies the code and smoke fixture on GitHub's runner. A user-device browser acceptance pass with representative images, generated Kokoro WAVs, imported music/SFX and the user's installed FFmpeg/ffprobe remains open. M14–M16 model/voice synthesis and M22–M25 real browser timeline/playback review also remain separate manual acceptance checks. The 196-image contact-sheet sample remains unverified; no manual pass is claimed.
 
 ## Local-first and scope constraints
 
@@ -60,11 +60,11 @@ The Vercel status check on the current PR head reports a deployment failure due 
 - Folder selection is progressive enhancement; multi-file selection remains available.
 - M21 exports the selected original images with an ordered manifest. M22 adds project-local image assets, IndexedDB originals, thumbnails, sequence review and correction. M23 adds scene mapping. JSON backups preserve image metadata but do not bundle IndexedDB image binaries; the portable media archive remains M30.
 - M17–M19 provide segment-level timing and captions; word/phoneme alignment is not claimed.
-- M25 provides editable image/audio lanes and synchronized local speech playback. Music/SFX mixing, levels, mute/solo, fades, transitions, image effects, FFmpeg rendering, MP4 export, media-inclusive project ZIP export, and end-to-end production validation remain later milestones.
+- M25 provides editable image/audio lanes and synchronized local speech playback. M26–M31 add local mixing, transitions/effects, FFmpeg/MP4 rendering, media-inclusive project ZIP export and restore. CI run #195 validates these six implementation milestones; end-to-end target-device acceptance and broader release testing remain open.
 
 ## Current next steps
 
-M26–M31 implementation is now on the feature branch. The updated CI run must pass before the checkpoint boxes are marked complete. Local renderer setup and target-device browser acceptance remain manual checks; install FFmpeg/ffprobe and run the sidecar using [local-render/README.md](../local-render/README.md). M22–M25 browser playback review and M14–M16 real Kokoro model/voice synthesis acceptance also remain open.
+M26–M31 implementation and automated CI validation are complete on the feature branch (run #195). Local renderer setup and target-device browser acceptance remain manual checks; install FFmpeg/ffprobe and run the sidecar using [local-render/README.md](../local-render/README.md). M22–M25 browser playback review and M14–M16 real Kokoro model/voice synthesis acceptance also remain open.
 
 ## Operating rules
 

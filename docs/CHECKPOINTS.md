@@ -6,7 +6,7 @@
 **Open draft PR:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
-A milestone is complete only when its implementation exists, required tests or validation pass, and the evidence is recorded in `docs/PROJECT_STATUS.md`. Planning, mock UI, untested code, and documentation alone do not complete implementation milestones.
+A milestone is complete only when its implementation exists, required tests or validation pass, and the evidence is recorded in `docs/PROJECT_STATUS.md`. Planning, mock UI, untested code, and documentation alone do not complete implementation milestones. The M26–M31 checkboxes record implementation plus automated CI evidence; target-device and real-model acceptance gaps are listed separately and are not implied by those checks.
 
 ## Milestones
 
@@ -35,12 +35,12 @@ A milestone is complete only when its implementation exists, required tests or v
 - [x] **M23 — Scene-to-image mapping.** Many-to-many mapping, normalization, stale-reference cleanup, project persistence, and duplicate-project scene remapping. Automated CI passed.
 - [x] **M24 — Automatic synchronization.** Schedule creation from measured local WAV sample durations, evenly distributed image spans, and missing audio/image warnings. Automated CI passed.
 - [x] **M25 — Timeline editor.** Visual image/audio lanes, ruler, playhead preview, seek/play/pause/stop, clip start/duration editing, position nudges, and browser Web Audio scheduling for local WAV segments. Automated CI passed; real-browser playback review remains a manual acceptance step.
-- [ ] **M26 — Audio mixing.** Four independent local tracks with volume, mute/solo, imported music/SFX, and fade automation are implemented; await the new CI run and evidence update.
-- [ ] **M27 — Transitions and image effects.** Per-image cut/fade/dissolve/wipe transitions and pan/zoom/Ken Burns settings are implemented and persisted; await the renderer smoke-test result.
-- [ ] **M28 — FFmpeg rendering.** Optional loopback-only Python sidecar, archive validation, job progress/cancellation and FFmpeg execution are implemented; await CI render fixture.
-- [ ] **M29 — MP4 export.** Render profiles, H.264/AAC encoding and ffprobe validation of container, dimensions, frame rate and duration are implemented; await CI render fixture.
-- [ ] **M30 — Complete ZIP export.** Browser-generated portable archive now includes editable project data, original image/audio blobs, measured sync JSON, SRT/VTT, README and per-file SHA-256 manifest; await automated archive validation.
-- [ ] **M31 — Project restoration.** Local ZIP restore validates paths/checksums, stores media, remaps all project IDs and restores as a new project; await automated validation.
+- [x] **M26 — Audio mixing.** Four independent local narration/dialogue/music/SFX tracks; persisted gain, mute/solo and fade settings; local music/SFX import and Web Audio preview. CI run #195 passed mix/domain tests.
+- [x] **M27 — Transitions and image effects.** Per-image cut/fade/dissolve/wipe transitions and static/Ken Burns/pan/zoom presets persist against timeline clip IDs and are consumed by the local renderer. CI render fixture passed in run #195.
+- [x] **M28 — FFmpeg rendering.** Optional Python sidecar binds to loopback, enforces exact Origin/Host checks, validates the portable archive, reports render progress and supports cancellation. Python syntax/archive/render tests passed in run #195.
+- [x] **M29 — MP4 export.** Landscape/portrait/square profiles; local H.264/AAC render; ffprobe checks container, codecs, dimensions, frame rate and duration. The real FFmpeg fixture passed in run #195.
+- [x] **M30 — Complete ZIP export.** Media-inclusive versioned archive with editable project data, original images, ready speech WAVs, music/SFX, sample-derived sync JSON, SRT/VTT, README and SHA-256 manifest. Archive validation and export/restore unit tests passed in run #195.
+- [x] **M31 — Project restoration.** Local ZIP restore validates paths, sizes and checksums, stores media in IndexedDB, remaps project/scene/block/image/segment/track/clip IDs and creates a separate project. Remapping and archive tests passed in run #195.
 - [ ] **M32 — Integration testing.** Test the script-to-render workflow end to end.
 - [ ] **M33 — Performance optimization.** Profile large scripts, images, models, timelines, and renders.
 - [ ] **M34 — Security and privacy review.** Verify local-only behavior, file handling, cleanup, dependency safety, and asset/model licenses.
@@ -49,7 +49,7 @@ A milestone is complete only when its implementation exists, required tests or v
 
 ## Current branch validation
 
-M06–M25 implementation is committed on the feature branch in draft PR #1 and is not merged into `main`. **GitHub Actions run #182 passed on the current code head:** Python sidecar syntax check, `npm ci`, ESLint, **76 tests across 15 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #182](https://github.com/somildholakia/GridSplit/actions/runs/42826679257). The earlier run #131 remains the historical M17–M21 validation baseline.
+M06–M31 implementation is committed on the feature branch in draft PR #1 and is not merged into `main`. **GitHub Actions run #195 passed on the current feature head:** Python sidecar compilation and **6 Python tests**, ESLint, **89 Vitest tests across 17 files**, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430). The earlier run #131 remains the historical M17–M21 validation baseline.
 
 The additional M17–M19 tests cover sub-second SRT/VTT cue boundaries. The additional M21 tests cover natural ordering across nested folder paths and the 500-image cap. These are automated tests, not a substitute for visual acceptance of a real contact sheet.
 
@@ -75,7 +75,7 @@ Manual browser review of image import, mapping persistence, playback/seek, actua
 
 ## M26–M31 implementation and validation
 
-Code for all six milestones has been added on the active feature branch. The new CI workflow installs FFmpeg, runs archive path/checksum tests and attempts a small transition + audio-mix MP4 render before the existing npm checks. Completion boxes remain open until that workflow succeeds and its evidence is recorded. A target-device local renderer/browser acceptance pass remains a separate release task. See [docs/M26-M31.md](M26-M31.md).
+All six milestones are implemented on the feature branch and the CI workflow passed in run #195. The workflow compiled both Python sidecars, passed 6 Python tests (including a real FFmpeg/ffprobe transition + audio-mix render), passed ESLint and 89 Vitest tests across 17 files, completed TypeScript typecheck and the Vite production build, and uploaded the static artifact. The checkboxes above record this automated completion. A target-device browser run with the user's installed FFmpeg/ffprobe, actual project media and local Kokoro models remains a separate release acceptance task. See [docs/M26-M31.md](M26-M31.md).
 
 ## M12–M16 implementation and validation
 

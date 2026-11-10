@@ -82,5 +82,5 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 - Added H.264/AAC MP4 output profiles and ffprobe validation for container, codecs, dimensions, frame rate and duration.
 - Added media-inclusive .gridsplit.zip export: editable project metadata, original images, ready speech WAVs, music/SFX, sample-derived synchronization JSON, SRT/VTT subtitles, README and SHA-256 manifest.
 - Added archive restoration with project/scene/block/asset/segment/track/clip ID remapping; imported media is stored locally and the source project remains untouched.
-- Added audio-mix/profile/effect unit tests, archive safety/checksum tests, and a real FFmpeg transition + audio-mix render fixture to CI. Completion evidence is pending the current CI run.
+- Added audio-mix/profile/effect unit tests, archive safety/checksum tests, and a real FFmpeg transition + audio-mix render fixture to CI. GitHub Actions run #195 passed: 6 Python tests, 89 Vitest tests across 17 files, lint, typecheck, production build and static artifact upload. [Run #195](https://github.com/somildholakia/GridSplit/actions/runs/42854525430).
 - The local FFmpeg executable and codecs are user-installed and not bundled. Target-device browser/renderer acceptance remains separate.
