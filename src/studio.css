@@ -36,3 +36,12 @@
 
 .scene-chapter-input{display:block;width:calc(100% - 24px);margin:4px 0 8px 24px;padding:4px 6px;border:1px solid #ffffff12;border-radius:4px;outline:0;background:#121e2d;color:#91a2b9;font-size:8px}
 .scene-chapter-input:focus{border-color:#c9ef7566;color:#d4dfed}
+
+.block-type-select{flex:0 0 82px;width:82px;min-height:29px;padding:4px 5px;border:1px solid #ffffff18;border-radius:5px;outline:0;background:#111c2a;color:#aab8ca;font-size:8px;text-transform:uppercase}
+.block-type-select:focus,.block-meta-input:focus{border-color:#c9ef7566}
+.block-type-select.dialogue{color:#8bb7ff}
+.block-type-select.sfx{color:#e6b17c}
+.block-type-select.music{color:#c69cff}
+.block-meta-input{flex:0 0 88px;width:88px;min-width:0;min-height:29px;padding:5px 6px;border:1px solid #ffffff14;border-radius:5px;outline:0;background:#111c2a;color:#cbd5e3;font-size:8px}
+.block-meta-input::placeholder{color:#64738a}
+@media(max-width:680px){.block-type-select{flex-basis:76px;width:76px}.block-meta-input{flex-basis:78px;width:78px}}
