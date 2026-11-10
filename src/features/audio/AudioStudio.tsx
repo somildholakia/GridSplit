@@ -212,7 +212,7 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     <section className="audio-panel">
       <div className="audio-panel-title"><div><span className="audio-step">M13–M14</span><div><h2>Offline engine</h2><p>Kokoro ONNX runs in a separate local process; the browser only talks to loopback.</p></div></div>
         <span className={engineReady ? "audio-engine-state ready" : "audio-engine-state"}>{engineReady ? <CheckCircle2 size={13}/> : <Server size={13}/>} {engineReady ? "Ready" : "Not connected"}</span></div>
-      <div className="audio-engine-config"><label>Local engine address<input value={endpointDraft} onChange={(event) => setEndpointDraft(event.target.value)} spellCheck={false}/></label>
+      <div className="audio-engine-config"><label>Local engine address<input value={endpointDraft} onChange={(event) => { setEndpointDraft(event.target.value); setEngineReady(false); setEngineMessage("Test the updated local engine address before generating."); }} spellCheck={false}/></label>
         <button className="audio-primary-button" onClick={() => { onUpdate({ ttsEndpoint: endpointDraft }); void checkEngine(); }}><RefreshCw size={14}/> Test connection</button></div>
       <p className="audio-engine-message"><ShieldCheck size={14}/>{engineMessage}</p>
       <div className="audio-engine-help"><b>First-time setup</b><span>Install the optional local engine and download the model and voice files yourself. No weights are included in this app.</span>
