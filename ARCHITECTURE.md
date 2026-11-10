@@ -231,3 +231,13 @@ The first post-move CI attempt caught a stale relative type import. That import 
 ## 12. M05 validation status
 
 The repository now commits `package-lock.json` (npm lockfile v3). GitHub Actions run #15 on 2026-11-10 completed `npm ci`, ESLint, 3 Vitest files / 11 tests, TypeScript typecheck, Vite production build, and static artifact upload successfully. This establishes a working CI and build-artifact delivery baseline; it does not claim browser E2E, contact-sheet sample acceptance, live deployment, TTS, or rendering validation.
+
+## 13. M12–M16 audio vertical slice
+
+Project records may carry optional `characters`, `audioSegments`, and `ttsEndpoint` fields while retaining the existing v1 local project contract. Stable speaker identities are project-local. Segment fingerprints include speech text and voice/language/speed settings so a targeted edit does not invalidate unrelated ready audio.
+
+The browser defines an engine-agnostic `LocalTtsProvider`. The current adapter talks only to a loopback service. It validates the RIFF/WAVE response and derives duration from actual sample frames divided by sample rate. Word alignment is not assumed.
+
+The optional Python sidecar uses `kokoro-onnx==0.6.1` and user-supplied model/voice assets. It binds to `127.0.0.1`; model and voice files are excluded from Git and never downloaded by GridSplit. A configurable explicit CORS allowlist is used for users opening the static frontend from a trusted deployed origin. The model license does not replace licenses for runtime, phonemizer, or voice assets.
+
+Generated WAV blobs are stored in IndexedDB under project/segment keys; project metadata retains only status and audio facts. Duplicating a project creates new IDs and remaps scene/block references, then resets generated segment output. Audio binaries are not included in the v1 JSON project backup; media-inclusive portable packaging is M30.
