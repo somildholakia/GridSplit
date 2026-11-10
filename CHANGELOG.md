@@ -2,7 +2,7 @@
 
 All notable changes to GridSplit Studio are recorded here.
 
-The project is currently evolving from the original GridSplit contact-sheet extractor into a local-first audio/video production studio. Entries distinguish documentation and audit work from implemented runtime functionality.
+The project is evolving from the original GridSplit contact-sheet extractor into a local-first audio/video production studio. Entries distinguish documentation and audit work from implemented runtime functionality.
 
 ## [Unreleased]
 
@@ -12,11 +12,13 @@ The project is currently evolving from the original GridSplit contact-sheet extr
 - Audited baseline, capability gaps, and validation state in `docs/PROJECT_STATUS.md`.
 
 ### Verified
-- Latest GitHub Actions build for the audited `main` HEAD passed dependency installation, TypeScript type-check, and Vite production build on 2026-11-09.
+- GitHub Actions run #15 passed dependency installation, lint, 11 tests, TypeScript typecheck, Vite production build, and static artifact upload.
+- M06–M11 studio implementation and the M12–M16 local audio workflow are recorded in the feature-branch history and detailed milestone notes.
 
-### Not changed
-- No application source code, dependencies, extraction behavior, or deployment configuration changed in this audit commit.
-- No audio/video studio feature is claimed as implemented.
+### Delivery boundary
+- CI build artifacts are downloadable static web builds, not production deployments.
+- Real Kokoro model/voice synthesis, playback, and WAV download remain a target-device acceptance test.
+- No model, voice pack, TTS binary, FFmpeg binary, or native desktop runtime is bundled.
 
 ## M02 — Product requirements
 - Added `PRODUCT_REQUIREMENTS.md` v1.0.0 with stable requirement IDs and priorities.
@@ -24,36 +26,37 @@ The project is currently evolving from the original GridSplit contact-sheet extr
 - M02 is a requirements baseline only; no new runtime feature is claimed.
 
 ## M03 — Architecture and processing design
-- Updated `ARCHITECTURE.md` with accepted web/desktop host boundaries, versioned project contract, rational media timebase, local storage, TTS provider and renderer interfaces.
-- Added `docs/decisions/ADRs.md` with five accepted architectural decisions.
-- Recorded current upstream licensing findings and release gates. Kokoro ONNX is an evaluation candidate only; Piper/eSpeak NG are not default-bundled.
-- No TTS engine, voice pack, model, FFmpeg binary, or native runtime was added.
+- Updated `ARCHITECTURE.md` with accepted web/desktop host boundaries, versioned project contract, rational media timebase, local storage, TTS provider, and renderer interfaces.
+- Added `docs/decisions/ADRs.md` with accepted architectural decisions.
+- Recorded upstream licensing findings and release gates; no TTS engine, voice pack, model, FFmpeg binary, or native runtime was added.
 
 ## M04 — Repository restructuring
 - Moved the current extractor screen to `src/features/image-extraction/ImageExtractionApp.tsx`; retained `src/App.tsx` as the application composition entry.
-- Added initial v1 domain contracts in `src/domain/project.ts` and rational media-time utilities in `src/domain/time.ts`.
+- Added initial v1 domain contracts and rational media-time utilities.
 - Preserved the existing detector, crop editing, and ZIP exporter code paths.
-- Initial CI caught a stale relative type import after the move; corrected it in `488de1e`. The corrected Node 22 typecheck and production build passed.
 
 ## M05 — CI/CD and automated validation
-- Added `package-lock.json` (npm lockfile v3) and switched CI to clean `npm ci` installs with npm cache.
-- Added ESLint configuration and a `lint` script.
-- Added Vitest coverage for rational time math, project schema-version handling, and GridSplit detector invariants.
-- GitHub Actions run #15 passed: lint, 3 test files / 11 tests, TypeScript typecheck, production build, and artifact upload.
-- Added a commit-specific `dist/` artifact with 14-day retention. Production deployment remains deferred to M35.
+- Added `package-lock.json`, clean `npm ci` installs, ESLint, Vitest, TypeScript typecheck, production build, and static build-artifact upload.
+- GitHub Actions run #15 passed: 3 test files / 11 tests, lint, typecheck, production build, and artifact upload.
+- Production deployment remains deferred to M35.
 
-## M12–M16 — Character and local audio workflow (CI #100 passed; local model smoke test pending)
+## M12–M16 — Character and local audio workflow
+- Added stable narrator/dialogue character records with voice, language, and speed preferences.
+- Added engine-independent provider interfaces and an optional loopback-only Kokoro ONNX sidecar.
+- Added per-block generation, cancellation, retry/regenerate, fingerprint reconciliation, and IndexedDB WAV persistence.
+- Added native browser audio preview, sample-derived duration display, and individual WAV download.
+- **Acceptance pending:** no real model/voice synthesis → playback → download cycle has yet been verified on a target device.
 
-### Added
-- Stable narrator and dialogue character records with voice, language, and speed preferences.
-- Engine-independent provider interfaces and WAV sample metadata validation.
-- Optional Kokoro ONNX loopback sidecar; user-supplied model and voice files remain outside the repository.
-- Per-block narration/dialogue generation, cancellation, retry/regenerate, fingerprint reconciliation, and IndexedDB WAV persistence.
-- Native browser audio preview, sample-derived duration display, and individual WAV download.
-- Unit tests for WAV metadata, loopback endpoint privacy, character stability, segment reconciliation, copied-project reference remapping, and interrupted-generation recovery.
-- GitHub Actions run #100 on final PR head `4bc195b7201e2d170a3f6d32667db7b885478b46`: lint, 42 tests across 9 files, TypeScript typecheck, production build, Python sidecar syntax compilation, and artifact upload all passed.
+## M17–M19 — Measured timing and subtitles
+- Added WAV-header remeasurement from locally stored audio blobs and exact rational sample-derived durations.
+- Added versioned deterministic `gridsplit.sync` JSON with scene and segment timing.
+- Added segment-level SRT and WebVTT export; word-level alignment is not claimed.
+- Added regression coverage for exact sample-derived accumulation and sub-second subtitle cue boundaries.
 
-### Boundaries
-- No cloud TTS fallback or bundled/downloaded model weights.
-- Real sidecar synthesis is not claimed until run with user-installed weights and matching voice files.
-- Word alignment, subtitles, timeline duration correction, mixing, and video rendering remain later milestones.
+## M20–M21 — Extractor regression and image intake
+- Added flat-image fallback and uniform-grid boundary regression fixtures while retaining the existing detector/export flow.
+- Added multi-file and browser-supported folder intake, natural relative-path ordering, duplicate/type/size validation, and a removable intake queue.
+- Added a 500-image batch cap and local ordered ZIP/CSV source bundle.
+- Added regression tests for nested-folder natural sorting and the documented batch limit.
+- GitHub Actions run #124 passed lint, 58 tests across 12 files, typecheck, production build, Python sidecar syntax check, and artifact upload.
+- The 196-image contact-sheet sample remains unverified; no manual review pass is claimed.
