@@ -40,6 +40,16 @@ describe("sample-accurate media timeline", () => {
     expect(toVtt(result)).toContain("WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nMaya: Hello there.");
   });
 
+  it("preserves sub-second cue boundaries to millisecond precision", () => {
+    const result = buildSynchronizationMetadata([
+      { id: "short-a", sceneId: "scene-1", blockId: "a", text: "First cue", sampleCount: 2_205, sampleRate: 44_100 },
+      { id: "short-b", sceneId: "scene-1", blockId: "b", text: "Second cue", sampleCount: 2_205, sampleRate: 44_100 },
+    ]);
+    expect(toSrt(result)).toContain("00:00:00,000 --> 00:00:00,050\nFirst cue");
+    expect(toSrt(result)).toContain("00:00:00,050 --> 00:00:00,100\nSecond cue");
+    expect(toVtt(result)).toContain("00:00:00.050 --> 00:00:00.100\nSecond cue");
+  });
+
   it("rejects invalid sample metadata and duplicate IDs", () => {
     expect(() => buildSynchronizationMetadata([{ ...segments[0], sampleRate: 0 }])).toThrow(/positive sample count/);
     expect(() => buildSynchronizationMetadata([segments[0], segments[0]])).toThrow(/unique/);
