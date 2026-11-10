@@ -49,7 +49,7 @@ A milestone is complete only when its implementation exists, required tests or v
 
 ## Current branch validation
 
-The M06–M11 implementation is on the feature branch and remains in draft PR #1; it is not merged into `main`. GitHub Actions run #65 passed all steps: npm install, lint, 31 unit tests across 6 files, typecheck, production build, and static artifact upload. The Vercel preview deployment is Ready for the verified head.
+The M06–M11 implementation is on the feature branch and remains in draft PR #1; it is not merged into `main`. GitHub Actions run #70 passed all steps: npm install, lint, 31 unit tests across 6 files, typecheck, production build, and static artifact upload. The Vercel preview deployment is Ready for the verified head.
 
 M09 is complete for selectable-text PDFs. Scanned/image-only PDF OCR is not included. M10 also has a regression test for starting a new scene when a chapter changes without an explicit scene heading. A live browser smoke test was attempted against the Vercel preview but the preview redirected to Vercel Authentication; without an authenticated browser profile, interactive UI validation of project restore, file import controls, scene editing, and the retained image extractor remains unverified.
 
