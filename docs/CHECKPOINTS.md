@@ -12,7 +12,7 @@ A milestone is complete only when its implementation exists, required tests or v
 - [x] **M02 — Update product requirements.** Added `PRODUCT_REQUIREMENTS.md` v1.0.0 with stable requirement IDs, priorities, local-first/security rules, and release acceptance criteria.
 - [x] **M03 — Architecture and processing design.** Recorded shared web/optional Tauri architecture, versioned project schema, sample/rational timebases, local storage, TTS/render adapters, and upstream license gates in `ARCHITECTURE.md` and `docs/decisions/ADRs.md`.
 - [x] **M04 — Repository restructuring.** Moved the existing extractor screen under `src/features/image-extraction/`, kept `src/App.tsx` as the composition entry, and added v1 project/time domain types. Node 22 typecheck and production build passed on the corrected commit.
-- [ ] **M05 — CI/CD.** Add reliable install, lint/typecheck, unit, integration, build, and appropriate deployment checks.
+- [x] **M05 — CI/CD.** Added a committed npm lockfile and `npm ci`, ESLint, 11 Vitest unit tests, TypeScript typecheck, production build, and a 14-day commit-specific static build artifact. GitHub Actions run #15 passed all steps. Production deployment remains correctly deferred to M35.
 - [ ] **M06 — Design system.** Establish the production-studio design tokens, reusable components, navigation, and responsive behavior.
 - [ ] **M07 — Dashboard.** Implement the project dashboard.
 - [ ] **M08 — Project management.** Create, rename, duplicate, archive, autosave, and restore projects locally.

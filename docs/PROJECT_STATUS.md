@@ -3,91 +3,90 @@
 **Last updated:** 2026-11-10  
 **Repository:** `somildholakia/GridSplit`  
 **Active branch:** `main`  
+**Current HEAD:** `8aa1d3e986bbbc36366b74856f1fc2b298f8ab3a`  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
 
-**M04 complete — initial feature/domain restructuring committed and CI-verified.** M01–M03 remain complete.
+**M05 complete — CI/CD and automated validation baseline committed and passing.**
 
-The existing GridSplit repository was audited before runtime code changes. Repository metadata, source tree, application entry points, image detector, ZIP exporter, styling, package scripts, TypeScript configuration, license, GitHub Actions workflow, and previous project notes were inspected.
-
-This completion applies only to M01. It does not claim that the original extractor's sample export or browser workflow has been manually validated.
-
-## Repository baseline
-
-- Public GitHub repository with push/admin permissions available to the project maintainer.
-- Only one branch was listed during the audit: `main`.
-- Existing license: MIT.
-- Existing frontend: React 18 + TypeScript + Vite.
-- Existing dependencies: React, React DOM, JSZip, and lucide-react.
-- No backend, cloud processing API, or model dependency exists in the audited source.
-- No test files, test runner, or test script were present in the audited tree.
-- No package lockfile was present in the audited tree.
-
-See [ARCHITECTURE.md](../ARCHITECTURE.md) for the detailed baseline and proposed migration boundaries.
-
-## Existing functionality confirmed by source inspection
-
-- Browser-local contact-sheet upload and image decoding.
-- Canvas-based pixel/luminance analysis.
-- Horizontal row-band detection and independent per-row vertical boundary analysis.
-- Tile gallery with include/exclude controls.
-- Per-tile horizontal midpoint split and merge-with-next actions.
-- Uniform rows/columns fallback grid.
-- Adjustable crop border trim.
-- Sequential PNG crop generation and JSZip export.
-- CSV crop manifest and ZIP README.
-- Responsive dark interface and local-only processing design.
-
-## Validation evidence
-
-### GitHub Actions
-
-The latest workflow run for the audited HEAD was successful on 2026-11-09. The Node 22 workflow completed:
-- `npm install`
-- `npm run typecheck`
-- `npm run build`
-
-This is CI evidence for the checked-in TypeScript/Vite build only. The feature-boundary refactor was validated by the Node 22 GitHub Actions typecheck and production build. Browser interaction, manual crop correctness, ZIP inspection, and the complete audio/video workflow have not been independently validated.
-
-The workflow history also includes an earlier failed run for a prior commit; the latest run on the current audited HEAD is successful.
-
-### Sample contact sheet
-
-The existing `docs/SAMPLE_ANALYSIS.md` records a 1536 × 864 sheet, 13 image-bearing bands, and approximately 210 preliminary crop regions against a desired 196. The target of 196 individual images remains unverified and must not be marked complete until the TypeScript implementation is run against the actual source sheet and the exported ZIP is inspected.
-
-## Key gaps before the full studio vision
-
-- Single image/contact-sheet session only; no batch or folder upload.
-- No script editor or deterministic script/scene parser.
-- No project library, persistent project schema, or restoration.
-- No character/speaker manager or offline TTS engine.
-- No segment-level audio generation or actual audio-duration metadata.
-- No trusted word alignment, timeline metadata engine, or subtitle generation.
-- No scene/image mapping or automatic synchronization.
-- No multitrack timeline editor, waveform view, or mixing.
-- No FFmpeg/WebAssembly/native renderer or MP4 export.
-- No full production ZIP or end-to-end automated tests.
+M01–M05 are complete. The existing GridSplit extractor has been retained and moved behind a feature boundary. Product requirements, architecture/processing decisions, initial project/time domain types, automated unit tests, and a clean-install CI pipeline are now in the repository.
 
 ## Milestone state
 
 - **M01:** Complete — repository audit recorded.
 - **M02:** Complete — `PRODUCT_REQUIREMENTS.md` v1.0.0 committed.
-- **M03:** Complete — architecture and processing decisions recorded.
-- **M04:** Complete — extractor moved behind a feature boundary; initial domain project/time contracts added; corrected Node 22 CI passed.
-- **M05–M36:** Not started.
+- **M03:** Complete — architecture, data/timing, storage, processing-host, renderer, and license decisions recorded.
+- **M04:** Complete — extractor screen moved to `src/features/image-extraction/ImageExtractionApp.tsx`; initial domain project/time types added; corrected Node 22 typecheck and build passed.
+- **M05:** Complete — `package-lock.json`, `npm ci`, lint, unit tests, typecheck, production build, and workflow artifact delivery implemented and verified.
+- **M06–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
-## Immediate next step
+## M01 repository audit findings
 
-M05: add automated tests for the exact timebase and existing grid detector, then strengthen CI to run tests, typecheck, production build, and publish build artifacts.
+The initial repository was a React 18 + TypeScript + Vite browser-only contact-sheet extractor, licensed MIT. It had no test runner, test script, or npm lockfile at the time of audit. Those gaps have now been addressed by M05 as described below.
+
+The audited extractor already had:
+- Browser-local contact-sheet upload and image decoding.
+- Canvas-based pixel/luminance analysis.
+- Horizontal row-band detection and independent per-row vertical boundary analysis.
+- Tile gallery with include/exclude controls.
+- Per-tile horizontal midpoint split and merge-with-next actions.
+- Uniform rows/columns fallback grid and adjustable crop border trim.
+- Sequential PNG crop generation, JSZip export, CSV manifest, and ZIP README.
+
+## M04 source organization
+
+- `src/App.tsx` remains the initial application composition entry.
+- The original extractor UI now lives in `src/features/image-extraction/ImageExtractionApp.tsx`.
+- Existing detector and exporter logic remain in `src/lib/detectGrid.ts` and `src/lib/exportZip.ts`.
+- `src/domain/project.ts` defines the initial versioned v1 project contracts.
+- `src/domain/time.ts` implements rational time helpers for sample- and frame-derived timing.
+
+The original detector/exporter implementation was not rewritten as part of the move. The first CI run found one stale relative type import; it was corrected in commit `488de1e`, then typecheck and production build passed.
+
+## M05 CI/CD and test evidence
+
+**GitHub Actions run #15: successful.**  
+[View complete workflow run](https://github.com/somildholakia/GridSplit/actions/runs/42775014351)
+
+The successful workflow ran on Node.js 22 and performed:
+1. `npm ci --no-audit --no-fund` from the committed npm lockfile.
+2. `npm run lint`.
+3. `npm test -- --reporter=verbose`.
+4. `npm run typecheck`.
+5. `npm run build`.
+6. Uploaded the `dist/` web build as a commit-specific artifact with a 14-day retention period.
+
+**Test result:** 3 test files passed; 11 tests passed.
+
+Coverage currently includes:
+- Rational-time normalization, exact sample-based duration, frame-based duration, addition, comparison, and invalid inputs.
+- Supported project schema version gate.
+- Existing GridSplit boundary helper invariants and a featureless-image fallback crop geometry.
+
+The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with npm cache enabled. The workflow uses read-only repository permissions, runs on pushes and pull requests to `main`, supports manual dispatch, and cancels superseded runs on the same ref.
+
+**Delivery boundary:** the CI build artifact is a downloadable static web build, not a production deployment. Production deployment remains M35 so the Studio's real workflow, privacy, runtime/model distribution, and release readiness can be validated first.
+
+## Remaining unverified work and limitations
+
+- The 196-image contact-sheet target in `docs/SAMPLE_ANALYSIS.md` remains unverified; its recorded ~210 preliminary regions are not a pass.
+- No browser interaction or end-to-end crop/ZIP test has been run against the supplied 196-image sheet.
+- No batch/folder image upload, script editor/parser, project library, offline TTS, audio generation, waveform, sync mapping, subtitle generation, multitrack editor, FFmpeg renderer, MP4 export, or complete production ZIP has been implemented yet.
+- Current tests are domain/unit regression tests; browser integration and script-to-render integration tests remain future work.
+- No model, voice pack, TTS binary, FFmpeg binary, or native desktop runtime has been bundled.
+
+## Next step
+
+**M06 — Design system.** Establish the production-studio design tokens, reusable components, navigation, and responsive behavior before introducing the dashboard and feature workspaces.
 
 ## Operating rules
 
-- Preserve the existing extractor and keep source assets on-device.
+- Preserve the working extractor and keep source assets on-device.
 - No paid APIs, mandatory subscriptions, or usage-based cloud processing.
-- Verify every engine, model, voice, and bundled asset license before adoption.
-- Keep the project schema and export package portable and versioned.
+- Verify every engine, model, voice, codec, and bundled asset license before adoption.
+- Keep project data and export packages portable and versioned.
 - Record real test results; never infer success from code or mock screens.
-- Update the status, checkpoint list, architecture, and changelog as implementation progresses.
+- Update the status, checkpoint list, architecture, and changelog after each milestone.

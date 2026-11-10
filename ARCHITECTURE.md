@@ -76,7 +76,7 @@ This is the target organization, not a claim that every folder or feature has be
 
 ### 2.2 Required top-level shape
 
-The following is a conceptual v1 contract. Concrete TypeScript types and runtime validation are added in M04/M08; this example is not a completed serializer.
+The following is a conceptual v1 contract. Initial TypeScript domain types are present from M04; full runtime schema validation and migrations are still planned for M08. This example is not a completed serializer.
 
 ```json
 {
@@ -218,8 +218,8 @@ This is a technical license inventory, not legal advice. Licensing is rechecked 
 1. M01 repository audit — complete.
 2. M02 product requirements — complete.
 3. M03 architecture and processing decisions — this document and ADRs.
-4. M04 feature/domain boundary refactor — preserve existing extractor.
-5. M05 automated validation and CI hardening — tests before new studio feature expansion.
+4. M04 feature/domain boundary refactor — complete; existing extractor preserved.
+5. M05 automated validation and CI hardening — complete; clean install, lint, unit tests, typecheck, build and build artifact delivery pass.
 6. M06 onward — implement the user-facing production studio modules incrementally.
 
 ## 11. M04 restructuring note
@@ -227,3 +227,7 @@ This is a technical license inventory, not legal advice. Licensing is rechecked 
 The extractor implementation was moved without rewriting its detection, crop selection, split/merge, border-trim, or ZIP-export logic. Its detector and exporter remain in `src/lib` and are imported by the feature using relative paths. New domain types define the initial v1 project shape and exact rational-time utilities; they are not yet connected to persistence or UI workflows.
 
 The first post-move CI attempt caught a stale relative type import. That import was corrected in commit `488de1e`, after which Node 22 `typecheck` and `build` both passed. This failure and repair are retained in repository history rather than hidden.
+
+## 12. M05 validation status
+
+The repository now commits `package-lock.json` (npm lockfile v3). GitHub Actions run #15 on 2026-11-10 completed `npm ci`, ESLint, 3 Vitest files / 11 tests, TypeScript typecheck, Vite production build, and static artifact upload successfully. This establishes a working CI and build-artifact delivery baseline; it does not claim browser E2E, contact-sheet sample acceptance, live deployment, TTS, or rendering validation.

@@ -34,3 +34,10 @@ The project is currently evolving from the original GridSplit contact-sheet extr
 - Added initial v1 domain contracts in `src/domain/project.ts` and rational media-time utilities in `src/domain/time.ts`.
 - Preserved the existing detector, crop editing, and ZIP exporter code paths.
 - Initial CI caught a stale relative type import after the move; corrected it in `488de1e`. The corrected Node 22 typecheck and production build passed.
+
+## M05 — CI/CD and automated validation
+- Added `package-lock.json` (npm lockfile v3) and switched CI to clean `npm ci` installs with npm cache.
+- Added ESLint configuration and a `lint` script.
+- Added Vitest coverage for rational time math, project schema-version handling, and GridSplit detector invariants.
+- GitHub Actions run #15 passed: lint, 3 test files / 11 tests, TypeScript typecheck, production build, and artifact upload.
+- Added a commit-specific `dist/` artifact with 14-day retention. Production deployment remains deferred to M35.
