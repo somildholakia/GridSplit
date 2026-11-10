@@ -19,6 +19,8 @@ mkdir -p models
 
 Download the matching `kokoro-v1.0.onnx` and `voices-v1.0.bin` files from the upstream project yourself and place them in `models/`. See the package's setup guide: https://pypi.org/project/kokoro-onnx/.
 
+The Python dependency graph is resolved with a pinned uv toolchain in CI and audited with `pip-audit`. The audit tool is a development-only dependency; normal sidecar installs use `--no-dev`. Model and voice assets remain separate user-installed files and are not included in the Python lock.
+
 GridSplit does not download model weights or voice files and does not redistribute them. The current PyPI page describes `kokoro-onnx` 0.6.1 as MIT licensed and the Kokoro model as Apache-2.0; it requires Python 3.10–3.13. Review each installed phonemizer/runtime/voice dependency and its notices separately before redistribution. See the live voice catalog at https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md.
 
 ## Run
