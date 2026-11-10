@@ -18,7 +18,7 @@ export interface SceneImageMapping {
 export function sequenceNumberFromName(name: string): number | null {
   const base = name.split(/[\\/]/).pop() ?? name;
   const stem = base.replace(/\.[^.]+$/, "");
-  const match = stem.match(/(\d+)(?=\D*$)/);
+  const match = stem.match(/(?:^|\D)(\d{1,8})(?=\D*$)/);
   if (!match) return null;
   const value = Number(match[1]);
   return Number.isSafeInteger(value) ? value : null;
