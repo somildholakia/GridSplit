@@ -32,6 +32,29 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Set up uv and Python 3.12
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.5"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: |
+            local-tts/pyproject.toml
+            local-tts/uv.lock
+
+      - name: Generate the local TTS dependency lock
+        run: uv lock --project local-tts
+
+      - name: Upload resolved Python lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: gridsplit-local-tts-uv-lock-${{ github.sha }}
+          path: local-tts/uv.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Audit the resolved Python dependency graph
+        run: uv run --project local-tts --locked --group dev pip-audit --strict --locked local-tts
 
       - name: Install FFmpeg for local-render smoke test
         run: |
