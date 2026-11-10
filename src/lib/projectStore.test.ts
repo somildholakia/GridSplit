@@ -122,7 +122,7 @@ describe("GridSplit project data", () => {
     expect(restored.audioSegments?.map((item) => item.status)).toEqual(["pending", "ready"]);
   });
 
-  it("moves blocks between adjacent scenes without losing them", () =>
+  it("moves blocks between adjacent scenes without losing them", () => {
     const moved = moveBlockAcrossScenes(twoScenes, 0, 1, 1);
     expect(moved[0].blocks.map((block) => block.id)).toEqual(["b1"]);
     expect(moved[1].blocks.map((block) => block.id)).toEqual(["b2", "b3"]);
