@@ -22,6 +22,14 @@ Count arithmetic: 210 preliminary candidates − 1 title-card merge − 1 title 
 
 The repeated-number exclusions are a manual interpretation of the user's requested 196-image result, not semantic image recognition. GridSplit does not infer story meaning or use AI to decide which panels belong in a sequence. The user must review the proposed crop selection before exporting.
 
+## Exact-sample preset in the browser app
+
+The extractor now has a deterministic preset for this exact source file. It first verifies the original file's SHA-256 and byte length, then requires the detector to return the expected 210 candidates with the reviewed per-row shape and an adjacent split title card. Only then does it show **Apply 196-crop map**.
+
+The action merges the two title-card halves and marks the title, the 11 repeated-number panels and the continuation card as excluded. Those excluded candidates remain visible and can be re-selected. The selected count becomes 196. The preset uses fixed pixel/layout metadata only; it does not use OCR, AI, network services or server-side image processing. Any different image, changed file bytes, or changed detector geometry keeps the normal manual controls and does not receive this preset.
+
+The helper is covered by Vitest tests for the 210-candidate layout, title merge, exact 196 selected count and refusal of a changed title geometry. The actual uploaded file still needs a browser run to verify that the detector exposes the expected layout and that all 196 crops look correct before the preset can be considered accepted.
+
 ## Diagnostic export generated during this continuation
 
 An independent deterministic crop pass over this exact source produced a ZIP containing:

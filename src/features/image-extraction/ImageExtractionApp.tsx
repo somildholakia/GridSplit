@@ -19,6 +19,7 @@ import {
 import { countCells, detectContactSheet, makeEvenBoundaries } from "../../lib/detectGrid";
 import type { ContactSheetLayout } from "../../lib/detectGrid";
 import { createImageZip, type ExportCell } from "../../lib/exportZip";
+import { applyReviewed196SampleCorrection, is196SampleCandidateLayout } from "../../lib/sampleCorrections";
 
 type Cell = ExportCell & {
   id: string;
@@ -39,6 +40,25 @@ type Analysis = {
 };
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const REVIEWED_196_SAMPLE_SIZE = 536907;
+const REVIEWED_196_SAMPLE_SHA256 = "f07ff9935d150e593e45a1de2c591ff6c2e9ac016dc0374cf8f1f83dd5dc5372";
+
+async function isReviewed196SampleFile(file: File, image: HTMLImageElement): Promise<boolean> {
+  if (
+    image.naturalWidth !== 1536 ||
+    image.naturalHeight !== 864 ||
+    file.size !== REVIEWED_196_SAMPLE_SIZE ||
+    !globalThis.crypto?.subtle
+  ) return false;
+
+  try {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return hash === REVIEWED_196_SAMPLE_SHA256;
+  } catch {
+    return false;
+  }
+}
 
 function makeCellId(row: number, column: number, x: number, y: number): string {
   return [row, column, x, y].join("-");
@@ -171,8 +191,11 @@ function App() {
   const [notice, setNotice] = useState("");
   const [confidence, setConfidence] = useState({ x: 0, y: 0 });
   const [detectedRows, setDetectedRows] = useState(0);
+  const [isReviewed196Sample, setIsReviewed196Sample] = useState(false);
+  const [isSampleLayoutPristine, setIsSampleLayoutPristine] = useState(false);
 
   const selectedCells = useMemo(() => cells.filter((cell) => cell.selected), [cells]);
+  const canApplyReviewed196Map = isReviewed196Sample && isSampleLayoutPristine && is196SampleCandidateLayout(cells);
 
   const releaseLoadedImage = useCallback(() => {
     setLoaded((current) => {
@@ -211,6 +234,8 @@ function App() {
     if (!file) return;
     setError("");
     setNotice("");
+    setIsReviewed196Sample(false);
+    setIsSampleLayoutPristine(false);
 
     if (!file.type.startsWith("image/")) {
       setError("Choose an image format supported by your browser, such as PNG, JPG, or WebP.");
@@ -223,10 +248,11 @@ function App() {
 
     const url = URL.createObjectURL(file);
     const image = new Image();
-    image.onload = () => {
+    image.onload = async () => {
       try {
         const layout = applyAnalysis(image);
         const nextCells = createCellsFromLayout(layout);
+        const exactSample = await isReviewed196SampleFile(file, image);
         if (nextCells.length === 0) {
           URL.revokeObjectURL(url);
           setError("No usable image tiles were found. Try a clearer contact sheet or use the uniform-grid controls.");
@@ -235,6 +261,8 @@ function App() {
 
         setLoaded({ file, url, image });
         setCells(nextCells);
+        setIsReviewed196Sample(exactSample);
+        setIsSampleLayoutPristine(exactSample && is196SampleCandidateLayout(nextCells));
         setColumnsInput(String(typicalColumns(layout)));
         setRowsInput(String(layout.rows.length));
         setDetectedRows(layout.rows.length);
@@ -252,6 +280,8 @@ function App() {
       }
     };
     image.onerror = () => {
+      setIsReviewed196Sample(false);
+      setIsSampleLayoutPristine(false);
       URL.revokeObjectURL(url);
       setError("This image could not be opened. Try exporting it as PNG or JPG first.");
     };
@@ -278,6 +308,7 @@ function App() {
 
   const applyEvenGrid = () => {
     if (!loaded) return;
+    setIsSampleLayoutPristine(false);
     const requestedColumns = Number.parseInt(columnsInput, 10);
     const requestedRows = Number.parseInt(rowsInput, 10);
     if (!Number.isFinite(requestedColumns) || !Number.isFinite(requestedRows) ||
@@ -302,7 +333,9 @@ function App() {
     if (!loaded) return;
     try {
       const layout = applyAnalysis(loaded.image);
-      setCells(createCellsFromLayout(layout));
+      const nextCells = createCellsFromLayout(layout);
+      setCells(nextCells);
+      setIsSampleLayoutPristine(isReviewed196Sample && is196SampleCandidateLayout(nextCells));
       setColumnsInput(String(typicalColumns(layout)));
       setRowsInput(String(layout.rows.length));
       setDetectedRows(layout.rows.length);
@@ -314,7 +347,20 @@ function App() {
     }
   };
 
+  const applyReviewed196Map = () => {
+    const corrected = applyReviewed196SampleCorrection(cells);
+    if (!corrected) {
+      setError("The detected grid no longer matches the reviewed 196-crop sample layout. Re-detect the original image before applying this map.");
+      return;
+    }
+    setCells(corrected);
+    setIsSampleLayoutPristine(false);
+    setError("");
+    setNotice("Applied the reviewed non-AI correction map. 196 crops are selected; the excluded title, repeated-number panels and continuation card remain visible for review.");
+  };
+
   const splitCell = (id: string) => {
+    setIsSampleLayoutPristine(false);
     setCells((current) => {
       const index = current.findIndex((cell) => cell.id === id);
       if (index < 0) return current;
@@ -343,6 +389,7 @@ function App() {
   };
 
   const mergeWithNext = (id: string) => {
+    setIsSampleLayoutPristine(false);
     setCells((current) => {
       const sorted = [...current].sort((a, b) => a.row - b.row || a.x - b.x);
       const index = sorted.findIndex((cell) => cell.id === id);
@@ -408,6 +455,8 @@ function App() {
   const startOver = () => {
     releaseLoadedImage();
     setCells([]);
+    setIsReviewed196Sample(false);
+    setIsSampleLayoutPristine(false);
     setNotice("");
     setError("");
     setDetectedRows(0);
@@ -539,6 +588,12 @@ function App() {
               {error && <div className="notice error-notice"><X size={15} /> {error}</div>}
 
               <div className="review-hint"><CircleHelp size={15} /> Click a tile to include or exclude it. Use Split to divide a wide tile or Merge → to join it with the next tile in the same row.</div>
+              {canApplyReviewed196Map && (
+                <div className="notice sample-correction-notice">
+                  <span><b>Exact sample recognized.</b> Apply the reviewed pixel-based correction map to select the requested 196 storyboard crops. You can still review and change every tile before export.</span>
+                  <button className="button button-secondary" onClick={applyReviewed196Map}>Apply 196-crop map</button>
+                </div>
+              )}
 
               <div className="image-grid">
                 {cells.map((cell, index) => (

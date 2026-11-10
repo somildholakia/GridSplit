@@ -140,6 +140,8 @@ a { color: inherit; text-decoration: none; }
 .error-notice { color: #ffb2aa; background: rgba(205,87,79,.09); border: 1px solid rgba(205,87,79,.2); }
 .review-hint { margin: 15px 0; display: flex; align-items: center; gap: 7px; color: #8492a8; font-size: 10px; }
 .review-hint svg { color: #a4b2c8; }
+.sample-correction-notice { align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.sample-correction-notice > span { flex: 1; min-width: 220px; }
 .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(142px, 1fr)); gap: 11px; }
 .image-card { overflow: hidden; min-width: 0; padding: 0; text-align: left; border-radius: 9px; border: 1px solid rgba(177,190,218,.14); background: #111927; transition: border-color .16s, opacity .16s, transform .16s; }
 .image-card:hover { border-color: rgba(213,244,119,.55); transform: translateY(-2px); }
