@@ -42,8 +42,8 @@ jobs:
             local-tts/pyproject.toml
             local-tts/uv.lock
 
-      - name: Generate the local TTS dependency lock
-        run: uv lock --project local-tts
+      - name: Check the committed local TTS dependency lock
+        run: uv lock --check --project local-tts
 
       - name: Upload resolved Python lockfile
         uses: actions/upload-artifact@v4
