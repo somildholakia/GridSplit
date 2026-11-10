@@ -3,154 +3,64 @@
 **Last updated:** 2026-11-10  
 **Repository:** `somildholakia/GridSplit`  
 **Baseline branch:** `main` (M01–M05)  
-**Active development branch:** `feat/m06-m11-studio-script-workflow` (M06–M21 scope)  
-**M05 verified implementation commit:** `8aa1d3e986bbbc36366b74856f1fc2b298f8ab3a`  
+**Active development branch:** `feat/m06-m11-studio-script-workflow` (M06–M21)  
+**Open pull request:** https://github.com/somildholakia/GridSplit/pull/1  
+**Current PR head:** `7d53e2701a2d2ef634182ee70f032f9638f2e9b7`  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
 
-**M05 remains the verified `main` baseline. M06–M13 are implemented and CI-verified on PR #1. M14–M16 implementation is committed and passes browser CI; real model-backed audio verification remains environment-dependent.**
+M01–M05 remain the verified baseline on `main`. The Studio implementation for M06–M21 is on the feature branch in draft PR #1 and has **not** been merged into `main`.
 
-M01–M05 remain complete on `main`. The GridSplit Studio branch adds the production workspace, project management, script parsing, and manual scene editing while retaining the existing image extractor. The branch is not merged.
+**Latest code validation: GitHub Actions run #124 passed.** The workflow completed the optional Python sidecar syntax check, npm clean install, ESLint, 58 Vitest tests across 12 files, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #124](https://github.com/somildholakia/GridSplit/actions/runs/42816605616).
 
 ## Milestone state
 
-- **M01:** Complete — repository audit recorded.
-- **M02:** Complete — `PRODUCT_REQUIREMENTS.md` v1.0.0 committed.
-- **M03:** Complete — architecture, data/timing, storage, processing-host, renderer, and license decisions recorded.
-- **M04:** Complete — extractor screen moved to `src/features/image-extraction/ImageExtractionApp.tsx`; initial domain project/time types added; corrected Node 22 typecheck and build passed.
-- **M05:** Complete — `package-lock.json`, `npm ci`, lint, unit tests, typecheck, production build, and workflow artifact delivery implemented and verified.
-- **M06:** Complete on PR #1 — design tokens, reusable studio components, navigation, and responsive shell.
-- **M07:** Complete on PR #1 — project dashboard, statistics, search, and project actions.
-- **M08:** Complete on PR #1 — local project create/rename/duplicate/archive, autosave/restore, and versioned JSON backup import/export.
-- **M09:** Complete on PR #1 — paste, TXT, DOCX, and selectable-text PDF import are implemented locally in the browser; PDF.js worker is bundled with the app. OCR for scanned PDFs is explicitly out of scope.
+- **M01–M05:** Complete on `main` — repository audit, product requirements, architecture/ADRs, source restructuring, and CI baseline.
+- **M06:** Complete on PR #1 — design tokens, reusable studio components, responsive workspace navigation.
+- **M07:** Complete on PR #1 — dashboard, statistics, project search, active/archive views, project actions.
+- **M08:** Complete on PR #1 — local project create/rename/duplicate/archive/restore, autosave, validated versioned JSON backups.
+- **M09:** Complete on PR #1 for paste, TXT, DOCX, and selectable-text PDF import. Scanned/image-only PDF OCR is not included.
 - **M10:** Complete on PR #1 — deterministic chapter/scene/paragraph parser with narration, dialogue, SFX, and music markers.
-- **M11:** Complete on PR #1 — editable chapters/scenes/blocks, scene and block reordering, cross-scene moves, split, and merge controls.
-- **M12:** Complete on PR #1 — stable narrator/dialogue identities and per-character voice/language/speed. CI #100 passed.
-- **M13:** Complete on PR #1 — engine-agnostic local TTS provider, voice/health contracts, abortable requests, WAV metadata parser, and loopback endpoint guard. CI #98 passed.
-- **M14:** Implemented on PR #1 — optional Kokoro ONNX FastAPI loopback sidecar and explicit trusted-origin CORS allowlist. Python syntax passes CI; real model/voice synthesis is not yet verified.
-- **M15:** Implemented on PR #1 — fingerprinted per-block generation, cancellation/retry/regenerate, interrupted-state recovery, and IndexedDB WAV storage. Browser CI passes; live model generation is pending.
-- **M16:** Implemented on PR #1 — local audio preview, sample-derived duration, WAV download, and missing-blob recovery. Browser CI passes; playback of a real generated segment is pending.
-- **M17:** Complete on PR #1 — local WAV blobs are re-read and duration is derived from actual sample frames/sample rate; CI #121 passed.
-- **M18:** Complete on PR #1 — deterministic versioned synchronization JSON with exact rational segment and scene timing; CI #121 passed.
-- **M19:** Complete on PR #1 — segment-level SRT/VTT export from measured timing; no word alignment is claimed; CI #121 passed.
-- **M20:** Complete on PR #1 — regression fixtures protect flat-image fallback and uniform-grid boundary coverage; CI #121 passed. The 196-image sample remains unverified.
-- **M21:** Complete on PR #1 — multi-file/folder intake, natural sorting, duplicate/type/size limits, and local ordered ZIP/CSV bundle; CI #121 passed.
+- **M11:** Complete on PR #1 — editable scenes/blocks, reorder, cross-scene moves, split, merge, add, and remove.
+- **M12:** Complete on PR #1 — stable narrator/dialogue identities and per-character voice/language/speed.
+- **M13:** Complete on PR #1 — local TTS provider contract, voice/health checks, abortable requests, WAV metadata parsing, and loopback endpoint guard.
+- **M14:** Implemented; real Kokoro ONNX model/voice synthesis smoke test remains pending.
+- **M15:** Implemented; live generation with an installed model remains pending.
+- **M16:** Implemented; real generated WAV playback and download review remains pending.
+- **M17:** Complete on PR #1 — read stored WAV headers and derive duration from real sample frames/sample rate.
+- **M18:** Complete on PR #1 — deterministic versioned synchronization JSON with rational segment and scene timing.
+- **M19:** Complete on PR #1 — segment-level SRT/VTT export from measured timing, without invented word alignment.
+- **M20:** Complete on PR #1 — flat-image fallback and even-grid boundary regression fixtures; original detector/crop/export behavior retained. The 196-image sample remains unverified.
+- **M21:** Complete on PR #1 — multi-file/folder intake, natural relative-path ordering, duplicate/type/size validation, 500-image cap, removable queue, and local ordered ZIP/CSV bundle.
 - **M22–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
-## M01 repository audit findings
+## Validation and delivery boundaries
 
-The initial repository was a React 18 + TypeScript + Vite browser-only contact-sheet extractor, licensed MIT. It had no test runner, test script, or npm lockfile at the time of audit. Those gaps have now been addressed by M05 as described below.
+The run #124 test summary was **12 test files passed and 58 tests passed**. Lint, typecheck, production build, optional sidecar syntax check, and artifact upload also passed. The static web artifact is a CI build output; it is not a production deployment.
 
-The audited extractor already had:
-- Browser-local contact-sheet upload and image decoding.
-- Canvas-based pixel/luminance analysis.
-- Horizontal row-band detection and independent per-row vertical boundary analysis.
-- Tile gallery with include/exclude controls.
-- Per-tile horizontal midpoint split and merge-with-next actions.
-- Uniform rows/columns fallback grid and adjustable crop border trim.
-- Sequential PNG crop generation, JSZip export, CSV manifest, and ZIP README.
+A Vercel preview was reported Ready in the PR conversation, but an interactive browser smoke test could not be completed because the preview redirected to Vercel Authentication. No end-to-end browser acceptance pass is claimed. The 196-image contact-sheet sample and its preliminary region count are not treated as verified output.
 
-## M04 source organization
+## Local-first and scope constraints
 
-- `src/App.tsx` remains the initial application composition entry.
-- The original extractor UI now lives in `src/features/image-extraction/ImageExtractionApp.tsx`.
-- Existing detector and exporter logic remain in `src/lib/detectGrid.ts` and `src/lib/exportZip.ts`.
-- `src/domain/project.ts` defines the initial versioned v1 project contracts.
-- `src/domain/time.ts` implements rational time helpers for sample- and frame-derived timing.
+- Project data and generated audio remain in browser-local storage/IndexedDB.
+- The optional Kokoro sidecar is loopback-only and expects the user to install compatible model and voice files; weights are not bundled.
+- No paid APIs, mandatory subscriptions, or usage-based cloud media processing are required.
+- Folder selection is progressive enhancement; multi-file selection remains available.
+- M21 exports the selected original images with an ordered manifest. It does not yet persist image assets into the project document, generate image thumbnails, detect/correct sequence gaps, or map images to scenes.
+- M17–M19 provide segment-level timing and captions; word/phoneme alignment is not claimed.
+- Multitrack editing, mixing, transitions, FFmpeg rendering, MP4 export, complete project ZIP export, and final end-to-end production validation remain later milestones.
 
-The original detector/exporter implementation was not rewritten as part of the move. The first CI run found one stale relative type import; it was corrected in commit `488de1e`, then typecheck and production build passed.
+## Next development milestone
 
-## M05 CI/CD and test evidence
-
-**GitHub Actions run #15: successful.**  
-[View complete workflow run](https://github.com/somildholakia/GridSplit/actions/runs/42775014351)
-
-The successful workflow ran on Node.js 22 and performed:
-1. `npm ci --no-audit --no-fund` from the committed npm lockfile.
-2. `npm run lint`.
-3. `npm test -- --reporter=verbose`.
-4. `npm run typecheck`.
-5. `npm run build`.
-6. Uploaded the `dist/` web build as a commit-specific artifact with a 14-day retention period.
-
-**Test result:** 3 test files passed; 11 tests passed.
-
-Coverage currently includes:
-- Rational-time normalization, exact sample-based duration, frame-based duration, addition, comparison, and invalid inputs.
-- Supported project schema version gate.
-- Existing GridSplit boundary helper invariants and a featureless-image fallback crop geometry.
-
-The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with npm cache enabled. The workflow uses read-only repository permissions, runs on pushes and pull requests to `main`, supports manual dispatch, and cancels superseded runs on the same ref.
-
-**Delivery boundary:** the CI build artifact is a downloadable static web build, not a production deployment. Production deployment remains M35 so the Studio's real workflow, privacy, runtime/model distribution, and release readiness can be validated first.
-
-## Remaining unverified work and limitations
-
-- The 196-image contact-sheet target in `docs/SAMPLE_ANALYSIS.md` remains unverified; its recorded ~210 preliminary regions are not a pass.
-- No browser interaction or end-to-end crop/ZIP test has been run against the supplied 196-image sheet.
-- No batch/folder image upload, word-level alignment, canonical audio-to-scene duration correction, waveform timeline, subtitle generation, multitrack editor, FFmpeg renderer, MP4 export, or complete production ZIP has been implemented yet. Script import supports paste, TXT, DOCX, and selectable-text PDF; scanned PDF OCR is not included.
-- GitHub Actions run #73 passed lint, 31 unit tests across 6 files, TypeScript typecheck, production build, and static build-artifact upload. The Vercel preview deployment is Ready. A live browser smoke test was attempted but the preview is protected by Vercel Authentication, so interactive UI checks could not be completed without an authenticated browser profile. Image-extractor regression and script-to-render integration tests remain future work.
-- No model, voice pack, TTS binary, FFmpeg binary, or native desktop runtime has been bundled.
-
-## Next step
-
-**Remaining M14–M16 acceptance test:** install Kokoro ONNX and the matching voice file on a target machine, run the optional sidecar, and verify one generate → playback → WAV-download cycle. This machine-specific test is not represented as passed. M17–M21 are complete on the feature branch; GitHub Actions run #121 passed lint, 55 tests across 12 files, typecheck, production build, Python sidecar syntax, and static artifact upload. See [M17–M19](M17-M19.md) and [M20–M21](M20-M21.md).
+**M22 — Image sequence management:** introduce thumbnail previews, sequence gap detection, duplicate review, and tools to correct image ordering. The separate M14–M16 device acceptance test remains open until real model/voice files are installed and a generate → playback → WAV-download cycle is verified.
 
 ## Operating rules
 
 - Preserve the working extractor and keep source assets on-device.
-- No paid APIs, mandatory subscriptions, or usage-based cloud processing.
 - Verify every engine, model, voice, codec, and bundled asset license before adoption.
 - Keep project data and export packages portable and versioned.
 - Record real test results; never infer success from code or mock screens.
 - Update the status, checkpoint list, architecture, and changelog after each milestone.
-
-
-## M06–M16 implementation on PR #1
-
-**Branch:** `feat/m06-m11-studio-script-workflow`  
-**Pull request:** https://github.com/somildholakia/GridSplit/pull/1  
-**Latest implementation head verified by CI:** `4bc195b7201e2d170a3f6d32667db7b885478b46`  
-**PR state:** open, draft, mergeable; not merged into `main`.
-
-### Delivered
-
-- **M06:** Added CSS design tokens, reusable `StudioButton` and `StudioPanelHeader` components, responsive workspace navigation, and a dark production-studio shell.
-- **M07:** Added project dashboard, search, project statistics, create/open/delete, and active/archive views.
-- **M08:** Added create/rename/duplicate/archive/restore, browser-local autosave, validated version-1 JSON backup import/export, and nested ID regeneration when importing copies.
-- **M09:** Script paste, TXT import, local DOCX extraction, and local selectable-text PDF extraction are implemented. PDF.js 6.5.438 and its matching worker are bundled; scanned/image-only PDFs return an explicit OCR-not-included error. File size is limited to 10 MB and PDFs over 500 pages are rejected with guidance.
-- **M10:** Deterministic parser recognises chapter/part headings, scene/sequence headings, Markdown headings, paragraphs, and `[NARRATOR]`, `[CHARACTER: NAME]`, `[SFX: NAME]`, and `[MUSIC: NAME]` markers. Source-line tracking is covered when paragraph text repeats.
-- **M11:** Scene titles and chapter labels are editable; blocks can be edited, added, removed, reordered, and moved to an adjacent scene. Scenes can be reordered, split after a selected block, merged into the previous scene, added, or removed. The original full script remains stored separately from the editable breakdown.
-
-### Validation evidence
-
-**GitHub Actions run #73: successful.**  
-[View workflow run](https://github.com/somildholakia/GridSplit/actions/runs/42784773000)
-
-- `npm ci --no-audit --no-fund`: passed.
-- `npm run lint`: passed.
-- `npm test -- --reporter=verbose`: 6 test files and 31 tests passed, including selectable-text PDF extraction, scanned/text-free PDF handling, and invalid PDF input.
-- `npm run typecheck`: passed.
-- `npm run build`: passed.
-- Static `dist/` artifact upload: passed.
-- Vercel preview status for the verified implementation head: success.
-
-The first CI attempt exposed a TypeScript control-flow issue in the parser's chapter-heading branch. It was fixed in commit `8d9ef27`. A later parser review found that text after a new chapter heading could remain attached to the prior scene when no explicit scene heading was present; this was fixed and covered by a dedicated regression test. Subsequent dependency/API and worker path issues during PDF.js integration were corrected; CI run #73 passes. The PR remains a draft and has not been merged.
-
-### Remaining gaps
-
-- Scanned/image-only PDF OCR is not implemented; selectable text is extracted locally by PDF.js.
-- DOCX extraction currently reads the primary document part; unusual Word features such as footnotes, tracked changes, and embedded text boxes are not yet included.
-- Browser end-to-end tests have not been run for localStorage reload/restore, backup file selection, TXT/DOCX/PDF import in the UI, scene controls, or the preserved image extractor. A smoke-test attempt against the preview was blocked by Vercel Authentication; no UI test pass is claimed.
-- No manual browser QA of the supplied 196-image contact sheet has been completed; the existing image-extractor behavior is retained but not yet regression-verified in a browser.
-
-M06–M11 are checked in `docs/CHECKPOINTS.md` based on implementation and CI evidence. M09 automated tests cover DOCX extraction, PDF selectable-text extraction, text-free/scanned PDF handling, and invalid PDF input. Live UI validation remains blocked by Vercel Authentication.
-
-## M12–M16 implementation notes and CI evidence
-
-See [docs/M12-M16.md](M12-M16.md). Existing project records remain compatible because audio fields are optional. Audio binaries live in IndexedDB, not localStorage. Project copies receive new nested character/segment IDs and segment scene/block references are remapped; generated audio output is reset to pending rather than shared. The loopback sidecar does not fetch or redistribute model files.
-
-**Final PR head:** `4bc195b7201e2d170a3f6d32667db7b885478b46`. **GitHub Actions run #100 passed:** Python sidecar syntax check, ESLint, 42 tests across 9 files, TypeScript typecheck, production build, and static artifact upload. No real TTS model/voice package was available in the CI environment; therefore M14–M16 are implemented but remain open for the on-device synthesis/playback/download acceptance test.
