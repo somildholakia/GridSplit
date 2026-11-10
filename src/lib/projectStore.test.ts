@@ -7,6 +7,7 @@ import {
   moveItem,
   splitSceneAfterBlock,
   parseProjectBackup,
+  parseStoredProjects,
   type StudioProject,
 } from "./projectStore";
 
@@ -51,6 +52,13 @@ describe("GridSplit project data", () => {
   it("round-trips projects through a versioned backup", () => {
     const contents = createProjectBackup([fixture], "2026-01-03T00:00:00.000Z");
     expect(parseProjectBackup(contents)).toEqual([{ ...fixture, archived: false }]);
+  });
+
+  it("restores valid local projects and defaults legacy archive state", () => {
+    const legacy = { ...fixture };
+    expect(parseStoredProjects(JSON.stringify([legacy]))).toEqual([{ ...fixture, archived: false }]);
+    expect(parseStoredProjects("not-json")).toEqual([]);
+    expect(parseStoredProjects(JSON.stringify({}))).toEqual([]);
   });
 
   it("rejects malformed and unsupported backups", () => {
