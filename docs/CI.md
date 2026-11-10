@@ -39,7 +39,7 @@ The performance regression test parses and schedules a 500-scene/500-image proje
 
 ## Delivery and verification boundaries
 
-The uploaded artifact is the static frontend build, not a production deployment. A READY Vercel preview exists at `gridsplit-5alhvnqz3-somildholakias-projects.vercel.app` from the pre-merge validation SHA. PR #1 is merged, but production promotion (M35) remains open: the current production alias `gridsplit-kappa.vercel.app` still serves the older M01–M05 deployment. Vercel rejected a production deployment request with HTTP 402 `api-deployments-free-per-day` after the Hobby team exceeded 100 deployments in 24 hours; retry is available after the quota window resets.
+The uploaded artifact is the static frontend build, not a production deployment. A READY Vercel preview exists at `gridsplit-5alhvnqz3-somildholakias-projects.vercel.app` from the pre-merge validation SHA. The preview redirects to Vercel SSO before the app loads, so browser smoke testing was blocked; deployment protection was not changed. PR #1 is merged, but production promotion (M35) remains open: the current production alias `gridsplit-kappa.vercel.app` still serves the older M01–M05 deployment. Vercel rejected a production deployment request with HTTP 402 `api-deployments-free-per-day` after the Hobby team exceeded 100 deployments in 24 hours; retry is available after the quota window resets.
 
 CI's HTTP render fixture validates the sidecar API and MP4 output using a tiny generated image archive. It does not automate every browser screen or prove that a real GridSplit UI export containing the user's images, generated Kokoro audio, music/SFX and local codecs is complete. That full target-device package acceptance remains M36.
 
