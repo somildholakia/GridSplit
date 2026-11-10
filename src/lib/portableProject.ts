@@ -3,7 +3,7 @@ import type { StudioProject } from "./projectStore";
 import { buildSynchronizationMetadata, measureWavBlob, toSrt, toVtt } from "./mediaTimeline";
 import type { SyncSegmentInput } from "./mediaTimeline";
 import { duplicateProject } from "./projectStore";
-import { readGeneratedAudio, saveGeneratedAudio } from "../audio/audioStore";
+import { deleteGeneratedAudio, readGeneratedAudio, saveGeneratedAudio } from "../audio/audioStore";
 import {
   deleteProjectImageBlob,
   deleteProjectMedia,
@@ -343,7 +343,7 @@ export async function importPortableProject(blob: Blob, makeId: () => string = (
   } catch (error) {
     await Promise.all([
       ...savedImages.map((id) => deleteProjectImageBlob(id).catch(() => undefined)),
-      ...savedAudio.map((id) => import("./audio/audioStore").then((store) => store.deleteGeneratedAudio(remapped.project.id, id)).catch(() => undefined)),
+      ...savedAudio.map((id) => deleteGeneratedAudio(remapped.project.id, id).catch(() => undefined)),
       ...savedMix.map((id) => deleteProjectMedia(remapped.project.id, id).catch(() => undefined)),
     ]);
     throw error;
