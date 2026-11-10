@@ -67,3 +67,9 @@ This branch delivers the M06–M11 studio foundation: design system, dashboard, 
 ## License
 
 GridSplit is MIT licensed. The locally bundled PDF.js dependency is Apache-2.0; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Local audio generation (M12–M16)
+
+GridSplit includes a character/voice workspace and an optional Kokoro ONNX local TTS provider. Follow [local-tts/README.md](local-tts/README.md) to set up the sidecar, then open **Audio studio** in an active project. Model and voice files are installed by the user and are not included in this repository. The browser calls only a loopback service; WAV blobs are stored in local IndexedDB.
+
+See [docs/M12-M16.md](docs/M12-M16.md) for milestones and limitations.
