@@ -64,7 +64,7 @@ The CI result verifies the code and smoke fixture on GitHub's runner. A user-dev
 - Folder selection is progressive enhancement; multi-file selection remains available.
 - M21 exports the selected original images with an ordered manifest. M22 adds project-local image assets, IndexedDB originals, thumbnails, sequence review and correction. M23 adds scene mapping. JSON backups preserve image metadata but do not bundle IndexedDB image binaries; the portable media archive remains M30.
 - M17–M19 provide segment-level timing and captions; word/phoneme alignment is not claimed.
-- M25 provides editable image/audio lanes and synchronized local speech playback. M26–M31 add local mixing, transitions/effects, FFmpeg/MP4 rendering, media-inclusive project ZIP export and restore. M32–M34 add automated integration/performance regressions and the application security review. CI run #199 validates this automated scope; target-device acceptance, production promotion and full browser-generated package inspection remain open.
+- M25 provides editable image/audio lanes and synchronized local speech playback. M26–M31 add local mixing, transitions/effects, FFmpeg/MP4 rendering, media-inclusive project ZIP export and restore. M32–M34 add automated integration/performance regressions and the application security review. CI run #199 and Python-lock runs #217/#224 validate the automated scope. Production deployment and the public dashboard/script/audio/production-shell smoke test are complete; real target-device media acceptance and full browser-generated package inspection remain open.
 
 ## Current next steps
 
