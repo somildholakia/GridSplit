@@ -53,7 +53,7 @@ M06–M34 Studio implementation is merged into `main` via PR #1, and the optiona
 
 The additional M17–M19 tests cover sub-second SRT/VTT cue boundaries. The additional M21 tests cover natural ordering across nested folder paths and the 500-image cap. These are automated tests, not a substitute for visual acceptance of a real contact sheet.
 
-M09 is complete for selectable-text PDFs. Scanned/image-only PDF OCR is not included. Vercel deployment initially hit the free-tier daily deployment quota, but M35 is now complete. Preview deployments require Vercel SSO; the production alias is public and its dashboard/script/audio/production-shell smoke test passed. The previously recorded 196-image sample sheet is also still unverified; no manual pass is claimed.
+M09 is complete for selectable-text PDFs. Scanned/image-only PDF OCR is not included. M35 production deployment is complete after the Vercel quota window cleared. Preview deployments require Vercel SSO; the production alias is public and its dashboard/script/audio/production-shell smoke test passed. The previously recorded 196-image sample sheet is also still unverified; no manual pass is claimed.
 
 ## Completion evidence template
 
