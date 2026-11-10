@@ -10,7 +10,7 @@ A milestone is complete only when its implementation exists, required tests or v
 
 - [x] **M01 — Audit existing GridSplit repository.** Read-only source, repository, license, CI, and capability audit completed; baseline recorded. The outstanding 196-image sample export is not claimed as verified.
 - [x] **M02 — Update product requirements.** Added `PRODUCT_REQUIREMENTS.md` v1.0.0 with stable requirement IDs, priorities, local-first/security rules, and release acceptance criteria.
-- [ ] **M03 — Architecture and processing design.** Decide module boundaries, project schema, TTS/render adapters, browser/desktop split, local asset/model handling, and media timebases.
+- [x] **M03 — Architecture and processing design.** Recorded shared web/optional Tauri architecture, versioned project schema, sample/rational timebases, local storage, TTS/render adapters, and upstream license gates in `ARCHITECTURE.md` and `docs/decisions/ADRs.md`.
 - [ ] **M04 — Repository restructuring.** Introduce modular feature/domain boundaries without regressing extraction.
 - [ ] **M05 — CI/CD.** Add reliable install, lint/typecheck, unit, integration, build, and appropriate deployment checks.
 - [ ] **M06 — Design system.** Establish the production-studio design tokens, reusable components, navigation, and responsive behavior.

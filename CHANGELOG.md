@@ -22,3 +22,9 @@ The project is currently evolving from the original GridSplit contact-sheet extr
 - Added `PRODUCT_REQUIREMENTS.md` v1.0.0 with stable requirement IDs and priorities.
 - Added functional, privacy, platform, timing, recovery, accessibility, and release acceptance criteria.
 - M02 is a requirements baseline only; no new runtime feature is claimed.
+
+## M03 — Architecture and processing design
+- Updated `ARCHITECTURE.md` with accepted web/desktop host boundaries, versioned project contract, rational media timebase, local storage, TTS provider and renderer interfaces.
+- Added `docs/decisions/ADRs.md` with five accepted architectural decisions.
+- Recorded current upstream licensing findings and release gates. Kokoro ONNX is an evaluation candidate only; Piper/eSpeak NG are not default-bundled.
+- No TTS engine, voice pack, model, FFmpeg binary, or native runtime was added.
