@@ -41,3 +41,18 @@ The project is currently evolving from the original GridSplit contact-sheet extr
 - Added Vitest coverage for rational time math, project schema-version handling, and GridSplit detector invariants.
 - GitHub Actions run #15 passed: lint, 3 test files / 11 tests, TypeScript typecheck, production build, and artifact upload.
 - Added a commit-specific `dist/` artifact with 14-day retention. Production deployment remains deferred to M35.
+
+## M12–M16 — Character and local audio workflow (implementation added; CI pending)
+
+### Added
+- Stable narrator and dialogue character records with voice, language, and speed preferences.
+- Engine-independent provider interfaces and WAV sample metadata validation.
+- Optional Kokoro ONNX loopback sidecar; user-supplied model and voice files remain outside the repository.
+- Per-block narration/dialogue generation, cancellation, retry/regenerate, fingerprint reconciliation, and IndexedDB WAV persistence.
+- Native browser audio preview, sample-derived duration display, and individual WAV download.
+- Unit tests for WAV metadata and segment reconciliation.
+
+### Boundaries
+- No cloud TTS fallback or bundled/downloaded model weights.
+- Real sidecar synthesis is not claimed until run with user-installed weights and matching voice files.
+- Word alignment, subtitles, timeline duration correction, mixing, and video rendering remain later milestones.
