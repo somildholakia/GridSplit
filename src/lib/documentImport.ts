@@ -62,13 +62,7 @@ export async function extractDocxText(file: Blob): Promise<string> {
   return extractDocxXmlText(await document.async("string"));
 }
 
-type PdfTextItem = {
-  str: string;
-  transform: number[];
-  width: number;
-  height: number;
-  hasEOL: boolean;
-};
+
 
 /**
  * Reads selectable PDF text locally through PDF.js. The worker is bundled with
