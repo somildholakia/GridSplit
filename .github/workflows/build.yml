@@ -54,7 +54,7 @@ jobs:
           retention-days: 7
 
       - name: Audit the resolved Python dependency graph
-        run: uv run --project local-tts --locked --group dev pip-audit --strict --locked local-tts
+        run: uv run --project local-tts --locked --group dev pip-audit --strict
 
       - name: Install FFmpeg for local-render smoke test
         run: |
