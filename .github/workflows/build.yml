@@ -27,10 +27,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Emit initial npm lockfile for check-in
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          node --input-type=module -e 'import { readFileSync } from "node:fs"; const encoded = readFileSync("package-lock.json").toString("base64"); console.log("LOCKFILE_BASE64_BEGIN"); for (let i = 0; i < encoded.length; i += 4000) console.log("LOCKFILE_CHUNK:" + encoded.slice(i, i + 4000)); console.log("LOCKFILE_BASE64_END");'
 
       - name: Lint
         run: npm run lint
