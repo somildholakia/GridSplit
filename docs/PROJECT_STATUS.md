@@ -11,7 +11,7 @@
 
 M06–M34 implementation is now merged into `main` by PR #1 at commit `0f6bb317508f028627d02bcece7b414598438399` (merged 2026-11-10 16:57:47 UTC). M01–M05 remain the original baseline milestones; they are not the current main-branch code state.
 
-**Latest code validation: GitHub Actions run #199 passed on commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`.** The workflow compiled both Python sidecars, passed **9 Python tests** (including an HTTP upload → local FFmpeg render → MP4 download test), ESLint, **91 Vitest tests across 18 files**, TypeScript typecheck, Vite production build, static artifact upload and production npm dependency audit (**0 vulnerabilities at the high-severity threshold**). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750).
+**Base Studio validation:** GitHub Actions run #199 passed on pre-merge commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`, including 9 Python tests, 91 Vitest tests across 18 files, ESLint, TypeScript typecheck, Vite production build, static artifact upload and production npm audit (0 vulnerabilities at the high-severity threshold). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). **Latest local-TTS dependency PR validation:** run #217 passed `uv lock --check`, `pip-audit --strict` (no known vulnerabilities found), 9 Python tests, 91 Vitest tests across 18 files, ESLint, typecheck, production build and artifact upload. [Open run #217](https://github.com/somildholakia/GridSplit/actions/runs/42865601179).
 
 ## Milestone state
 
@@ -44,7 +44,7 @@ M06–M34 implementation is now merged into `main` by PR #1 at commit `0f6bb3175
 - **M31:** Complete on main (merged via PR #1) — archive verification and new-project restore with ID/reference remapping and rollback of failed media writes; automated validation passed in run #195.
 - **M32:** Automated integration slice complete — script/sync/subtitle/mapping/timeline test and HTTP ZIP-to-MP4 local render test passed in run #199. Full browser-driven project export is still M36.
 - **M33:** Performance regression baseline complete — 500 scenes, 500 images, 1,000 clips under a 10-second test ceiling; renderer bounded to two active jobs/eight retained finished jobs. Real target-device/media profiling is still open.
-- **M34:** Application security/privacy review documented in [SECURITY_REVIEW.md](SECURITY_REVIEW.md); Host/Origin/archive checks and 0-production-npm-vulnerability audit passed. Python dependency audit and exact licenses for externally installed model/voice/FFmpeg assets remain external release checks.
+- **M34:** Application security/privacy review documented in [SECURITY_REVIEW.md](SECURITY_REVIEW.md). This PR adds a committed cross-platform `local-tts/uv.lock` for Python 3.10–3.13, pins `uv` 0.13.5 and development-only `pip-audit` 2.10.1, checks lock consistency with `uv lock --check`, and audits the synchronized sidecar environment with `pip-audit --strict`. GitHub Actions run #217 passed all these checks plus the existing Python, frontend and build suites. Exact provenance/licenses of user-installed model/voice/phonemizer/FFmpeg assets remain external release checks.
 - **M35:** Open — Vercel production deployment for merged main commit `0f6bb317` was rejected with HTTP 402 `api-deployments-free-per-day` after the Hobby team exceeded 100 deployments in 24 hours. The current production alias still points to the M01–M05 baseline deployment; see [M32–M36](M32-M36.md).
 - **M36:** Open — no real browser-generated full project package has yet been produced and inspected on a target device.
 
@@ -52,7 +52,7 @@ The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPO
 
 ## Validation and delivery boundaries
 
-GitHub Actions run #199 passed on the current feature-branch head: **9 Python tests** (including a real HTTP ZIP upload → local FFmpeg/ffprobe render → MP4 download), ESLint, **91 Vitest tests across 18 files**, TypeScript typecheck, Vite production build, static artifact upload, and npm production dependency audit (**0 vulnerabilities at the high-severity threshold**). [Run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). The static web artifact and Vercel preview are not a production release or proof of target-device compatibility.
+GitHub Actions run #199 validated the M06–M34 implementation before merge. On the Python-dependency PR branch, run #217 additionally passed committed-lock validation (`uv lock --check`), `pip-audit --strict` (no known vulnerabilities found), 9 Python tests, ESLint, 91 Vitest tests across 18 files, TypeScript typecheck, Vite build and artifact upload. [Run #217](https://github.com/somildholakia/GridSplit/actions/runs/42865601179). The static web artifact and Vercel preview are not a production release or proof of target-device compatibility.
 
 The CI result verifies the code and smoke fixture on GitHub's runner. A user-device browser acceptance pass with representative images, generated Kokoro WAVs, imported music/SFX and the user's installed FFmpeg/ffprobe remains open. M14–M16 model/voice synthesis and M22–M25 real browser timeline/playback review also remain separate manual acceptance checks. The 196-image contact-sheet sample remains unverified; no manual pass is claimed.
 
@@ -68,7 +68,7 @@ The CI result verifies the code and smoke fixture on GitHub's runner. A user-dev
 
 ## Current next steps
 
-M26–M34 automated implementation is merged into main. CI run #199 passed on feature validation SHA `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`; a separate post-merge run on `0f6bb317` remains to be recorded. M35 production promotion and M36 representative browser-generated package inspection remain open. Local renderer setup and target-device browser acceptance remain manual checks; install FFmpeg/ffprobe and run the sidecar using [local-render/README.md](../local-render/README.md). M22–M25 browser playback review and M14–M16 real Kokoro model/voice synthesis acceptance also remain open.
+M26–M34 Studio implementation is merged into `main`. This PR #3 adds the optional TTS sidecar's pinned Python lock and CI advisory audit; run #217 passed on the PR branch, but PR #3 still needs to merge for that lock/audit pipeline to be on `main`. M35 production promotion and M36 representative browser-generated package inspection remain open. Local renderer setup and target-device browser acceptance remain manual checks; install FFmpeg/ffprobe and run the sidecar using [local-render/README.md](../local-render/README.md). M22–M25 browser playback review and M14–M16 real Kokoro model/voice synthesis acceptance also remain open.
 
 ## Operating rules
 
