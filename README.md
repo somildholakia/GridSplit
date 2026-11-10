@@ -48,7 +48,7 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 - Edit clip start times and durations, nudge clips, view image/audio lanes on a time ruler, and seek a playhead with a live frame preview.
 - Play and pause a timeline while local narration/dialogue WAV segments are scheduled against scene positions using Web Audio.
 
-The M22–M25 implementation and automated verification status are tracked in [docs/M22-M25.md](docs/M22-M25.md). GitHub Actions run #177 passed 76 tests across 15 files, lint, typecheck, production build, optional Python sidecar syntax, and static artifact upload. Manual browser acceptance remains open. The live editor uses second-based project timeline positions; it does not yet provide audio mixing, music/SFX processing, transitions, image effects, MP4 rendering, or media-inclusive project packaging.
+The M22–M25 implementation and automated verification status are tracked in [docs/M22-M25.md](docs/M22-M25.md). GitHub Actions run #182 passed 76 tests across 15 files, lint, typecheck, production build, optional Python sidecar syntax, and static artifact upload. Manual browser acceptance remains open. The live editor uses second-based project timeline positions; it does not yet provide audio mixing, music/SFX processing, transitions, image effects, MP4 rendering, or media-inclusive project packaging.
 
 ### Image Splitter
 - Upload browser-supported PNG, JPG, WebP, GIF, and other image formats (up to 100 MB).
@@ -92,7 +92,7 @@ Images and imported scripts are processed locally in the browser. Studio project
 
 ## Scope and roadmap
 
-This feature branch contains the M06–M25 implementation: design system, dashboard, local projects, script import/parsing/editing, local audio workflow, measured timing and subtitles, original image splitter, project-local image sequence management, many-to-many scene mapping, measured image/audio scheduling, and a visual timeline with local playback. GitHub Actions run #177 passed for the M22–M25 implementation (76 tests across 15 files, lint, typecheck, production build, optional Python sidecar syntax, and artifact upload). Real Kokoro synthesis still requires user-installed model/voice files and a local generate → playback → download smoke test. Audio mixing, transitions/effects, FFmpeg/MP4 rendering, and a media-inclusive portable project archive remain later milestones.
+This feature branch contains the M06–M25 implementation: design system, dashboard, local projects, script import/parsing/editing, local audio workflow, measured timing and subtitles, original image splitter, project-local image sequence management, many-to-many scene mapping, measured image/audio scheduling, and a visual timeline with local playback. GitHub Actions run #182 passed for the M22–M25 implementation (76 tests across 15 files, lint, typecheck, production build, optional Python sidecar syntax, and artifact upload). Real Kokoro synthesis still requires user-installed model/voice files and a local generate → playback → download smoke test. Audio mixing, transitions/effects, FFmpeg/MP4 rendering, and a media-inclusive portable project archive remain later milestones.
 
 ## License
 
