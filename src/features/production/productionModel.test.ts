@@ -102,10 +102,11 @@ describe("automatic schedule and timeline editing", () => {
   });
 
   it("reorders clips within their own track without changing clip timing", () => {
+    let nextId = 0;
     const clips = buildTimeline([
       { sceneId: "one", durationSeconds: 2, imageIds: ["a"] },
       { sceneId: "two", durationSeconds: 2, imageIds: ["b"] },
-    ], () => "clip-" + Math.random());
+    ], () => "clip-" + (++nextId));
     const imageClips = clips.filter((clip) => clip.track === "images");
     const moved = moveTimelineClip(clips, imageClips[1].id, -1);
     expect(moved.filter((clip) => clip.track === "images").sort((a, b) => a.order - b.order).map((clip) => clip.assetId))
