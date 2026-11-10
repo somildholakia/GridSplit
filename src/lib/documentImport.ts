@@ -74,8 +74,8 @@ export async function extractPdfText(file: Blob, options: { workerSrc?: string }
   }
 
   const [{ getDocument, GlobalWorkerOptions }, workerModule] = await Promise.all([
-    import("pdfjs-dist"),
-    import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+    import("pdfjs-dist/legacy/build/pdf.mjs"),
+    import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url"),
   ]);
   GlobalWorkerOptions.workerSrc = options.workerSrc ?? workerModule.default;
 
