@@ -1,15 +1,15 @@
 # GridSplit Studio — Project Status
 
-**Last updated:** 2026-11-10  
+**Last updated:** 2026-11-11  
 **Repository:** `somildholakia/GridSplit`  
-**Main branch:** `main` — M01–M34 implementation and Python TTS lock/audit merged via PRs #1 and #3  
-**Release work branch:** `chore/reconcile-release-status` (documentation reconciliation)  
+**Main branch:** `main` — latest commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6`; implementation and release records merged through PR #11  
+**Latest release record:** PR #11 — acceptance/deployment boundary  
 **Merged pull request:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
 
-M06–M34 implementation is now merged into `main` by PR #1 at commit `0f6bb317508f028627d02bcece7b414598438399` (merged 2026-11-10 16:57:47 UTC). M01–M05 remain the original baseline milestones; they are not the current main-branch code state.
+Current `main` is `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` (PR #11). M01–M34 implementation, the Python TTS lock/audit, sidecar-origin corrections, and 196-entry ZIP regression are merged. M01–M05 remain the original baseline milestones; they are not the current main-branch code state.
 
 **Base Studio validation:** GitHub Actions run #199 passed on pre-merge commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`, including 9 Python tests, 91 Vitest tests across 18 files, ESLint, TypeScript typecheck, Vite production build, static artifact upload and production npm audit (0 vulnerabilities at the high-severity threshold). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). **Latest local-TTS dependency PR validation:** run #217 passed `uv lock --check`, `pip-audit --strict` (no known vulnerabilities found), 9 Python tests, 91 Vitest tests across 18 files, ESLint, typecheck, production build and artifact upload. [Open run #217](https://github.com/somildholakia/GridSplit/actions/runs/42865601179).
 
@@ -45,8 +45,8 @@ M06–M34 implementation is now merged into `main` by PR #1 at commit `0f6bb3175
 - **M32:** Automated integration slice complete — script/sync/subtitle/mapping/timeline test and HTTP ZIP-to-MP4 local render test passed in run #199. Full browser-driven project export is still M36.
 - **M33:** Performance regression baseline complete — 500 scenes, 500 images, 1,000 clips under a 10-second test ceiling; renderer bounded to two active jobs/eight retained finished jobs. Real target-device/media profiling is still open.
 - **M34:** Complete on `main` via PR #3 (merge commit `e080b90eae670f0983840750fb41a7f08759717a`). The security review documents the renderer/TTS threat boundaries, loopback Host/Origin checks, archive validation and local storage. The optional TTS sidecar now has a committed cross-platform `local-tts/uv.lock` for Python 3.10–3.13, pinned `uv` 0.13.5 and development-only `pip-audit` 2.10.1; CI validates the lock with `uv lock --check` and scans the synchronized environment with `pip-audit --strict`. Runs #217 and #224 passed with no known Python dependency vulnerabilities plus the Python, frontend and build suites. Exact provenance/licenses of user-installed model/voice/phonemizer/FFmpeg assets remain external release checks.
-- **M35:** Original production deployment of main commit `bc03f8b32902cea8cef1a1dbd92695024b684c8e` is READY at [gridsplit-kappa.vercel.app](https://gridsplit-kappa.vercel.app). The public browser smoke test and 16-check production-workspace UI sweep passed. PR #9 (sidecar origin/setup corrections) and PR #10 (196-entry ZIP export regression) are merged into main, but the live alias has not yet been redeployed from the newer main because Vercel rejected the deployment request with HTTP 402 `api-deployments-free-per-day`. [Smoke-test report](https://agent.tinyfish.ai/runs/18b8bcc4-e178-4d1d-9d5b-04a441910f8c) · [16-check UI report](https://agent.tinyfish.ai/runs/8f1ac7b7-3759-4d7e-babb-69649ef94b5e) · [CI run #232](https://github.com/somildholakia/GridSplit/actions/runs/42876232453).
-- **M36:** Open — no real browser-generated full project package has yet been produced and inspected on a target device.
+- **M35:** Complete — latest main commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` is deployed READY to [gridsplit-kappa.vercel.app](https://gridsplit-kappa.vercel.app) (deployment `dpl_6nTrXw6ySQMUr9V36tWicjNzoB36`). Public smoke test on 2026-11-10 passed dashboard access, all four workspace navigations, two-scene script parsing, and Audio/Production Studio shell checks. Local TTS and real media processing were not run. [Latest smoke test](https://agent.tinyfish.ai/runs/4fead7de-4604-4b7d-9af8-e54a6424a381) · [CI run #235](https://github.com/somildholakia/GridSplit/actions/runs/42877426412).
+- **M36:** Open — target-device real-media workflow has not been completed. The exact 1536 × 864 sample has a documented manual correction map and an independent 196-crop diagnostic ZIP, but the deployed browser UI has not yet exported those crops. Real Kokoro generation/playback, image/timeline playback, MP4 export, media-inclusive archive restore and re-render remain pending.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
@@ -54,7 +54,7 @@ The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPO
 
 GitHub Actions run #199 validated the M06–M34 implementation before merge. PR #10's run #232 subsequently passed the exporter regression together with the Python security/sidecar checks, FFmpeg integration, npm audit, lint, unit tests, typecheck and production build. On the Python-dependency PR branch, run #217 additionally passed committed-lock validation (`uv lock --check`), `pip-audit --strict` (no known vulnerabilities found), 9 Python tests, ESLint, 91 Vitest tests across 18 files, TypeScript typecheck, Vite build and artifact upload. [Run #217](https://github.com/somildholakia/GridSplit/actions/runs/42865601179). The production frontend is live at `gridsplit-kappa.vercel.app`. Its smoke test verified the core dashboard, script parser, Audio Studio shell and Production Studio shell; it does not establish real Kokoro synthesis, media rendering, image-sequence acceptance or complete project export/restore.
 
-The CI result verifies code and fixtures on GitHub's runner. The new 196-entry ZIP test uses mocked canvas output and verifies archive naming/manifest integrity only. A real-media target-device acceptance pass with representative images, generated Kokoro WAVs, imported music/SFX and the user's installed FFmpeg/ffprobe remains open. The 16-check browser sweep verified the visible UI and empty states only; it did not exercise those media operations. M14–M16 model/voice synthesis and M22–M25 real browser timeline/playback review also remain separate manual acceptance checks. The 196-image contact-sheet sample remains unverified; no manual pass is claimed.
+The CI result verifies code and fixtures on GitHub's runner. The 196-entry ZIP test uses mocked canvas output and verifies archive naming/manifest integrity only. The exact `1000277512.png` contact sheet has now been visually reviewed: 210 preliminary candidates can be manually corrected to the requested 196 using the map in `docs/SAMPLE_ANALYSIS.md`; an independent diagnostic ZIP contains 196 PNGs but is not an export from the app. Browser export/pixel review remains open. A real-media target-device acceptance pass with Kokoro-generated WAVs, imported music/SFX and the user's installed FFmpeg/ffprobe also remains open.
 
 ## Local-first and scope constraints
 
@@ -68,7 +68,7 @@ The CI result verifies code and fixtures on GitHub's runner. The new 196-entry Z
 
 ## Current next steps
 
-M26–M34 Studio implementation and the M34 Python lock/audit pipeline are merged into `main` (PRs #1 and #3). Runs #217 and #224 passed the committed lock check, Python advisory scan and complete CI suite. M35 production deployment and a seven-step public browser smoke test are complete. M36 representative real-media export/restore/re-render acceptance remains open. Local renderer setup and target-device browser acceptance remain manual checks; install FFmpeg/ffprobe and run the sidecar using [local-render/README.md](../local-render/README.md). M22–M25 browser playback review and M14–M16 real Kokoro model/voice synthesis acceptance also remain open.
+M35 is deployed from current main and run #235 passed. The next acceptance gates are the browser's 196-crop sample export, real Kokoro generation/playback/download, real image/timeline playback, and a target-device MP4 export → archive restore → re-render pass. These require the user's installed local model/voice files and FFmpeg/ffprobe; setup is documented in [local-tts/README.md](../local-tts/README.md) and [local-render/README.md](../local-render/README.md).
 
 ## Operating rules
 
