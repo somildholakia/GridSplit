@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, RefreshCw, Trash2 } from "lucide-react";
 import type { StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
@@ -41,6 +41,8 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
   const [thumbs,setThumbs]=useState<Record<string,string>>({});
   const [audioUrls,setAudioUrls]=useState<Record<string,string>>({});
   const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
+  const folderRef=useRef<HTMLInputElement>(null);
+  useEffect(()=>{folderRef.current?.setAttribute("webkitdirectory","");folderRef.current?.setAttribute("directory","");},[]);
   const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline">("sequence");
   const issues=useMemo(()=>analyseSequence(assets),[assets]);
   useEffect(()=>{
@@ -66,7 +68,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
       const ordered=sortSequence(accepted.map(f=>({name:f.name,relativePath:(f as File&{webkitRelativePath?:string}).webkitRelativePath||f.name,file:f})));
       for(const item of ordered){
         const file=item.file,id=crypto.randomUUID(),hash=await fingerprint(file);
-        if(existing.has(hash))continue;existing.add(hash);
+        existing.add(hash);
         const size=await dimensions(file);await saveImage(id,file);
         additions.push({id,name:file.name,relativePath:item.relativePath,mimeType:file.type,bytes:file.size,sequenceNumber:extractSequenceNumber(file.name),order:assets.length+additions.length,width:size.width,height:size.height,fingerprint:hash});
       }
@@ -76,8 +78,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
   };
   const removeAsset=async(id:string)=>{
     await deleteImage(id);updateAssets(assets.filter(a=>a.id!==id).map((a,index)=>({...a,order:index})));
-    updateMappings(mappings.map(m=>({...m,imageIds:m.imageIds.filter(x=>x!==id)})));
-    patchProject(onUpdate,{timelineClips:clips.filter(c=>c.assetId!==id)});
+    patchProject(onUpdate,{imageMappings:normalizeMappings(mappings.map(m=>({...m,imageIds:m.imageIds.filter(x=>x!==id)})),project.scenes.map(s=>s.id),assets.filter(a=>a.id!==id).map(a=>a.id)),timelineClips:clips.filter(c=>c.assetId!==id)});
   };
   const moveAsset=(index:number,direction:-1|1)=>{
     const next=[...assets],target=index+direction;if(target<0||target>=next.length)return;
@@ -120,6 +121,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
     if(!Number.isFinite(value)||value<=0)return;
     patchProject(onUpdate,{timelineClips:clips.map(c=>c.id===id?{...c,durationSeconds:value}:c)});
   };
+  const editClipStart=(id:string,value:number)=>{if(!Number.isFinite(value)||value<0)return;patchProject(onUpdate,{timelineClips:clips.map(c=>c.id===id?{...c,startSeconds:value}:c)});};
   const reorderClip=(id:string,direction:-1|1)=>patchProject(onUpdate,{timelineClips:moveTimelineClip(clips,id,direction)});
   const clearAssets=async()=>{for(const asset of assets)await deleteImage(asset.id);updateAssets([]);updateMappings([]);patchProject(onUpdate,{timelineClips:[]});setMessage("Removed all image assets from this project.");};
   return <section className="production-workspace">
@@ -131,7 +133,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
     </nav>
     {message&&<p className="production-message" role="status">{message}</p>}
     {activeTab==="sequence"&&<div className="production-section">
-      <div className="production-actions"><label className="production-button"><ImagePlus size={15}/> Add images<input type="file" accept="image/*" multiple onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/></label><label className="production-button"><ImagePlus size={15}/> Add folder<input type="file" accept="image/*" multiple onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/></label><button className="production-button danger" disabled={!assets.length} onClick={()=>void clearAssets()}><Trash2 size={14}/> Clear all</button><span>{assets.length} images · thumbnails and originals stored locally</span></div>
+      <div className="production-actions"><label className="production-button"><ImagePlus size={15}/> Add images<input type="file" accept="image/*" multiple onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/></label><button type="button" className="production-button" onClick={()=>folderRef.current?.click()}><ImagePlus size={15}/> Add folder</button><input ref={folderRef} type="file" accept="image/*" multiple hidden onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/><button className="production-button danger" disabled={!assets.length} onClick={()=>void clearAssets()}><Trash2 size={14}/> Clear all</button><span>{assets.length} images · thumbnails and originals stored locally</span></div>
       {issues.length>0&&<div className="production-issues"><b><AlertTriangle size={15}/> {issues.length} sequence issue(s) to review</b><ul>{issues.map((issue,i)=><li key={i}>{issue.message}</li>)}</ul></div>}
       {!assets.length?<div className="production-empty">Add your numbered storyboard images to start sequence management.</div>:<div className="production-assets">{assets.map((asset,index)=><article className="production-asset" key={asset.id}>
         {thumbs[asset.id]?<img src={thumbs[asset.id]} alt={asset.name}/>:<div className="production-thumb-placeholder">Preview</div>}
@@ -146,7 +148,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
     {activeTab==="timeline"&&<div className="production-section">
       <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Rebuild from measured audio"}</button><span>Image and audio tracks · seconds</span></div>
       {!clips.length?<div className="production-empty">Map images to scenes and generate WAV audio, then build the initial schedule.</div>:<><div className="production-ruler"><span>Track</span><span>Start</span><span>Duration</span><span>Scene / asset</span><span>Controls</span></div>
-        {(["images","audio"] as const).map(track=><section className="production-track" key={track}><h3>{track==="images"?"IMAGE TRACK":"AUDIO TRACK"}</h3>{clips.filter(c=>c.track===track).sort((a,b)=>a.order-b.order).map((clip,index)=><div className="production-clip" key={clip.id}><b>{track==="images"?"IMG":"WAV"}</b><span>{seconds(clip.startSeconds)}</span><label><input type="number" min="0.1" step="0.1" value={Number(clip.durationSeconds.toFixed(2))} onChange={e=>editClip(clip.id,Number(e.target.value))}/> s</label><span>{project.scenes.find(s=>s.id===clip.sceneId)?.title??"Unknown scene"}{clip.assetId?" · "+(assets.find(a=>a.id===clip.assetId)?.name??"Missing image"):""}</span><div><button title="Move earlier on track" disabled={index===0} onClick={()=>reorderClip(clip.id,-1)}><ArrowUp size={13}/></button><button title="Move later on track" disabled={index===clips.filter(c=>c.track===track).length-1} onClick={()=>reorderClip(clip.id,1)}><ArrowDown size={13}/></button></div></div>)}</section>)}
+        {(["images","audio"] as const).map(track=><section className="production-track" key={track}><h3>{track==="images"?"IMAGE TRACK":"AUDIO TRACK"}</h3>{clips.filter(c=>c.track===track).sort((a,b)=>a.order-b.order).map((clip,index)=><div className="production-clip" key={clip.id}><b>{track==="images"?"IMG":"WAV"}</b><label><input aria-label="Clip start seconds" type="number" min="0" step="0.1" value={Number(clip.startSeconds.toFixed(2))} onChange={e=>editClipStart(clip.id,Number(e.target.value))}/> s</label><label><input aria-label="Clip duration seconds" type="number" min="0.1" step="0.1" value={Number(clip.durationSeconds.toFixed(2))} onChange={e=>editClip(clip.id,Number(e.target.value))}/> s</label><span>{project.scenes.find(s=>s.id===clip.sceneId)?.title??"Unknown scene"}{clip.assetId?" · "+(assets.find(a=>a.id===clip.assetId)?.name??"Missing image"):""}</span><div><button title="Move earlier on track" disabled={index===0} onClick={()=>reorderClip(clip.id,-1)}><ArrowUp size={13}/></button><button title="Move later on track" disabled={index===clips.filter(c=>c.track===track).length-1} onClick={()=>reorderClip(clip.id,1)}><ArrowDown size={13}/></button></div></div>)}</section>)}
         <div className="production-audio-preview"><b>Local audio playback</b>{(project.audioSegments??[]).filter(s=>s.status==="ready"&&audioUrls[s.id]).map(s=><label key={s.id}>{project.scenes.find(sc=>sc.id===s.sceneId)?.title??"Scene"}<audio controls preload="none" src={audioUrls[s.id]}/></label>)}</div>
       </>}
       <p className="production-footnote">The schedule uses measured WAV sample durations. Rebuild after changing scene audio or mappings. Timeline edits are project-local; this milestone does not render MP4 or mix audio.</p>
