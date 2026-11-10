@@ -1,7 +1,9 @@
 # GridSplit Studio — Development Checkpoints
 
 **Last updated:** 2026-11-10  
-**Audited branch:** `main`  
+**Audited baseline branch:** `main`  
+**Active implementation branch:** `feat/m06-m11-studio-script-workflow`  
+**Open draft PR:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 A milestone is complete only when its implementation exists, required tests or validation pass, and the evidence is recorded in `docs/PROJECT_STATUS.md`. Planning, mock UI, untested code, and documentation alone do not complete implementation milestones.
@@ -13,12 +15,12 @@ A milestone is complete only when its implementation exists, required tests or v
 - [x] **M03 — Architecture and processing design.** Recorded shared web/optional Tauri architecture, versioned project schema, sample/rational timebases, local storage, TTS/render adapters, and upstream license gates in `ARCHITECTURE.md` and `docs/decisions/ADRs.md`.
 - [x] **M04 — Repository restructuring.** Moved the existing extractor screen under `src/features/image-extraction/`, kept `src/App.tsx` as the composition entry, and added v1 project/time domain types. Node 22 typecheck and production build passed on the corrected commit.
 - [x] **M05 — CI/CD.** Added a committed npm lockfile and `npm ci`, ESLint, 11 Vitest unit tests, TypeScript typecheck, production build, and a 14-day commit-specific static build artifact. GitHub Actions run #15 passed all steps. Production deployment remains correctly deferred to M35.
-- [ ] **M06 — Design system.** Establish the production-studio design tokens, reusable components, navigation, and responsive behavior.
-- [ ] **M07 — Dashboard.** Implement the project dashboard.
-- [ ] **M08 — Project management.** Create, rename, duplicate, archive, autosave, and restore projects locally.
-- [ ] **M09 — Script editor.** Support paste, TXT, DOCX, and PDF text import with original-source preservation.
-- [ ] **M10 — Deterministic script parser.** Parse narration, character, SFX, and music directives.
-- [ ] **M11 — Scene segmentation.** Build and manually correct chapters, paragraphs, and scene boundaries.
+- [x] **M06 — Design system.** Added studio design tokens, reusable `StudioButton` and `StudioPanelHeader` components, workspace navigation, and responsive behavior. CI run #40 passed.
+- [x] **M07 — Dashboard.** Added project statistics, searchable project cards, active/archive views, and create/open/delete/backup actions. CI run #40 passed.
+- [x] **M08 — Project management.** Implemented local create/rename/duplicate/archive/restore/autosave plus versioned JSON backup import/export; validation tests and CI run #40 passed.
+- [ ] **M09 — Script editor.** Supports paste, TXT, and local DOCX text import with original-source preservation. PDF text extraction and its fixture/validation are still outstanding.
+- [x] **M10 — Deterministic script parser.** Parses chapter/scene headings, paragraphs, narration, character, SFX, and music directives; source-line tracking is tested. CI run #40 passed.
+- [x] **M11 — Scene segmentation.** Added editable chapter/scene labels and blocks, scene/block reordering, cross-scene block moves, split/merge controls, and add/remove actions. Unit tests and CI run #40 passed.
 - [ ] **M12 — Character management.** Manage speakers and stable voice assignments.
 - [ ] **M13 — Offline TTS provider abstraction.** Define capability-aware local engine contracts.
 - [ ] **M14 — Local TTS integration.** Integrate approved offline engines and voice packages with verified licenses.
@@ -44,6 +46,12 @@ A milestone is complete only when its implementation exists, required tests or v
 - [ ] **M34 — Security and privacy review.** Verify local-only behavior, file handling, cleanup, dependency safety, and asset/model licenses.
 - [ ] **M35 — Production deployment.** Deploy the static frontend without making hosted processing mandatory.
 - [ ] **M36 — End-to-end validation.** Complete and inspect a representative exported production package.
+
+## Current branch validation
+
+The M06–M11 implementation is on the feature branch and remains in draft PR #1; it is not merged into `main`. GitHub Actions run #40 passed all steps: npm install, lint, 27 unit tests across 6 files, typecheck, production build, and static artifact upload. The Vercel check also passed for the verified implementation head.
+
+M09 is intentionally unchecked: DOCX support exists, but PDF text extraction is not yet implemented. Browser end-to-end validation of local restore, import controls, scene editing, and the existing image extractor remains outstanding.
 
 ## Completion evidence template
 
