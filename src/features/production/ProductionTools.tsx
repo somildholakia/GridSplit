@@ -250,11 +250,14 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
 
   const restoreArchive = async (file?: File) => {
     if (!file) return;
+    if (!onRestoreProject) {
+      setNotice("Project restore is unavailable in this workspace.");
+      return;
+    }
     setBusy(true);
     setNotice("Validating archive paths, sizes, checksums and project metadata…");
     try {
       const restored = await importPortableProject(file);
-      if (!onRestoreProject) throw new Error("Project restore is unavailable in this workspace.");
       onRestoreProject(restored);
       setNotice("Project restored as a new local project. The original project was not changed.");
     } catch (error) {

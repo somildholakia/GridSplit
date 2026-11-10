@@ -42,7 +42,7 @@ function localBaseUrl(value: string): string {
   }
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (url.protocol !== "http:" || !["127.0.0.1", "localhost", "::1"].includes(host)
-    || url.username || url.password || url.search || url.hash) {
+    || url.pathname !== "/" || url.username || url.password || url.search || url.hash) {
     throw new Error("GridSplit accepts only an HTTP loopback renderer URL. Remote hosts are blocked.");
   }
   return url.toString().replace(/\/$/, "");
@@ -108,40 +108,37 @@ export async function renderProjectLocally(
     signal,
   }));
   let job = asJob(submitted);
-  let activeJobId: string | null = job.id;
+  const activeJobId = job.id;
   const cancelJob = () => {
-    if (activeJobId) {
-      void fetch(base + "/v1/jobs/" + encodeURIComponent(activeJobId), { method: "DELETE" }).catch(() => undefined);
-    }
+    void fetch(base + "/v1/jobs/" + encodeURIComponent(activeJobId), { method: "DELETE" }).catch(() => undefined);
   };
   signal?.addEventListener("abort", cancelJob, { once: true });
-  if (signal?.aborted) cancelJob();
-  onProgress(job);
-
-  while (job.status === "queued" || job.status === "running") {
-    if (signal?.aborted) {
-      await fetch(base + "/v1/jobs/" + encodeURIComponent(job.id), { method: "DELETE" }).catch(() => undefined);
-      throw new DOMException("Render cancelled.", "AbortError");
-    }
-    await new Promise((resolve) => window.setTimeout(resolve, 900));
-    const next = await responseJson(await fetch(base + "/v1/jobs/" + encodeURIComponent(job.id), { signal }));
-    job = asJob(next);
+  try {
     onProgress(job);
+    while (job.status === "queued" || job.status === "running") {
+      if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
+      await new Promise((resolve) => window.setTimeout(resolve, 900));
+      const next = await responseJson(await fetch(base + "/v1/jobs/" + encodeURIComponent(job.id), { signal }));
+      job = asJob(next);
+      onProgress(job);
+    }
+    if (job.status !== "completed") throw new Error(job.error || job.message || "The local render did not complete.");
+    const output = await fetch(base + "/v1/jobs/" + encodeURIComponent(job.id) + "/output", { signal });
+    if (!output.ok) {
+      const failure = await responseJson(output);
+      throw new Error(String(failure.error ?? "The local renderer did not provide an MP4 file."));
+    }
+    const blob = await output.blob();
+    if (!blob.size || (blob.type && !blob.type.includes("video/mp4"))) {
+      throw new Error("The renderer output is empty or is not an MP4 file.");
+    }
+    return { blob, job };
+  } catch (error) {
+    if (signal?.aborted) cancelJob();
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", cancelJob);
   }
-  signal?.removeEventListener("abort", cancelJob);
-  activeJobId = null;
-  if (job.status !== "completed") throw new Error(job.error || job.message || "The local render did not complete.");
-
-  const output = await fetch(base + "/v1/jobs/" + encodeURIComponent(job.id) + "/output", { signal });
-  if (!output.ok) {
-    const failure = await responseJson(output);
-    throw new Error(String(failure.error ?? "The local renderer did not provide an MP4 file."));
-  }
-  const blob = await output.blob();
-  if (!blob.size || (blob.type && !blob.type.includes("video/mp4"))) {
-    throw new Error("The renderer output is empty or is not an MP4 file.");
-  }
-  return { blob, job };
 }
 
 export function downloadRenderedVideo(blob: Blob, projectName: string): void {

@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import type { StudioProject } from "./projectStore";
 import { buildSynchronizationMetadata, measureWavBlob, toSrt, toVtt } from "./mediaTimeline";
 import type { SyncSegmentInput } from "./mediaTimeline";
-import { duplicateProject } from "./projectStore";
+import { duplicateProject, isStudioProject } from "./projectStore";
 import { deleteGeneratedAudio, readGeneratedAudio, saveGeneratedAudio } from "../audio/audioStore";
 import {
   deleteProjectImageBlob,
@@ -14,7 +14,7 @@ import {
 } from "./projectMediaStore";
 import type { AudioMixTrack, MixAudioAsset, VideoClipEdit, RenderProfile } from "../domain/production";
 
-type PortableProject = StudioProject & {
+export type PortableProject = StudioProject & {
   audioMixTracks?: AudioMixTrack[];
   mixAssets?: MixAudioAsset[];
   videoClipEdits?: VideoClipEdit[];
@@ -81,6 +81,7 @@ export async function exportPortableProject(project: StudioProject): Promise<Blo
 
   const add = async (path: string, kind: PortableFileRecord["kind"], assetId: string, blob: Blob, mimeType: string) => {
     if (blob.size <= 0) throw new Error("Cannot package an empty media file: " + path);
+    if (files.some((item) => item.path === path)) throw new Error("Two project assets map to the same archive path: " + path);
     totalBytes += blob.size;
     if (totalBytes > MAX_UNCOMPRESSED_BYTES) throw new Error("The project media exceeds the 2 GB portable archive limit.");
     zip.file(path, blob, { date: new Date("2000-01-01T00:00:00.000Z") });
@@ -148,13 +149,15 @@ export async function exportPortableProject(project: StudioProject): Promise<Blo
     files: files.sort((left, right) => left.path.localeCompare(right.path)),
   };
   zip.file("manifest.json", JSON.stringify(manifest, null, 2));
-  return zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 4 } });
+  const archive = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 4 } });
+  if (archive.size > MAX_ARCHIVE_BYTES) throw new Error("The compressed project archive exceeds the 1 GB export limit.");
+  return archive;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-function validateManifest(value: unknown): PortableManifest {
+export function validatePortableManifest(value: unknown): PortableManifest {
   if (!isRecord(value) || value.format !== "gridsplit-studio-project" || value.version !== ARCHIVE_VERSION
     || typeof value.projectId !== "string" || !Array.isArray(value.files) || value.files.length > MAX_FILES) {
     throw new Error("This is not a supported GridSplit Studio project archive.");
@@ -165,6 +168,9 @@ function validateManifest(value: unknown): PortableManifest {
     if (!isRecord(entry)
       || typeof entry.path !== "string"
       || !/^(media\/(images|generated-audio|mix-audio)\/)[a-zA-Z0-9_.-]+$/.test(entry.path)
+      || (entry.kind === "image" && !entry.path.startsWith("media/images/"))
+      || (entry.kind === "generated-audio" && !entry.path.startsWith("media/generated-audio/"))
+      || (entry.kind === "mix-audio" && !entry.path.startsWith("media/mix-audio/"))
       || entry.path.includes("..")
       || entry.path.includes("\\")
       || seen.has(entry.path)
@@ -185,7 +191,7 @@ function validateManifest(value: unknown): PortableManifest {
   return { format: "gridsplit-studio-project", version: ARCHIVE_VERSION, createdAt: String(value.createdAt ?? ""), projectId: value.projectId, files };
 }
 
-function remapRestoredProject(source: PortableProject, makeId: () => string): {
+export function remapRestoredProject(source: PortableProject, makeId: () => string): {
   project: PortableProject;
   imageIds: Map<string, string>;
   segmentIds: Map<string, string>;
@@ -269,6 +275,16 @@ export async function importPortableProject(blob: Blob, makeId: () => string = (
   const zip = await JSZip.loadAsync(blob, { checkCRC32: true });
   const paths = Object.keys(zip.files);
   if (paths.length > MAX_FILES + 8) throw new Error("The project archive contains too many entries.");
+  let expandedBytes = 0;
+  for (const entry of Object.values(zip.files)) {
+    if (entry.dir) continue;
+    const metadata = (entry as unknown as { _data?: { uncompressedSize?: number } })._data;
+    const uncompressed = metadata?.uncompressedSize;
+    if (typeof uncompressed === "number" && Number.isSafeInteger(uncompressed) && uncompressed > 0) {
+      expandedBytes += uncompressed;
+      if (expandedBytes > MAX_UNCOMPRESSED_BYTES) throw new Error("The project archive exceeds the 2 GB uncompressed limit.");
+    }
+  }
   for (const path of paths) {
     if (path.startsWith("/") || path.includes("\\") || path.split("/").some((part) => part === "..")) {
       throw new Error("The project archive contains an unsafe file path.");
@@ -277,9 +293,8 @@ export async function importPortableProject(blob: Blob, makeId: () => string = (
   const manifestFile = zip.file("manifest.json");
   const projectFile = zip.file("project.json");
   if (!manifestFile || !projectFile) throw new Error("The archive is missing its manifest or editable project file.");
-  const manifest = validateManifest(JSON.parse(await manifestFile.async("string")));
+  const manifest = validatePortableManifest(JSON.parse(await manifestFile.async("string")));
   const sourceValue: unknown = JSON.parse(await projectFile.async("string"));
-  const { isStudioProject } = await import("./projectStore");
   if (!isStudioProject(sourceValue) || sourceValue.id !== manifest.projectId) {
     throw new Error("The archive project metadata is invalid or does not match its manifest.");
   }
