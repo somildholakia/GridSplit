@@ -31,7 +31,12 @@ M01–M05 remain complete on `main`. The GridSplit Studio branch adds the produc
 - **M14:** Implemented on PR #1 — optional Kokoro ONNX FastAPI loopback sidecar and explicit trusted-origin CORS allowlist. Python syntax passes CI; real model/voice synthesis is not yet verified.
 - **M15:** Implemented on PR #1 — fingerprinted per-block generation, cancellation/retry/regenerate, interrupted-state recovery, and IndexedDB WAV storage. Browser CI passes; live model generation is pending.
 - **M16:** Implemented on PR #1 — local audio preview, sample-derived duration, WAV download, and missing-blob recovery. Browser CI passes; playback of a real generated segment is pending.
-- **M17:** Complete on PR #1 — local WAV blobs are re-read and duration is derived from actual sample frames/sample rate; CI #115 passed.\n- **M18:** Complete on PR #1 — deterministic versioned synchronization JSON with exact rational segment and scene timing; CI #115 passed.\n- **M19:** Complete on PR #1 — segment-level SRT/VTT export from measured timing; no word alignment is claimed; CI #115 passed.\n- **M20:** Complete on PR #1 — regression fixtures protect flat-image fallback and uniform-grid boundary coverage; CI #115 passed. The 196-image sample remains unverified.\n- **M21:** Complete on PR #1 — multi-file/folder intake, natural sorting, duplicate/type/size limits, and local ordered ZIP/CSV bundle; CI #115 passed.\n- **M22–M36:** Not started.
+- **M17:** Complete on PR #1 — local WAV blobs are re-read and duration is derived from actual sample frames/sample rate; CI #115 passed.
+- **M18:** Complete on PR #1 — deterministic versioned synchronization JSON with exact rational segment and scene timing; CI #115 passed.
+- **M19:** Complete on PR #1 — segment-level SRT/VTT export from measured timing; no word alignment is claimed; CI #115 passed.
+- **M20:** Complete on PR #1 — regression fixtures protect flat-image fallback and uniform-grid boundary coverage; CI #115 passed. The 196-image sample remains unverified.
+- **M21:** Complete on PR #1 — multi-file/folder intake, natural sorting, duplicate/type/size limits, and local ordered ZIP/CSV bundle; CI #115 passed.
+- **M22–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
