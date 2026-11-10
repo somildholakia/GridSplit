@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { countCells, detectContactSheet, makeEvenBoundaries } from "../../lib/detectGrid";
-import type { ContactSheetLayout } from "./lib/detectGrid";
+import type { ContactSheetLayout } from "../../lib/detectGrid";
 import { createImageZip, type ExportCell } from "../../lib/exportZip";
 
 type Cell = ExportCell & {
