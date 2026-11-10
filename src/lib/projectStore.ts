@@ -12,6 +12,35 @@ export type StudioProject = {
   characters?: StudioCharacter[];
   audioSegments?: StudioAudioSegment[];
   ttsEndpoint?: string;
+  imageAssets?: ProjectImageAsset[];
+  imageMappings?: ProjectImageMapping[];
+  timelineClips?: ProjectTimelineClip[];
+};
+
+export type ProjectImageAsset = {
+  id: string;
+  name: string;
+  relativePath: string;
+  mimeType: string;
+  bytes: number;
+  sequenceNumber: number | null;
+  order: number;
+  width: number;
+  height: number;
+  fingerprint: string;
+};
+
+export type ProjectImageMapping = { sceneId: string; imageIds: string[] };
+
+export type ProjectTimelineClip = {
+  id: string;
+  track: "images" | "audio";
+  sceneId: string;
+  assetId?: string;
+  segmentId?: string;
+  startSeconds: number;
+  durationSeconds: number;
+  order: number;
 };
 
 export const PROJECT_STORAGE_KEY = "gridsplit.studio.projects.v1";
@@ -64,6 +93,54 @@ function isAudioSegment(value: unknown): value is StudioAudioSegment {
     && (value.error === undefined || typeof value.error === "string");
 }
 
+function isProjectImageAsset(value: unknown): value is ProjectImageAsset {
+  return isRecord(value)
+    && typeof value.id === "string"
+    && typeof value.name === "string"
+    && typeof value.relativePath === "string"
+    && typeof value.mimeType === "string"
+    && value.mimeType.startsWith("image/")
+    && typeof value.bytes === "number"
+    && Number.isSafeInteger(value.bytes)
+    && value.bytes >= 0
+    && (value.sequenceNumber === null || (typeof value.sequenceNumber === "number" && Number.isSafeInteger(value.sequenceNumber) && value.sequenceNumber >= 0))
+    && typeof value.order === "number"
+    && Number.isSafeInteger(value.order)
+    && value.order >= 0
+    && typeof value.width === "number"
+    && Number.isFinite(value.width)
+    && value.width >= 0
+    && typeof value.height === "number"
+    && Number.isFinite(value.height)
+    && value.height >= 0
+    && typeof value.fingerprint === "string";
+}
+
+function isProjectImageMapping(value: unknown): value is ProjectImageMapping {
+  return isRecord(value)
+    && typeof value.sceneId === "string"
+    && Array.isArray(value.imageIds)
+    && value.imageIds.every((id) => typeof id === "string");
+}
+
+function isProjectTimelineClip(value: unknown): value is ProjectTimelineClip {
+  return isRecord(value)
+    && typeof value.id === "string"
+    && (value.track === "images" || value.track === "audio")
+    && typeof value.sceneId === "string"
+    && (value.assetId === undefined || typeof value.assetId === "string")
+    && (value.segmentId === undefined || typeof value.segmentId === "string")
+    && typeof value.startSeconds === "number"
+    && Number.isFinite(value.startSeconds)
+    && value.startSeconds >= 0
+    && typeof value.durationSeconds === "number"
+    && Number.isFinite(value.durationSeconds)
+    && value.durationSeconds > 0
+    && typeof value.order === "number"
+    && Number.isSafeInteger(value.order)
+    && value.order >= 0;
+}
+
 function isScene(value: unknown): value is ParsedScene {
   return isRecord(value)
     && typeof value.id === "string"
@@ -85,6 +162,9 @@ export function isStudioProject(value: unknown): value is StudioProject {
     && (value.ttsEndpoint === undefined || typeof value.ttsEndpoint === "string")
     && (value.characters === undefined || (Array.isArray(value.characters) && value.characters.every(isCharacter)))
     && (value.audioSegments === undefined || (Array.isArray(value.audioSegments) && value.audioSegments.every(isAudioSegment)))
+    && (value.imageAssets === undefined || (Array.isArray(value.imageAssets) && value.imageAssets.every(isProjectImageAsset)))
+    && (value.imageMappings === undefined || (Array.isArray(value.imageMappings) && value.imageMappings.every(isProjectImageMapping)))
+    && (value.timelineClips === undefined || (Array.isArray(value.timelineClips) && value.timelineClips.every(isProjectTimelineClip)))
     && Array.isArray(value.scenes)
     && value.scenes.every(isScene);
 }
@@ -164,13 +244,16 @@ export function duplicateProject(
     });
     return { ...scene, id: sceneId, blocks };
   });
+  const audioSegmentIds = new Map<string, string>();
   const audioSegments = project.audioSegments?.flatMap((segment) => {
     const sceneId = sceneIds.get(segment.sceneId);
     const blockId = blockIds.get(segment.blockId);
     if (!sceneId || !blockId) return [];
+    const id = makeId();
+    audioSegmentIds.set(segment.id, id);
     return [{
       ...segment,
-      id: makeId(),
+      id,
       sceneId,
       blockId,
       status: "pending" as const,
@@ -191,6 +274,22 @@ export function duplicateProject(
     scenes,
     characters: project.characters?.map((character) => ({ ...character, id: makeId() })),
     audioSegments,
+    // Image binaries are shared by stable asset ID in IndexedDB until one project removes them.
+    imageAssets: project.imageAssets?.map((asset) => ({ ...asset })),
+    imageMappings: project.imageMappings?.flatMap((mapping) => {
+      const sceneId = sceneIds.get(mapping.sceneId);
+      return sceneId ? [{ ...mapping, sceneId, imageIds: [...mapping.imageIds] }] : [];
+    }),
+    timelineClips: project.timelineClips?.flatMap((clip) => {
+      const sceneId = sceneIds.get(clip.sceneId);
+      if (!sceneId) return [];
+      return [{
+        ...clip,
+        id: makeId(),
+        sceneId,
+        segmentId: clip.segmentId ? audioSegmentIds.get(clip.segmentId) : undefined,
+      }];
+    }),
   };
 }
 
