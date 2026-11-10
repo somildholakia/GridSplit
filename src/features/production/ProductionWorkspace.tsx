@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Pause, Play, RefreshCw, Square, Trash2 } from "lucide-react";
-import type { StudioProject } from "../../lib/projectStore";
+import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import { measureWavBlob } from "../../lib/mediaTimeline";
 import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, sortSequence, timelineDurationSeconds, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
@@ -26,6 +26,26 @@ async function readImage(id:string):Promise<Blob|null>{
 async function deleteImage(id:string):Promise<void>{
   const db=await openImageDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);}).finally(()=>db.close());
 }
+function isImageUsedByAnotherProject(imageId:string,currentProjectId:string):boolean{
+  try{
+    const saved=JSON.parse(localStorage.getItem(PROJECT_STORAGE_KEY)??"[]") as unknown;
+    return Array.isArray(saved)&&saved.some((entry)=>entry&&typeof entry==="object"
+      &&(entry as {id?:unknown}).id!==currentProjectId
+      &&Array.isArray((entry as {imageAssets?:unknown}).imageAssets)
+      &&((entry as {imageAssets:Array<{id?:unknown}>}).imageAssets).some(asset=>asset.id===imageId));
+  }catch{return true;}
+}
+async function deleteImageIfUnreferenced(imageId:string,currentProjectId:string):Promise<void>{
+  if(!isImageUsedByAnotherProject(imageId,currentProjectId))await deleteImage(imageId);
+}
+
+/** Remove image blobs belonging only to a deleted project; duplicated projects may share source IDs. */
+export async function cleanupProjectImages(project:StudioProject,remainingProjects:StudioProject[]):Promise<void>{
+  const assets=(project as ProductionProject).imageAssets??[];
+  const referenced=new Set(remainingProjects.flatMap(item=>(item as ProductionProject).imageAssets??[]).map(asset=>asset.id));
+  for(const asset of assets)if(!referenced.has(asset.id))await deleteImage(asset.id);
+}
+
 async function fingerprint(file:File):Promise<string>{
   try{const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");}
   catch{return file.name.toLowerCase()+":"+file.size+":"+file.lastModified;}
@@ -88,7 +108,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
     }catch(error){setMessage(error instanceof Error?error.message:"Could not import these images.");}finally{setBusy(false);}
   };
   const removeAsset=async(id:string)=>{
-    await deleteImage(id);updateAssets(assets.filter(a=>a.id!==id).map((a,index)=>({...a,order:index})));
+    await deleteImageIfUnreferenced(id,project.id);updateAssets(assets.filter(a=>a.id!==id).map((a,index)=>({...a,order:index})));
     patchProject(onUpdate,{imageMappings:normalizeMappings(mappings.map(m=>({...m,imageIds:m.imageIds.filter(x=>x!==id)})),project.scenes.map(s=>s.id),assets.filter(a=>a.id!==id).map(a=>a.id)),timelineClips:clips.filter(c=>c.assetId!==id)});
   };
   const moveAsset=(index:number,direction:-1|1)=>{
@@ -203,7 +223,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
     void audioContextRef.current?.close();
   },[]);
   const seekTimeline=(value:number)=>{if(isPlaying)pauseTimeline();setPlayheadSeconds(Math.min(timelineDuration,Math.max(0,value)));};
-  const clearAssets=async()=>{for(const asset of assets)await deleteImage(asset.id);updateAssets([]);updateMappings([]);patchProject(onUpdate,{timelineClips:[]});setMessage("Removed all image assets from this project.");};
+  const clearAssets=async()=>{for(const asset of assets)await deleteImageIfUnreferenced(asset.id,project.id);updateAssets([]);updateMappings([]);patchProject(onUpdate,{timelineClips:[]});setMessage("Removed all image assets from this project.");};
   return <section className="production-workspace">
     <header className="production-head"><div><span className="production-kicker">M22–M25 · PRODUCTION WORKSPACE</span><h2>Images to timeline.</h2><p>Keep source images local, resolve sequence issues, map them to scenes, and schedule them against measured audio.</p></div><Clapperboard size={26}/></header>
     <nav className="production-tabs" aria-label="Production steps">
