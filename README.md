@@ -35,8 +35,20 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 
 ### Multi-image intake (M20–M21)
 - Add multiple image files or choose a folder where browser directory selection is supported.
-- Natural-sort numbered frames, filter duplicates and invalid/oversized files, and remove individual queue entries.
+- Natural-sort numbered frames, filter invalid/oversized files, and remove individual queue entries.
 - Export an ordered ZIP of unchanged originals with a CSV manifest.
+- In Production Studio, import images into projects, review duplicate content instead of silently dropping it, correct sequence numbers and order, map images to scenes, and build an initial schedule from measured WAV durations.
+
+### Production Studio (M22–M25 implementation)
+
+- Store numbered storyboard images in a project, with original files in local IndexedDB and browser-generated thumbnails.
+- Review missing frame numbers, sequence gaps, repeated frame numbers, and identical-content fingerprints; correct numbering and reorder images manually.
+- Map multiple images to each scene and reuse one image across different scenes.
+- Build an initial image/audio schedule from the measured duration of locally saved WAV segments, with explicit warnings for missing audio or images.
+- Edit clip start times and durations, nudge clips, view image/audio lanes on a time ruler, and seek a playhead with a live frame preview.
+- Play and pause a timeline while local narration/dialogue WAV segments are scheduled against scene positions using Web Audio.
+
+The M22–M25 implementation and automated verification status are tracked in [docs/M22-M25.md](docs/M22-M25.md). Manual browser acceptance remains open. The live editor uses second-based project timeline positions; it does not yet provide audio mixing, music/SFX processing, transitions, image effects, MP4 rendering, or media-inclusive project packaging.
 
 ### Image Splitter
 - Upload browser-supported PNG, JPG, WebP, GIF, and other image formats (up to 100 MB).
@@ -76,11 +88,11 @@ GridSplit first finds horizontal image bands, then analyses each band independen
 
 ## Privacy and storage
 
-Images and imported scripts are processed locally in the browser. Studio project data is saved in the current browser's `localStorage`; it is not synced between browsers or devices. Export a JSON backup to move project metadata between devices. (The JSON project backup stores project data and source text; it is not yet a portable archive containing generated audio/video media.)
+Images and imported scripts are processed locally in the browser. Studio project data is saved in the current browser's `localStorage`; it is not synced between browsers or devices. Export a JSON backup to move project metadata between devices. (The JSON project backup stores project data, source text, and image metadata; it does not embed IndexedDB image or audio binaries. A media-inclusive portable archive is planned for M30.)
 
 ## Scope and roadmap
 
-This branch contains the M06–M21 implementation: design system, dashboard, local project management, script import, deterministic parsing, manual scene segmentation, character/voice management, local TTS provider, per-segment generation controls, and audio preview UI. Real Kokoro synthesis/playback still requires user-installed model/voice files and a local smoke test. Editable scene-to-image mapping, the full timeline editor, audio mixing, FFmpeg/MP4 rendering, and complete production ZIP export remain later milestones. M17–M21 passed GitHub Actions run #131 (58 tests across 12 files, lint, typecheck, production build, optional Python sidecar syntax check, and static artifact upload). [View run #131](https://github.com/somildholakia/GridSplit/actions/runs/42817826847).
+This feature branch contains the M06–M25 implementation: design system, dashboard, local projects, script import/parsing/editing, local audio workflow, measured timing and subtitles, original image splitter, project-local image sequence management, many-to-many scene mapping, measured image/audio scheduling, and a visual timeline with local playback. The latest M22–M25 CI rerun is pending after correcting a stale test expectation; earlier M17–M21 CI passed run #131 (58 tests across 12 files, lint, typecheck, build, sidecar syntax, and artifact upload). Real Kokoro synthesis still requires user-installed model/voice files and a local generate → playback → download smoke test. Audio mixing, transitions/effects, FFmpeg/MP4 rendering, and a media-inclusive portable project archive remain later milestones.
 
 ## License
 
