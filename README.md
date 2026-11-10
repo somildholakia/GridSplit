@@ -80,7 +80,7 @@ Images and imported scripts are processed locally in the browser. Studio project
 
 ## Scope and roadmap
 
-This branch contains the M06–M21 implementation: design system, dashboard, local project management, script import, deterministic parsing, manual scene segmentation, character/voice management, local TTS provider, per-segment generation controls, and audio preview UI. Real Kokoro synthesis/playback still requires user-installed model/voice files and a local smoke test. Editable scene-to-image mapping, the full timeline editor, audio mixing, FFmpeg/MP4 rendering, and complete production ZIP export remain later milestones. M17–M21 passed GitHub Actions run #121 (55 tests across 12 files, lint, typecheck, and production build).
+This branch contains the M06–M21 implementation: design system, dashboard, local project management, script import, deterministic parsing, manual scene segmentation, character/voice management, local TTS provider, per-segment generation controls, and audio preview UI. Real Kokoro synthesis/playback still requires user-installed model/voice files and a local smoke test. Editable scene-to-image mapping, the full timeline editor, audio mixing, FFmpeg/MP4 rendering, and complete production ZIP export remain later milestones. M17–M21 passed GitHub Actions run #131 (58 tests across 12 files, lint, typecheck, production build, optional Python sidecar syntax check, and static artifact upload). [View run #131](https://github.com/somildholakia/GridSplit/actions/runs/42817826847).
 
 ## License
 
