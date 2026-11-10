@@ -42,7 +42,7 @@ The project is currently evolving from the original GridSplit contact-sheet extr
 - GitHub Actions run #15 passed: lint, 3 test files / 11 tests, TypeScript typecheck, production build, and artifact upload.
 - Added a commit-specific `dist/` artifact with 14-day retention. Production deployment remains deferred to M35.
 
-## M12–M16 — Character and local audio workflow (CI #98 passed; local model smoke test pending)
+## M12–M16 — Character and local audio workflow (CI #100 passed; local model smoke test pending)
 
 ### Added
 - Stable narrator and dialogue character records with voice, language, and speed preferences.
@@ -51,7 +51,7 @@ The project is currently evolving from the original GridSplit contact-sheet extr
 - Per-block narration/dialogue generation, cancellation, retry/regenerate, fingerprint reconciliation, and IndexedDB WAV persistence.
 - Native browser audio preview, sample-derived duration display, and individual WAV download.
 - Unit tests for WAV metadata, loopback endpoint privacy, character stability, segment reconciliation, copied-project reference remapping, and interrupted-generation recovery.
-- GitHub Actions run #98: lint, 42 tests across 9 files, TypeScript typecheck, production build, Python sidecar syntax compilation, and artifact upload all passed.
+- GitHub Actions run #100 on final PR head `4bc195b7201e2d170a3f6d32667db7b885478b46`: lint, 42 tests across 9 files, TypeScript typecheck, production build, Python sidecar syntax compilation, and artifact upload all passed.
 
 ### Boundaries
 - No cloud TTS fallback or bundled/downloaded model weights.
