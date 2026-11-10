@@ -4,31 +4,31 @@
 - Source SHA-256: `f07ff9935d150e593e45a1de2c591ff6c2e9ac016dc0374cf8f1f83dd5dc5372`.
 - Processing: deterministic pixel-boundary analysis and manual visual review; no generative AI or cloud image processing.
 - Image-bearing row bands: 13.
-- Preliminary TypeScript detector result recorded by the reference probe: 210 candidate rectangles (12 rows of 16 plus a final row of 18).
+- Visual detector overlay: 209 candidate rectangles — 15 in row 1, 16 in rows 2–12, and 18 in row 13.
 - Requested output count: 196 individual crops.
 
 ## Manual correction map
 
-The supplied sheet is irregular. The title card spans two detector candidates in the first row, the last row contains a "To Be Continued" card, and 11 repeated-number panels must be excluded to meet the requested 196-crop interpretation.
+The wide title card is already represented by a single candidate in row 1; it must be excluded, not merged with the first story frame. The final row contains a "To Be Continued" card, and 11 panels repeat a previously used shot number.
 
-Apply these corrections to the detector's 210 candidates:
+Exclude these 13 one-based row/column positions:
+- R1C1 — the title card.
+- R2C11, R3C13, R4C15, R5C11, R6C12, R7C14, R8C16, R9C13, R10C12, R11C13, R12C13 — 11 repeated-number panels.
+- R13C17 — the "To Be Continued" card.
 
-1. In row 1, merge candidate columns 1 and 2 to reconstruct the wide title card, then exclude that merged title card.
-2. Exclude the repeated-number panels at these one-based row/column positions: R2C11, R3C13, R4C15, R5C11, R6C12, R7C14, R8C16, R9C13, R10C12, R11C13, and R12C13.
-3. Exclude R13C17, the "To Be Continued" card.
-4. Keep the remaining image panels in row-major order.
+Keep all other detected rectangles in row-major order.
 
-Count arithmetic: 210 preliminary candidates − 1 title-card merge − 1 title card − 11 repeated-number panels − 1 continuation card = **196 selected crops**.
+Count arithmetic: 209 candidates − 1 title card − 11 repeated-number panels − 1 continuation card = **196 selected crops**.
 
-The repeated-number exclusions are a manual interpretation of the user's requested 196-image result, not semantic image recognition. GridSplit does not infer story meaning or use AI to decide which panels belong in a sequence. The user must review the proposed crop selection before exporting.
+The repeated-number exclusions are a manual interpretation of the requested 196-image result, not semantic image recognition. GridSplit does not infer story meaning or use AI to decide which panels belong in a sequence. All excluded candidates remain visible and can be re-selected before export.
 
 ## Exact-sample preset in the browser app
 
-The extractor now has a deterministic preset for this exact source file. It first verifies the original file's SHA-256 and byte length, then requires the detector to return the expected 210 candidates with the reviewed per-row shape and an adjacent split title card. Only then does it show **Apply 196-crop map**.
+The extractor includes a deterministic preset for this exact source file. It first verifies the original file's SHA-256, byte length and dimensions, then requires the detector to return the expected 209-candidate row shape (15 / 16 × 11 / 18) with contiguous cell geometry and a wide first title card. Only then does it show **Apply 196-crop map**.
 
-The action merges the two title-card halves and marks the title, the 11 repeated-number panels and the continuation card as excluded. Those excluded candidates remain visible and can be re-selected. The selected count becomes 196. The preset uses fixed pixel/layout metadata only; it does not use OCR, AI, network services or server-side image processing. Any different image, changed file bytes, or changed detector geometry keeps the normal manual controls and does not receive this preset.
+The action leaves the detected crop rectangles unchanged and marks the title, the 11 repeated-number panels and the continuation card as excluded. This produces 196 selected crops from 209 visible candidates. The excluded candidates remain visible and can be re-selected. The preset uses fixed pixel/layout metadata only; it does not use OCR, AI, network services or server-side image processing. Any different image, changed file bytes, or changed detector geometry keeps the normal manual controls and does not receive this preset.
 
-The helper is covered by Vitest tests for the 210-candidate layout, title merge, exact 196 selected count and refusal of a changed title geometry. The actual uploaded file still needs a browser run to verify that the detector exposes the expected layout and that all 196 crops look correct before the preset can be considered accepted.
+The helper tests cover the 209-candidate row geometry, exclusions, exact 196 selected count and refusal of malformed layouts. The actual uploaded file still needs a browser run to verify that the deployed detector exposes the expected layout and that all 196 crops look correct before the preset can be considered accepted.
 
 ## Diagnostic export generated during this continuation
 
