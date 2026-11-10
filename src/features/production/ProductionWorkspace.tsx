@@ -114,7 +114,11 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
   };
   const moveAsset=(index:number,direction:-1|1)=>{
     const next=[...assets],target=index+direction;if(target<0||target>=next.length)return;
-    [next[index],next[target]]=[next[target],next[index]];updateAssets(next.map((a,i)=>({...a,order:i})));
+    [next[index],next[target]]=[next[target],next[index]];
+    const ordered=next.map((asset,itemIndex)=>({...asset,order:itemIndex}));
+    updateAssets(ordered);
+    const rank=new Map(ordered.map((asset,itemIndex)=>[asset.id,itemIndex]));
+    patchProject(onUpdate,{imageMappings:mappings.map(mapping=>({...mapping,imageIds:[...mapping.imageIds].sort((left,right)=>(rank.get(left)??Number.MAX_SAFE_INTEGER)-(rank.get(right)??Number.MAX_SAFE_INTEGER))}))});
   };
   const setFrameNumber=(id:string,value:string)=>{
     const number=value.trim()===""?null:Number(value);
@@ -123,8 +127,10 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
   };
   const mappedFor=(sceneId:string)=>mappings.find(m=>m.sceneId===sceneId)?.imageIds??[];
   const toggleMapping=(sceneId:string,imageId:string)=>{
-    const current=mappedFor(sceneId),next=current.includes(imageId)?current.filter(id=>id!==imageId):[...current,imageId];
-    updateMappings([...mappings.filter(m=>m.sceneId!==sceneId),{sceneId,imageIds:next}]);
+    const selected=new Set(mappedFor(sceneId));
+    if(selected.has(imageId))selected.delete(imageId);else selected.add(imageId);
+    const next=assets.filter(asset=>selected.has(asset.id)).map(asset=>asset.id);
+    updateMappings([...mappings.filter(mapping=>mapping.sceneId!==sceneId),{sceneId,imageIds:next}]);
   };
   const createSchedule=async()=>{
     setBusy(true);setMessage("Measuring saved WAV audio and building the image schedule…");
