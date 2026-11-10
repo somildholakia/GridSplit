@@ -7,3 +7,10 @@ dist
 .env.*
 .vitest/
 coverage/
+
+# Optional local TTS model/runtime files
+local-tts/.venv/
+local-tts/models/
+local-tts/__pycache__/
+*.onnx
+*.bin
