@@ -44,7 +44,7 @@
 
 - CI runs `npm audit --omit=dev --audit-level=high`; run #199 reported **0 production npm vulnerabilities** at that threshold.
 - The bundled PDF.js dependency and optional Kokoro information are listed in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
-- The optional Python TTS sidecar is resolved with pinned uv 0.13.5 in GitHub Actions; CI generates a cross-platform `uv.lock` and audits the synchronized environment with `pip-audit --strict`. `pip-audit==2.10.1` is development-only and is excluded from normal runtime installs. The generated lock artifact is persisted to the PR branch by the default-branch handoff workflow after successful CI.
+- The optional Python TTS sidecar dependency graph is committed in `local-tts/uv.lock`, generated with pinned uv 0.13.5 for Python 3.10–3.13. CI validates it with `uv lock --check` and audits the synchronized environment with `pip-audit --strict`. `pip-audit==2.10.1` is development-only and excluded from normal runtime installs. The default-branch handoff workflow commits only the generated lockfile from successful same-repository PR CI runs; it does not modify workflow definitions.
 - Kokoro model/voice, phonemizer/runtime packages, FFmpeg binaries and codecs are not bundled. Their exact version, provenance, vulnerability status and license must be reviewed before creating a redistributable installer or combined binary package.
 
 ## Open release checks
