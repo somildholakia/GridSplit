@@ -49,7 +49,7 @@ A milestone is complete only when its implementation exists, required tests or v
 
 ## Current branch validation
 
-M06–M21 are implemented on the feature branch and remain in draft PR #1; they are not merged into `main`. **GitHub Actions run #129 passed** on the PR update: Python sidecar syntax check, `npm ci`, lint, **58 unit tests across 12 files**, TypeScript typecheck, production build, and static artifact upload. The run is available at https://github.com/somildholakia/GridSplit/actions/runs/42817438924.
+M06–M21 are implemented on the feature branch and remain in draft PR #1; they are not merged into `main`. **GitHub Actions run #130 passed** on the PR update: Python sidecar syntax check, `npm ci`, lint, **58 unit tests across 12 files**, TypeScript typecheck, production build, and static artifact upload. The run is available at https://github.com/somildholakia/GridSplit/actions/runs/42817664087.
 
 The additional M17–M19 tests cover sub-second SRT/VTT cue boundaries. The additional M21 tests cover natural ordering across nested folder paths and the 500-image cap. These are automated tests, not a substitute for visual acceptance of a real contact sheet.
 
@@ -69,4 +69,4 @@ Do not check a box until all required evidence is available.
 
 ## M12–M16 implementation and validation
 
-Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md), [docs/M17-M19.md](M17-M19.md), and [docs/M20-M21.md](M20-M21.md). M12–M13 satisfy their automated completion evidence. M14–M16 implementation is committed and browser CI passes, but their checkboxes remain open pending a real local model/voice generate → playback → WAV-download smoke test. M17–M21 have automated implementation and CI evidence from run #129.
+Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md), [docs/M17-M19.md](M17-M19.md), and [docs/M20-M21.md](M20-M21.md). M12–M13 satisfy their automated completion evidence. M14–M16 implementation is committed and browser CI passes, but their checkboxes remain open pending a real local model/voice generate → playback → WAV-download smoke test. M17–M21 have automated implementation and CI evidence from run #130.
