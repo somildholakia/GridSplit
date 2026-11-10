@@ -61,7 +61,7 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 - Added image/audio schedule construction from measured WAV durations and visible missing-media warnings.
 - Added a visual two-track timeline, ruler, playhead, current-frame preview, seek/play/pause/stop, clip start/duration editing, nudging, and local Web Audio scheduling of speech segments.
 - Added automated coverage for sequence parsing/review, mapping normalization, time-to-image selection, schedule distribution, project schema validation, and production-project duplication.
-- GitHub Actions run #177 passed: lint, 76 tests across 15 files, typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run #164](https://github.com/somildholakia/GridSplit/actions/runs/42826406478).
+- GitHub Actions run #182 passed: lint, 76 tests across 15 files, typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run #182](https://github.com/somildholakia/GridSplit/actions/runs/42826679257).
 - Manual browser playback and real model WAV validation remain open. The live timeline still stores second-based positions; mixing, transitions, effects, MP4 rendering, and media-inclusive portable packaging remain later milestones.
 
 ## M20–M21 — Extractor regression and image intake
