@@ -74,7 +74,7 @@ describe("GridSplit large-project performance smoke", () => {
       sampleRate: 48000,
     }));
     const synchronization = buildSynchronizationMetadata(segments);
-    const images: ImageSequenceAsset[] = scenes.map((scene, index) => ({
+    const images: ImageSequenceAsset[] = scenes.map((_, index) => ({
       id: "image-" + index,
       fileName: String(index + 1).padStart(4, "0") + ".png",
       relativePath: String(index + 1).padStart(4, "0") + ".png",
