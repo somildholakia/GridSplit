@@ -31,7 +31,7 @@ M01–M05 remain complete on `main`. The GridSplit Studio branch adds the produc
 - **M14:** Implemented on PR #1 — optional Kokoro ONNX FastAPI loopback sidecar and explicit trusted-origin CORS allowlist. Python syntax passes CI; real model/voice synthesis is not yet verified.
 - **M15:** Implemented on PR #1 — fingerprinted per-block generation, cancellation/retry/regenerate, interrupted-state recovery, and IndexedDB WAV storage. Browser CI passes; live model generation is pending.
 - **M16:** Implemented on PR #1 — local audio preview, sample-derived duration, WAV download, and missing-blob recovery. Browser CI passes; playback of a real generated segment is pending.
-- **M17:** Implementation added — local WAV blobs are re-read and duration is derived from actual sample frames/sample rate; CI validation pending.\n- **M18:** Implementation added — deterministic versioned synchronization JSON with exact rational segment and scene timing; CI validation pending.\n- **M19:** Implementation added — segment-level SRT/VTT export from measured timing; no word alignment is claimed; CI validation pending.\n- **M20:** Implementation added — regression fixtures protect flat-image fallback and uniform-grid boundary coverage; CI validation pending. The 196-image sample remains unverified.\n- **M21:** Implementation added — multi-file/folder intake, natural sorting, duplicate/type/size limits, and local ordered ZIP/CSV bundle; CI validation pending.\n- **M22–M36:** Not started.
+- **M17:** Complete on PR #1 — local WAV blobs are re-read and duration is derived from actual sample frames/sample rate; CI #115 passed.\n- **M18:** Complete on PR #1 — deterministic versioned synchronization JSON with exact rational segment and scene timing; CI #115 passed.\n- **M19:** Complete on PR #1 — segment-level SRT/VTT export from measured timing; no word alignment is claimed; CI #115 passed.\n- **M20:** Complete on PR #1 — regression fixtures protect flat-image fallback and uniform-grid boundary coverage; CI #115 passed. The 196-image sample remains unverified.\n- **M21:** Complete on PR #1 — multi-file/folder intake, natural sorting, duplicate/type/size limits, and local ordered ZIP/CSV bundle; CI #115 passed.\n- **M22–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
@@ -92,7 +92,7 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 
 ## Next step
 
-**Remaining M14–M16 acceptance test:** install Kokoro ONNX and the matching voice file on a target machine, run the optional sidecar, and verify one generate → playback → WAV-download cycle. This machine-specific test is not represented as passed. M17–M21 implementation is now present on the feature branch; see [M17–M19](M17-M19.md) and [M20–M21](M20-M21.md). Automated validation is pending.
+**Remaining M14–M16 acceptance test:** install Kokoro ONNX and the matching voice file on a target machine, run the optional sidecar, and verify one generate → playback → WAV-download cycle. This machine-specific test is not represented as passed. M17–M21 are complete on the feature branch; GitHub Actions run #115 passed lint, 53 tests across 12 files, typecheck, production build, Python sidecar syntax, and static artifact upload. See [M17–M19](M17-M19.md) and [M20–M21](M20-M21.md).
 
 ## Operating rules
 
