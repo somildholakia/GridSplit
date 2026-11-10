@@ -63,7 +63,7 @@ describe("contact-sheet image ZIP export", () => {
     expect(new Set(imagePaths).size).toBe(count);
     expect(imagePaths[0]).toBe("gridsplit-images/frame-001.png");
     expect(imagePaths.at(-1)).toBe("gridsplit-images/frame-196.png");
-    expect(manifest?.trim().split("\\n")).toHaveLength(count + 1);
+    expect(manifest?.trim().split("\n")).toHaveLength(count + 1);
     expect(manifest).toContain('"frame-001.png",1,1,2,2,96,76');
     expect(manifest).toContain('"frame-196.png",14,14,1302,1042,96,76');
     expect(drawImage).toHaveBeenCalledTimes(count);
