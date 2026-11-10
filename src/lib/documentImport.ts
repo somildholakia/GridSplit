@@ -68,7 +68,7 @@ export async function extractDocxText(file: Blob): Promise<string> {
  * Reads selectable PDF text locally through PDF.js. The worker is bundled with
  * the application so PDF parsing does not require a CDN or remote service.
  */
-export async function extractPdfText(file: Blob): Promise<string> {
+export async function extractPdfText(file: Blob, options: { workerSrc?: string } = {}): Promise<string> {
   if (file.size === 0) {
     throw new Error("The PDF file is empty.");
   }
@@ -77,7 +77,7 @@ export async function extractPdfText(file: Blob): Promise<string> {
     import("pdfjs-dist"),
     import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
   ]);
-  GlobalWorkerOptions.workerSrc = workerModule.default;
+  GlobalWorkerOptions.workerSrc = options.workerSrc ?? workerModule.default;
 
   const data = new Uint8Array(await file.arrayBuffer());
   const loadingTask = getDocument({
