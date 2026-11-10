@@ -35,7 +35,13 @@ Keep this terminal running. Open **Audio studio** in GridSplit, keep `http://127
 - `GET /voices` — available voice choices
 - `POST /synthesize` — JSON `{ "text", "voice_id", "language", "speed" }`; returns PCM WAV
 
-Only loopback browser origins are allowed by CORS. Do not expose this server to a LAN or public network. The default command binds to loopback. There is no authentication because the service is explicitly local-only.
+Local development origins are allowed by default. To use a separately hosted static frontend, configure its exact HTTPS origin before starting the sidecar:
+
+```bash
+GRIDSPLIT_ALLOWED_ORIGINS=https://your-exact-gridsplit-domain.example uv run uvicorn server:app --host 127.0.0.1 --port 8765
+```
+
+Do not use wildcard origins or expose this server to a LAN/public network. The process must remain bound to loopback. There is no authentication because this is a same-device workflow. The service acknowledges browser private-network preflight only for those permitted origins.
 
 ## Limits
 
