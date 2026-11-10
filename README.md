@@ -28,6 +28,16 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 - Persist WAV audio locally in IndexedDB; review with the browser audio player and download individual WAV files.
 - The Kokoro model and matching voice file are user-installed and are not bundled or downloaded by GridSplit. Real model-backed synthesis/playback smoke testing remains an explicit acceptance step.
 
+### Media timing and subtitles (M17–M19)
+- Re-measure saved WAV blobs from their actual sample headers and derive exact sample-based durations.
+- Export deterministic scene/segment synchronization JSON with rational timestamps.
+- Export segment-level SRT and WebVTT captions; word-level alignment is not fabricated.
+
+### Multi-image intake (M20–M21)
+- Add multiple image files or choose a folder where browser directory selection is supported.
+- Natural-sort numbered frames, filter duplicates and invalid/oversized files, and remove individual queue entries.
+- Export an ordered ZIP of unchanged originals with a CSV manifest.
+
 ### Image Splitter
 - Upload browser-supported PNG, JPG, WebP, GIF, and other image formats (up to 100 MB).
 - Detect horizontal row bands, then estimate vertical separators independently for each row.
