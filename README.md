@@ -70,7 +70,7 @@ Images and imported scripts are processed locally in the browser. Studio project
 
 ## Scope and roadmap
 
-This branch contains the M06–M16 implementation: design system, dashboard, local project management, script import, deterministic parsing, manual scene segmentation, character/voice management, local TTS provider, per-segment generation controls, and audio preview UI. Real Kokoro synthesis/playback still requires user-installed model/voice files and a local smoke test. Timeline synchronization, audio mixing, subtitles, MP4 rendering, and complete production ZIP export remain later milestones.
+This branch contains the M06–M21 implementation: design system, dashboard, local project management, script import, deterministic parsing, manual scene segmentation, character/voice management, local TTS provider, per-segment generation controls, and audio preview UI. Real Kokoro synthesis/playback still requires user-installed model/voice files and a local smoke test. Editable scene-to-image mapping, the full timeline editor, audio mixing, FFmpeg/MP4 rendering, and complete production ZIP export remain later milestones. M17–M21 automated validation is pending on the active pull request.
 
 ## License
 
