@@ -27,10 +27,10 @@ A milestone is complete only when its implementation exists, required tests or v
 - [ ] **M15 — Segment generation.** Implementation added — per-block fingerprints, generation lifecycle, recovery, and IndexedDB WAV storage. Browser CI passes; live synthesis against an installed model remains to be exercised.
 - [ ] **M16 — Audio preview.** Implementation added — native local playback, sample-derived duration, and WAV download. Browser build/tests pass; review of a real model-generated WAV remains part of the on-device smoke test.
 - [x] **M17 — Actual duration measurement.** Implementation added: re-read locally stored WAV headers and derive exact rational duration from sample count/sample rate; CI run #115 passed.
-- [x] **M18 — Synchronization metadata engine.** Implementation added: deterministic versioned sync JSON with rational segment/scene timing from measured WAV samples; automated validation pending.
-- [x] **M19 — Subtitle generation.** Implementation added: segment-level SRT/VTT export; no word-level alignment is invented; automated validation pending.
-- [x] **M20 — Preserve and improve GridSplit.** Existing detector/export flow retained; added flat-image fallback and even-grid regression fixtures; CI validation pending.
-- [x] **M21 — Multi-image upload.** Implementation added: multi-file/folder selection, natural sorting, duplicate/size/type validation, removable queue, and local ordered ZIP/CSV export; CI validation pending.
+- [x] **M18 — Synchronization metadata engine.** Implementation added: deterministic versioned sync JSON with rational segment/scene timing from measured WAV samples; CI run #115 passed.
+- [x] **M19 — Subtitle generation.** Implementation added: segment-level SRT/VTT export; no word-level alignment is invented; CI run #115 passed.
+- [x] **M20 — Preserve and improve GridSplit.** Existing detector/export flow retained; added flat-image fallback and even-grid regression fixtures; CI run #115 passed.
+- [x] **M21 — Multi-image upload.** Implementation added: multi-file/folder selection, natural sorting, duplicate/size/type validation, removable queue, and local ordered ZIP/CSV export; CI run #115 passed.
 - [ ] **M22 — Image sequence management.** Add natural sorting, duplicates/gaps, previews, and correction tools.
 - [ ] **M23 — Scene-to-image mapping.** Support flexible one-to-many and many-to-one mappings.
 - [ ] **M24 — Automatic synchronization.** Create and recalculate image/audio schedules with explicit warnings.
