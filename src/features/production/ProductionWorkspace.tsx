@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, RefreshCw, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Pause, Play, RefreshCw, Square, Trash2 } from "lucide-react";
 import type { StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import { measureWavBlob } from "../../lib/mediaTimeline";
-import { analyseSequence, buildTimeline, extractSequenceNumber, moveTimelineClip, normalizeMappings, sortSequence, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
+import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, sortSequence, timelineDurationSeconds, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
 import "./production-workspace.css";
 
 type ProductionProject = StudioProject & { imageAssets?: SequenceAsset[]; imageMappings?: SceneImageMapping[]; timelineClips?: TimelineClip[] };
 type Props = { project: StudioProject; onUpdate: (patch: Partial<StudioProject>) => void };
 const DB = "gridsplit-studio-images", STORE = "image-blobs", VERSION = 1;
+const TIMELINE_PIXELS_PER_SECOND = 64;
 function openImageDb(): Promise<IDBDatabase> {
   return new Promise((resolve,reject) => {
     const request=indexedDB.open(DB,VERSION);
@@ -41,10 +42,21 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
   const [thumbs,setThumbs]=useState<Record<string,string>>({});
   const [audioUrls,setAudioUrls]=useState<Record<string,string>>({});
   const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
+  const [playheadSeconds,setPlayheadSeconds]=useState(0); const [isPlaying,setIsPlaying]=useState(false);
+  const audioContextRef=useRef<AudioContext|null>(null);
+  const scheduledSourcesRef=useRef<AudioBufferSourceNode[]>([]);
+  const playbackOriginRef=useRef<number|null>(null);
+  const animationFrameRef=useRef<number|null>(null);
   const folderRef=useRef<HTMLInputElement>(null);
   useEffect(()=>{folderRef.current?.setAttribute("webkitdirectory","");folderRef.current?.setAttribute("directory","");},[]);
   const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline">("sequence");
   const issues=useMemo(()=>analyseSequence(assets),[assets]);
+  const timelineDuration=timelineDurationSeconds(clips);
+  const timelineWidth=Math.max(600,Math.ceil(timelineDuration*TIMELINE_PIXELS_PER_SECOND));
+  const currentImageClip=imageClipAtTime(clips,playheadSeconds);
+  const currentImage=currentImageClip?assets.find(asset=>asset.id===currentImageClip.assetId):undefined;
+  const rulerTicks=Array.from({length:Math.floor(timelineDuration/5)+1},(_,index)=>index*5);
+  if(timelineDuration>0&&rulerTicks[rulerTicks.length-1]!==timelineDuration)rulerTicks.push(timelineDuration);
   useEffect(()=>{
     let alive=true;const urls:Record<string,string>={};
     void Promise.all(assets.map(async asset=>{const blob=await readImage(asset.id);if(blob)urls[asset.id]=URL.createObjectURL(blob);}))
@@ -64,11 +76,10 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
     try{
       const accepted=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=100*1024*1024);
       const rejected=files.length-accepted.length;
-      const existing=new Set(assets.map(a=>a.fingerprint));const additions:SequenceAsset[]=[];
+      const additions:SequenceAsset[]=[];
       const ordered=sortSequence(accepted.map(f=>({name:f.name,relativePath:(f as File&{webkitRelativePath?:string}).webkitRelativePath||f.name,file:f})));
       for(const item of ordered){
         const file=item.file,id=crypto.randomUUID(),hash=await fingerprint(file);
-        existing.add(hash);
         const size=await dimensions(file);await saveImage(id,file);
         additions.push({id,name:file.name,relativePath:item.relativePath,mimeType:file.type,bytes:file.size,sequenceNumber:extractSequenceNumber(file.name),order:assets.length+additions.length,width:size.width,height:size.height,fingerprint:hash});
       }
@@ -113,6 +124,9 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
         if(duration>0&&imageIds.length)inputs.push({sceneId:scene.id,durationSeconds:duration,imageIds});
       }
       const next=buildTimeline(inputs);patchProject(onUpdate,{timelineClips:next});
+      setPlayheadSeconds(0);setIsPlaying(false);playbackOriginRef.current=null;
+      scheduledSourcesRef.current.forEach(source=>{try{source.stop();}catch{/* already stopped */}});
+      scheduledSourcesRef.current=[];
       setMessage("Built "+next.filter(c=>c.track==="images").length+" image clips from measured WAV durations. "+(warnings.length?warnings.join(" "):"All scenes with generated audio have mapped images."));
       setActiveTab("timeline");
     }catch(error){setMessage(error instanceof Error?error.message:"Could not build the schedule.");}finally{setBusy(false);}
@@ -122,7 +136,73 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
     patchProject(onUpdate,{timelineClips:clips.map(c=>c.id===id?{...c,durationSeconds:value}:c)});
   };
   const editClipStart=(id:string,value:number)=>{if(!Number.isFinite(value)||value<0)return;patchProject(onUpdate,{timelineClips:clips.map(c=>c.id===id?{...c,startSeconds:value}:c)});};
-  const reorderClip=(id:string,direction:-1|1)=>patchProject(onUpdate,{timelineClips:moveTimelineClip(clips,id,direction)});
+  const nudgeClip=(id:string,delta:number)=>patchProject(onUpdate,{timelineClips:clips.map(clip=>clip.id===id?{...clip,startSeconds:Math.max(0,clip.startSeconds+delta)}:clip)});
+  const stopScheduledAudio=()=>{scheduledSourcesRef.current.forEach(source=>{try{source.stop();}catch{/* source already ended */}});scheduledSourcesRef.current=[];};
+  const pauseTimeline=()=>{
+    if(playbackOriginRef.current!==null)setPlayheadSeconds(Math.min(timelineDuration,Math.max(0,performance.now()/1000-playbackOriginRef.current)));
+    playbackOriginRef.current=null;stopScheduledAudio();setIsPlaying(false);
+  };
+  const playTimeline=async()=>{
+    if(isPlaying){pauseTimeline();return;}
+    if(!clips.length||timelineDuration<=0){setMessage("Build a timeline before starting playback.");return;}
+    stopScheduledAudio();
+    try{
+      const context=audioContextRef.current??new AudioContext();audioContextRef.current=context;
+      await context.resume();
+      const sceneOrder=new Map(project.scenes.map((scene,index)=>[scene.id,index]));
+      const audioClips=new Map(clips.filter(clip=>clip.track==="audio").map(clip=>[clip.sceneId,clip]));
+      const offsets=new Map<string,number>();
+      const ready=[...(project.audioSegments??[])].filter(segment=>segment.status==="ready").sort((left,right)=>{
+        const sceneDifference=(sceneOrder.get(left.sceneId)??Number.MAX_SAFE_INTEGER)-(sceneOrder.get(right.sceneId)??Number.MAX_SAFE_INTEGER);
+        if(sceneDifference!==0)return sceneDifference;
+        const scene=project.scenes.find(item=>item.id===left.sceneId);
+        return (scene?.blocks.findIndex(block=>block.id===left.blockId)??0)-(scene?.blocks.findIndex(block=>block.id===right.blockId)??0);
+      });
+      const decoded:{buffer:AudioBuffer;startSeconds:number;endSeconds:number}[]=[];
+      const missing:string[]=[];
+      for(const segment of ready){
+        const sceneClip=audioClips.get(segment.sceneId);if(!sceneClip)continue;
+        const offset=offsets.get(segment.sceneId)??0;
+        const startSeconds=sceneClip.startSeconds+offset;
+        const blob=await readGeneratedAudio(project.id,segment.id);
+        if(!blob){missing.push(segment.id);offsets.set(segment.sceneId,offset+(segment.durationSeconds??0));continue;}
+        const buffer=await context.decodeAudioData(await blob.arrayBuffer());
+        const allowedDuration=Math.max(0,sceneClip.startSeconds+sceneClip.durationSeconds-startSeconds);
+        const duration=Math.min(buffer.duration,allowedDuration);
+        offsets.set(segment.sceneId,offset+buffer.duration);
+        if(duration>0)decoded.push({buffer,startSeconds,endSeconds:startSeconds+duration});
+      }
+      const now=context.currentTime+0.05;
+      for(const part of decoded){
+        if(part.endSeconds<=playheadSeconds)continue;
+        const offset=Math.max(0,playheadSeconds-part.startSeconds);
+        const source=context.createBufferSource();source.buffer=part.buffer;source.connect(context.destination);
+        source.start(now+Math.max(0,part.startSeconds-playheadSeconds),offset,part.endSeconds-part.startSeconds-offset);
+        scheduledSourcesRef.current.push(source);
+      }
+      playbackOriginRef.current=performance.now()/1000+0.05-playheadSeconds;setIsPlaying(true);
+      if(missing.length)setMessage("Playback started. "+missing.length+" saved WAV file(s) were missing and were skipped.");
+      else if(!decoded.length)setMessage("Timeline playback is running visually; no ready audio clips were available.");
+      else setMessage("Synchronized timeline playback started.");
+    }catch(error){setMessage(error instanceof Error?error.message:"Could not start timeline playback.");}
+  };
+  useEffect(()=>{
+    if(!isPlaying)return;
+    const tick=()=>{
+      const origin=playbackOriginRef.current;if(origin===null)return;
+      const next=Math.max(0,performance.now()/1000-origin);
+      if(next>=timelineDuration){setPlayheadSeconds(timelineDuration);playbackOriginRef.current=null;stopScheduledAudio();setIsPlaying(false);return;}
+      setPlayheadSeconds(next);animationFrameRef.current=requestAnimationFrame(tick);
+    };
+    animationFrameRef.current=requestAnimationFrame(tick);
+    return()=>{if(animationFrameRef.current!==null)cancelAnimationFrame(animationFrameRef.current);};
+  },[isPlaying,timelineDuration]);
+  useEffect(()=>()=>{ 
+    if(animationFrameRef.current!==null)cancelAnimationFrame(animationFrameRef.current);
+    scheduledSourcesRef.current.forEach(source=>{try{source.stop();}catch{/* already stopped */}});
+    void audioContextRef.current?.close();
+  },[]);
+  const seekTimeline=(value:number)=>{if(isPlaying)pauseTimeline();setPlayheadSeconds(Math.min(timelineDuration,Math.max(0,value)));};
   const clearAssets=async()=>{for(const asset of assets)await deleteImage(asset.id);updateAssets([]);updateMappings([]);patchProject(onUpdate,{timelineClips:[]});setMessage("Removed all image assets from this project.");};
   return <section className="production-workspace">
     <header className="production-head"><div><span className="production-kicker">M22–M25 · PRODUCTION WORKSPACE</span><h2>Images to timeline.</h2><p>Keep source images local, resolve sequence issues, map them to scenes, and schedule them against measured audio.</p></div><Clapperboard size={26}/></header>
@@ -140,18 +220,29 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
         <div className="production-asset-info"><b>{asset.name}</b><small>{asset.width&&asset.height?asset.width+" × "+asset.height+" · ":""}{(asset.bytes/1024).toFixed(0)} KB</small><label>Frame number<input aria-label={"Frame number for "+asset.name} value={asset.sequenceNumber??""} placeholder="Unnumbered" onChange={e=>setFrameNumber(asset.id,e.target.value)}/></label></div>
         <div className="production-asset-controls"><button title="Move earlier" disabled={index===0} onClick={()=>moveAsset(index,-1)}><ArrowUp size={14}/></button><button title="Move later" disabled={index===assets.length-1} onClick={()=>moveAsset(index,1)}><ArrowDown size={14}/></button><button title="Remove image" onClick={()=>void removeAsset(asset.id)}><Trash2 size={14}/></button></div>
       </article>)}</div>}
-      <p className="production-footnote">Duplicate file contents are filtered on import. Sequence numbers can be corrected manually; order is independent of frame numbering. No image is silently discarded after it has been added.</p>
+      <p className="production-footnote">Repeated frame numbers and matching content fingerprints are flagged for review, not silently deleted. Correct frame numbers and visual order independently.</p>
     </div>}
     {activeTab==="mapping"&&<div className="production-section"><p className="production-help">Select any number of images for each scene. The same image may be reused in multiple scenes, and each scene may contain multiple images.</p>
       {!assets.length||!project.scenes.length?<div className="production-empty">Add images and create scenes before mapping.</div>:project.scenes.map(scene=><article className="production-scene-map" key={scene.id}><header><b>{scene.title}</b><span>{mappedFor(scene.id).length} image(s)</span></header><div className="production-map-grid">{assets.map(asset=><label key={asset.id} className={mappedFor(scene.id).includes(asset.id)?"selected":""}>{thumbs[asset.id]?<img src={thumbs[asset.id]} alt=""/>:<span className="production-thumb-placeholder"/>}<input type="checkbox" checked={mappedFor(scene.id).includes(asset.id)} onChange={()=>toggleMapping(scene.id,asset.id)}/><span>{asset.name}</span></label>)}</div></article>)}
     </div>}
     {activeTab==="timeline"&&<div className="production-section">
-      <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Rebuild from measured audio"}</button><span>Image and audio tracks · seconds</span></div>
-      {!clips.length?<div className="production-empty">Map images to scenes and generate WAV audio, then build the initial schedule.</div>:<><div className="production-ruler"><span>Track</span><span>Start</span><span>Duration</span><span>Scene / asset</span><span>Controls</span></div>
-        {(["images","audio"] as const).map(track=><section className="production-track" key={track}><h3>{track==="images"?"IMAGE TRACK":"AUDIO TRACK"}</h3>{clips.filter(c=>c.track===track).sort((a,b)=>a.order-b.order).map((clip,index)=><div className="production-clip" key={clip.id}><b>{track==="images"?"IMG":"WAV"}</b><label><input aria-label="Clip start seconds" type="number" min="0" step="0.1" value={Number(clip.startSeconds.toFixed(2))} onChange={e=>editClipStart(clip.id,Number(e.target.value))}/> s</label><label><input aria-label="Clip duration seconds" type="number" min="0.1" step="0.1" value={Number(clip.durationSeconds.toFixed(2))} onChange={e=>editClip(clip.id,Number(e.target.value))}/> s</label><span>{project.scenes.find(s=>s.id===clip.sceneId)?.title??"Unknown scene"}{clip.assetId?" · "+(assets.find(a=>a.id===clip.assetId)?.name??"Missing image"):""}</span><div><button title="Move earlier on track" disabled={index===0} onClick={()=>reorderClip(clip.id,-1)}><ArrowUp size={13}/></button><button title="Move later on track" disabled={index===clips.filter(c=>c.track===track).length-1} onClick={()=>reorderClip(clip.id,1)}><ArrowDown size={13}/></button></div></div>)}</section>)}
-        <div className="production-audio-preview"><b>Local audio playback</b>{(project.audioSegments??[]).filter(s=>s.status==="ready"&&audioUrls[s.id]).map(s=><label key={s.id}>{project.scenes.find(sc=>sc.id===s.sceneId)?.title??"Scene"}<audio controls preload="none" src={audioUrls[s.id]}/></label>)}</div>
+      <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Rebuild from measured audio"}</button><span>{clips.length} clips · {seconds(timelineDuration)} total</span></div>
+      {!clips.length?<div className="production-empty">Map images to scenes and generate WAV audio, then build the initial schedule.</div>:<>
+        <div className="production-playback-controls">
+          <button className="production-button primary" onClick={()=>void playTimeline()}>{isPlaying?<Pause size={14}/>:<Play size={14}/>} {isPlaying?"Pause":"Play timeline"}</button>
+          <button className="production-button" onClick={()=>{if(isPlaying)pauseTimeline();setPlayheadSeconds(0);}}><Square size={13}/> Stop</button>
+          <label className="production-seek"><span>{seconds(playheadSeconds)}</span><input aria-label="Timeline playhead" type="range" min="0" max={Math.max(0.1,timelineDuration)} step="0.01" value={Math.min(playheadSeconds,timelineDuration)} onChange={event=>seekTimeline(Number(event.target.value))}/><span>{seconds(timelineDuration)}</span></label>
+        </div>
+        <div className="production-current-frame">{currentImage&&thumbs[currentImage.id]?<img src={thumbs[currentImage.id]} alt={"Current frame: "+currentImage.name}/>:<div className="production-current-placeholder">No image at this playhead position</div>}<div><b>{currentImage?.name??"Preview monitor"}</b><small>{currentImageClip?project.scenes.find(scene=>scene.id===currentImageClip.sceneId)?.title??"Scene":"Move the playhead to preview a frame"}</small></div></div>
+        <div className="production-timeline-scroll"><div className="production-timeline-board" style={{width:timelineWidth+132}}>
+          <div className="production-visual-ruler"><b>TIME</b><div className="production-visual-lane" style={{width:timelineWidth}}>{rulerTicks.map((tick,index)=><span key={index} style={{left:tick*TIMELINE_PIXELS_PER_SECOND}}>{seconds(tick)}</span>)}</div></div>
+          {(["images","audio"] as const).map(track=><div className="production-visual-track" key={track}><b>{track==="images"?"IMAGE TRACK":"AUDIO TRACK"}</b><div className="production-visual-lane" style={{width:timelineWidth}}>{clips.filter(clip=>clip.track===track).map(clip=><button key={clip.id} className={"production-visual-clip "+track} style={{left:clip.startSeconds*TIMELINE_PIXELS_PER_SECOND,width:Math.max(30,clip.durationSeconds*TIMELINE_PIXELS_PER_SECOND)}} title={track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Image clip"):"Scene audio · "+(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene")} onClick={()=>seekTimeline(clip.startSeconds)}>{track==="images"&&clip.assetId&&thumbs[clip.assetId]?<img src={thumbs[clip.assetId]} alt=""/>:null}<span>{track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene audio")}</span></button>)}</div></div>)}
+          <div className="production-visual-playhead" style={{left:132+playheadSeconds*TIMELINE_PIXELS_PER_SECOND}}/>
+        </div></div>
+        <div className="production-clip-editors"><b>Clip properties</b>{(["images","audio"] as const).map(track=><section className="production-track" key={track}><h3>{track==="images"?"IMAGE CLIPS":"AUDIO CLIPS"}</h3>{clips.filter(clip=>clip.track===track).sort((a,b)=>a.order-b.order).map(clip=><div className="production-clip" key={clip.id}><b>{track==="images"?"IMG":"WAV"}</b><label>Start <input aria-label="Clip start seconds" type="number" min="0" step="0.1" value={Number(clip.startSeconds.toFixed(2))} onChange={event=>editClipStart(clip.id,Number(event.target.value))}/> s</label><label>Duration <input aria-label="Clip duration seconds" type="number" min="0.1" step="0.1" value={Number(clip.durationSeconds.toFixed(2))} onChange={event=>editClip(clip.id,Number(event.target.value))}/> s</label><span>{project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Unknown scene"}{clip.assetId?" · "+(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):""}</span><div><button title="Nudge clip earlier by half a second" onClick={()=>nudgeClip(clip.id,-0.5)}><ArrowUp size={13}/></button><button title="Nudge clip later by half a second" onClick={()=>nudgeClip(clip.id,0.5)}><ArrowDown size={13}/></button></div></div>)}</section>)}</div>
+        <div className="production-audio-preview"><b>Individual local audio segments</b>{(project.audioSegments??[]).filter(segment=>segment.status==="ready"&&audioUrls[segment.id]).map(segment=><label key={segment.id}>{project.scenes.find(scene=>scene.id===segment.sceneId)?.title??"Scene"}<audio controls preload="none" src={audioUrls[segment.id]}/></label>)}</div>
       </>}
-      <p className="production-footnote">The schedule uses measured WAV sample durations. Rebuild after changing scene audio or mappings. Timeline edits are project-local; this milestone does not render MP4 or mix audio.</p>
+      <p className="production-footnote">Playback follows edited image positions and schedules local WAV segments against scene audio clips. Audio positions use measured WAV durations; edits stay in this browser. MP4 rendering and mixing are later milestones.</p>
     </div>}
   </section>;
 }
