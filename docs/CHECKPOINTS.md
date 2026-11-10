@@ -1,7 +1,7 @@
 # GridSplit Studio — Development Checkpoints
 
 **Last updated:** 2026-11-11  
-**Main branch:** `main` — latest commit `ddf61f1026ed61d6ffd1ea9df44312eaacccb1b2`; deployed frontend runtime commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` (PR #15's 196-sample preset awaits deployment because of Vercel's daily API quota)  
+**Main branch:** `main` — latest application code commit `ddf61f1026ed61d6ffd1ea9df44312eaacccb1b2`; deployed frontend runtime commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6`. Documentation-only commits may advance `main` without changing application code.  
 **Release work branch:** `chore/reconcile-release-status` (documentation reconciliation)  
 **Merged implementation PR:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
