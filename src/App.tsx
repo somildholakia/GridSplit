@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from "react";
 import {Archive,ArchiveRestore,ArrowDown,ArrowRight,ArrowUp,Clapperboard,Copy,Download,FileImage,FilePlus2,FolderOpen,LayoutDashboard,Plus,Search,ShieldCheck,Sparkles,Trash2,Upload} from "lucide-react";
 import ImageExtractionApp from "./features/image-extraction/ImageExtractionApp";
-import {parseScript,type ParsedScene} from "./lib/scriptParser";
+import {parseScript} from "./lib/scriptParser";
 import {PROJECT_STORAGE_KEY,createProjectBackup,duplicateProject,moveItem,parseProjectBackup,readStoredProjects,type StudioProject} from "./lib/projectStore";
 import "./studio.css";
 type Project=StudioProject;
