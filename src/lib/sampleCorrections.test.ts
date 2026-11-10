@@ -8,10 +8,12 @@ import {
 function candidateCells(): CorrectionCell[] {
   const cells: CorrectionCell[] = [];
   for (let row = 0; row < 13; row += 1) {
-    const count = row === 12 ? 18 : 16;
-    const width = row === 12 ? 84 : 96;
+    const count = row === 0 ? 15 : row === 12 ? 18 : 16;
     for (let column = 0; column < count; column += 1) {
-      const x = row === 0 && column >= 2 ? 180 + (column - 2) * width : column * width;
+      const width = row === 0 && column === 0 ? 180 : row === 12 ? 84 : 96;
+      const x = row === 0 && column >= 1
+        ? 180 + (column - 1) * 96
+        : row === 0 ? 0 : column * 96;
       cells.push({
         id: `${row}-${column}`,
         row,
@@ -25,24 +27,22 @@ function candidateCells(): CorrectionCell[] {
       });
     }
   }
-  // The first two detector candidates are the two halves of the wide title card.
-  cells[0].width = 90;
-  cells[1].x = 90;
-  cells[1].width = 90;
   return cells;
 }
 
 describe("reviewed 196-image sample correction", () => {
-  it("recognizes only the exact expected 210-candidate row shape", () => {
-    expect(is196SampleCandidateLayout(candidateCells())).toBe(true);
-    expect(is196SampleCandidateLayout(candidateCells().slice(1))).toBe(false);
+  it("recognizes the exact 209-candidate row shape", () => {
+    const candidates = candidateCells();
+    expect(candidates).toHaveLength(209);
+    expect(is196SampleCandidateLayout(candidates)).toBe(true);
+    expect(is196SampleCandidateLayout(candidates.slice(1))).toBe(false);
 
     const edited = candidateCells();
     edited[20].selected = false;
     expect(is196SampleCandidateLayout(edited)).toBe(false);
   });
 
-  it("merges the title halves and leaves exactly 196 crops selected", () => {
+  it("excludes the title, repeated-number panels and continuation card, leaving 196 crops", () => {
     const corrected = applyReviewed196SampleCorrection(candidateCells());
     expect(corrected).not.toBeNull();
     expect(corrected).toHaveLength(209);
@@ -54,7 +54,7 @@ describe("reviewed 196-image sample correction", () => {
     expect(title).toMatchObject({ x: 0, width: 180, selected: false });
 
     const excludedCoordinates = [
-      [1, 10], [2, 12], [3, 14], [4, 10], [5, 11], [6, 13],
+      [0, 0], [1, 10], [2, 12], [3, 14], [4, 10], [5, 11], [6, 13],
       [7, 15], [8, 12], [9, 11], [10, 12], [11, 12], [12, 16],
     ];
     for (const [row, column] of excludedCoordinates) {
@@ -69,9 +69,13 @@ describe("reviewed 196-image sample correction", () => {
     expect(selectedPerRow).toEqual([14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 17]);
   });
 
-  it("refuses a non-adjacent or changed title layout", () => {
+  it("refuses a changed candidate count or malformed row geometry", () => {
     const cells = candidateCells();
     cells[1].x += 20;
     expect(applyReviewed196SampleCorrection(cells)).toBeNull();
+
+    const wrongCount = candidateCells();
+    wrongCount.pop();
+    expect(applyReviewed196SampleCorrection(wrongCount)).toBeNull();
   });
 });
