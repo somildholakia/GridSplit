@@ -88,11 +88,11 @@ GridSplit first finds horizontal image bands, then analyses each band independen
 
 ## Privacy and storage
 
-Images and imported scripts are processed locally in the browser. Studio project data is saved in the current browser's `localStorage`; it is not synced between browsers or devices. Export a JSON backup to move project metadata between devices. (The JSON project backup stores project data, source text, and image metadata; it does not embed IndexedDB image or audio binaries. A media-inclusive portable archive is planned for M30.)
+Images, scripts and imported media are processed locally. Studio project metadata is saved in the current browser's localStorage; image, generated-audio and music/SFX blobs are kept in IndexedDB. These stores are not synced between browsers or devices. JSON backup is metadata-only. Production Studio can export a media-inclusive .gridsplit.zip with editable project data, original images, generated WAVs, imported audio, measured synchronization metadata and SRT/VTT subtitles; restore recreates a new local project after checksum validation.
 
 ## Scope and roadmap
 
-This feature branch contains the M06–M25 implementation: design system, dashboard, local projects, script import/parsing/editing, local audio workflow, measured timing and subtitles, original image splitter, project-local image sequence management, many-to-many scene mapping, measured image/audio scheduling, and a visual timeline with local playback. GitHub Actions run #182 passed for the M22–M25 implementation (76 tests across 15 files, lint, typecheck, production build, optional Python sidecar syntax, and artifact upload). Real Kokoro synthesis still requires user-installed model/voice files and a local generate → playback → download smoke test. Audio mixing, transitions/effects, FFmpeg/MP4 rendering, and a media-inclusive portable project archive remain later milestones.
+This feature branch extends GridSplit Studio through M31: design system, dashboard and project manager; script import/parsing/editing; optional local Kokoro TTS; measured WAV timing and captions; the original image splitter; image sequence management and scene mapping; a visual timeline; four-track audio mixing; transitions and image motion; optional loopback-only FFmpeg/MP4 rendering; and checksum-verified portable project export/restore. GitHub Actions validates TypeScript, unit tests, the production build, Python archive safety and a small FFmpeg render fixture. Target-device Kokoro synthesis and a complete browser-driven production remain manual acceptance tasks.
 
 ## License
 
@@ -103,3 +103,13 @@ GridSplit is MIT licensed. The locally bundled PDF.js dependency is Apache-2.0; 
 GridSplit includes a character/voice workspace and an optional Kokoro ONNX local TTS provider. Follow [local-tts/README.md](local-tts/README.md) to set up the sidecar, then open **Audio studio** in an active project. Model and voice files are installed by the user and are not included in this repository. The browser calls only a loopback service; WAV blobs are stored in local IndexedDB.
 
 See [docs/M12-M16.md](docs/M12-M16.md) for milestones and limitations.
+
+## Local rendering and portable projects (M26–M31)
+
+Open **Production studio → Mix & export** to configure narration/dialogue/music/SFX levels, mute/solo, fades, image effects, output profiles, complete ZIP export and project restore. MP4 rendering uses the optional local FFmpeg sidecar; no hosted renderer is required.
+
+Install FFmpeg and ffprobe yourself, then from the repository root run:
+
+    python local-render/server.py --allow-origin http://localhost:5173
+
+Use the exact browser origin for your frontend. The sidecar listens on 127.0.0.1 only and rejects origins outside its allowlist. See [local-render/README.md](local-render/README.md) and [docs/M26-M31.md](docs/M26-M31.md) for setup, archive contents and limits. GridSplit does not bundle FFmpeg or download codecs. The exact installed build must provide H.264 (libx264) and AAC encoding for the default MP4 export profile.

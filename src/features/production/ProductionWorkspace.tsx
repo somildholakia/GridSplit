@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Pause, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Pause, Play, RefreshCw, SlidersHorizontal, Square, Trash2 } from "lucide-react";
 import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
+import ProductionTools from "./ProductionTools";
 import { measureWavBlob } from "../../lib/mediaTimeline";
 import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
 import "./production-workspace.css";
 
 type ProductionProject = StudioProject & { imageAssets?: SequenceAsset[]; imageMappings?: SceneImageMapping[]; timelineClips?: TimelineClip[] };
-type Props = { project: StudioProject; onUpdate: (patch: Partial<StudioProject>) => void };
+type Props = { project: StudioProject; onUpdate: (patch: Partial<StudioProject>) => void; onRestoreProject?: (project: StudioProject) => void };
 const DB = "gridsplit-studio-images", STORE = "image-blobs", VERSION = 1;
 const TIMELINE_PIXELS_PER_SECOND = 64;
 function openImageDb(): Promise<IDBDatabase> {
@@ -56,7 +57,7 @@ async function dimensions(file:File):Promise<{width:number;height:number}>{
 function patchProject(onUpdate:Props["onUpdate"],patch:Partial<ProductionProject>){onUpdate({...patch} as Partial<StudioProject>);}
 function seconds(value:number){return Math.floor(value/60)+":"+((value%60).toFixed(1)).padStart(4,"0");}
 
-export default function ProductionWorkspace({project,onUpdate}:Props){
+export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:Props){
   const data=project as ProductionProject;
   const assets=data.imageAssets??[], mappings=data.imageMappings??[], clips=data.timelineClips??[];
   const [thumbs,setThumbs]=useState<Record<string,string>>({});
@@ -69,7 +70,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
   const animationFrameRef=useRef<number|null>(null);
   const folderRef=useRef<HTMLInputElement>(null);
   useEffect(()=>{folderRef.current?.setAttribute("webkitdirectory","");folderRef.current?.setAttribute("directory","");},[]);
-  const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline">("sequence");
+  const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline"|"tools">("sequence");
   const issues=useMemo(()=>analyseSequence(assets),[assets]);
   const timelineDuration=timelineDurationSeconds(clips);
   const timelineWidth=Math.max(600,Math.ceil(timelineDuration*TIMELINE_PIXELS_PER_SECOND));
@@ -249,6 +250,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
       <button className={activeTab==="sequence"?"active":""} onClick={()=>setActiveTab("sequence")}>1. Image sequence <span>{assets.length}</span></button>
       <button className={activeTab==="mapping"?"active":""} onClick={()=>setActiveTab("mapping")}>2. Scene mapping <span>{mappings.filter(m=>m.imageIds.length).length}</span></button>
       <button className={activeTab==="timeline"?"active":""} onClick={()=>setActiveTab("timeline")}>3. Timeline <span>{clips.length}</span></button>
+      <button className={activeTab==="tools"?"active":""} onClick={()=>setActiveTab("tools")}><SlidersHorizontal size={13}/> 4. Mix & export</button>
     </nav>
     {message&&<p className="production-message" role="status">{message}</p>}
     {activeTab==="sequence"&&<div className="production-section">
@@ -281,7 +283,8 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
         <div className="production-clip-editors"><b>Clip properties</b>{(["images","audio"] as const).map(track=><section className="production-track" key={track}><h3>{track==="images"?"IMAGE CLIPS":"AUDIO CLIPS"}</h3>{clips.filter(clip=>clip.track===track).sort((a,b)=>a.order-b.order).map(clip=><div className="production-clip" key={clip.id}><b>{track==="images"?"IMG":"WAV"}</b><label>Start <input aria-label="Clip start seconds" type="number" min="0" step="0.1" value={Number(clip.startSeconds.toFixed(2))} onChange={event=>editClipStart(clip.id,Number(event.target.value))}/> s</label><label>Duration <input aria-label="Clip duration seconds" type="number" min="0.1" step="0.1" value={Number(clip.durationSeconds.toFixed(2))} onChange={event=>editClip(clip.id,Number(event.target.value))}/> s</label><span>{project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Unknown scene"}{clip.assetId?" · "+(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):""}</span><div><button title="Nudge clip earlier by half a second" onClick={()=>nudgeClip(clip.id,-0.5)}><ArrowUp size={13}/></button><button title="Nudge clip later by half a second" onClick={()=>nudgeClip(clip.id,0.5)}><ArrowDown size={13}/></button></div></div>)}</section>)}</div>
         <div className="production-audio-preview"><b>Individual local audio segments</b>{(project.audioSegments??[]).filter(segment=>segment.status==="ready"&&audioUrls[segment.id]).map(segment=><label key={segment.id}>{project.scenes.find(scene=>scene.id===segment.sceneId)?.title??"Scene"}<audio controls preload="none" src={audioUrls[segment.id]}/></label>)}</div>
       </>}
-      <p className="production-footnote">Playback follows edited image positions and schedules local WAV segments against scene audio clips. Audio positions use measured WAV durations; edits stay in this browser. MP4 rendering and mixing are later milestones.</p>
+      <p className="production-footnote">Playback follows edited image positions and schedules local WAV segments against scene audio clips. Audio positions use measured WAV durations; edits stay in this browser.</p>
     </div>}
+    {activeTab==="tools"&&<ProductionTools project={project} onUpdate={onUpdate} onRestoreProject={onRestoreProject}/>}
   </section>;
 }

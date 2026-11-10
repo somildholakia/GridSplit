@@ -1,5 +1,6 @@
 import type { ParsedBlock, ParsedScene } from "./scriptParser";
 import type { StudioAudioSegment, StudioCharacter } from "../audio/types";
+import { isAudioMixTrack, isMixAudioAsset, isRenderProfile, isVideoClipEdit, type AudioMixTrack, type MixAudioAsset, type RenderProfile, type VideoClipEdit } from "../domain/production";
 
 export type StudioProject = {
   id: string;
@@ -15,6 +16,10 @@ export type StudioProject = {
   imageAssets?: ProjectImageAsset[];
   imageMappings?: ProjectImageMapping[];
   timelineClips?: ProjectTimelineClip[];
+  audioMixTracks?: AudioMixTrack[];
+  mixAssets?: MixAudioAsset[];
+  videoClipEdits?: VideoClipEdit[];
+  renderProfile?: RenderProfile;
 };
 
 export type ProjectImageAsset = {
@@ -165,6 +170,10 @@ export function isStudioProject(value: unknown): value is StudioProject {
     && (value.imageAssets === undefined || (Array.isArray(value.imageAssets) && value.imageAssets.every(isProjectImageAsset)))
     && (value.imageMappings === undefined || (Array.isArray(value.imageMappings) && value.imageMappings.every(isProjectImageMapping)))
     && (value.timelineClips === undefined || (Array.isArray(value.timelineClips) && value.timelineClips.every(isProjectTimelineClip)))
+    && (value.audioMixTracks === undefined || (Array.isArray(value.audioMixTracks) && value.audioMixTracks.every(isAudioMixTrack)))
+    && (value.mixAssets === undefined || (Array.isArray(value.mixAssets) && value.mixAssets.every(isMixAudioAsset)))
+    && (value.videoClipEdits === undefined || (Array.isArray(value.videoClipEdits) && value.videoClipEdits.every(isVideoClipEdit)))
+    && (value.renderProfile === undefined || isRenderProfile(value.renderProfile))
     && Array.isArray(value.scenes)
     && value.scenes.every(isScene);
 }
@@ -245,6 +254,7 @@ export function duplicateProject(
     return { ...scene, id: sceneId, blocks };
   });
   const audioSegmentIds = new Map<string, string>();
+  const timelineClipIds = new Map((project.timelineClips ?? []).map((clip) => [clip.id, makeId()]));
   const audioSegments = project.audioSegments?.flatMap((segment) => {
     const sceneId = sceneIds.get(segment.sceneId);
     const blockId = blockIds.get(segment.blockId);
@@ -282,14 +292,25 @@ export function duplicateProject(
     }),
     timelineClips: project.timelineClips?.flatMap((clip) => {
       const sceneId = sceneIds.get(clip.sceneId);
-      if (!sceneId) return [];
+      const id = timelineClipIds.get(clip.id);
+      if (!sceneId || !id) return [];
       return [{
         ...clip,
-        id: makeId(),
+        id,
         sceneId,
+        assetId: clip.assetId,
         segmentId: clip.segmentId ? audioSegmentIds.get(clip.segmentId) : undefined,
       }];
     }),
+    // Project-scoped custom audio blobs are not copied by normal duplication.
+    // Keep the mix settings but require re-import of music/SFX in the new project.
+    audioMixTracks: project.audioMixTracks?.map((track) => ({ ...track, id: makeId() })),
+    mixAssets: [],
+    videoClipEdits: project.videoClipEdits?.flatMap((edit) => {
+      const clipId = timelineClipIds.get(edit.clipId);
+      return clipId ? [{ ...edit, clipId }] : [];
+    }),
+    renderProfile: project.renderProfile ? { ...project.renderProfile } : undefined,
   };
 }
 

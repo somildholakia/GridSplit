@@ -33,8 +33,15 @@ jobs:
         run: npm ci --no-audit --no-fund
 
 
-      - name: Check optional TTS sidecar syntax
-        run: python -m py_compile local-tts/server.py
+      - name: Install FFmpeg for local-render smoke test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Check Python sidecars and local renderer
+        run: |
+          python -m py_compile local-tts/server.py local-render/server.py
+          python -m unittest discover -s local-render -p 'test_*.py'
 
       - name: Lint
         run: npm run lint

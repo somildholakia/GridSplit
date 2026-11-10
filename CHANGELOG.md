@@ -72,3 +72,15 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 - GitHub Actions run #131 passed lint, 58 tests across 12 files, typecheck, production build, Python sidecar syntax check, and artifact upload.
 - The 196-image contact-sheet sample remains unverified; no manual review pass is claimed.
 - GitHub Actions run #131 passed on the feature branch: lint, 58 tests across 12 files, typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run details](https://github.com/somildholakia/GridSplit/actions/runs/42817826847).
+
+
+## M26–M31 — Mixing, effects, local rendering and portable projects
+
+- Added independent narration, dialogue, music and SFX mix tracks with persisted levels, mute/solo and fade automation, plus local music/SFX import and Web Audio mix preview.
+- Added per-image transition and motion-effect settings, stored against clip IDs for local rendering.
+- Added an optional Python FFmpeg sidecar that binds to loopback, checks exact browser Origin/Host, verifies ZIP paths and SHA-256 checksums, reports jobs/progress and supports cancellation.
+- Added H.264/AAC MP4 output profiles and ffprobe validation for container, codecs, dimensions, frame rate and duration.
+- Added media-inclusive .gridsplit.zip export: editable project metadata, original images, ready speech WAVs, music/SFX, sample-derived synchronization JSON, SRT/VTT subtitles, README and SHA-256 manifest.
+- Added archive restoration with project/scene/block/asset/segment/track/clip ID remapping; imported media is stored locally and the source project remains untouched.
+- Added audio-mix/profile/effect unit tests, archive safety/checksum tests, and a real FFmpeg transition + audio-mix render fixture to CI. Completion evidence is pending the current CI run.
+- The local FFmpeg executable and codecs are user-installed and not bundled. Target-device browser/renderer acceptance remains separate.

@@ -37,11 +37,11 @@
 
 **Status:** Accepted
 
-**Decision:** Define a renderer interface. Evaluate FFmpeg WebAssembly for browser-local small/medium renders and a local FFmpeg process behind optional Tauri for larger jobs. Build/ship no renderer until exact FFmpeg configure flags, codecs, third-party libraries, notices, corresponding source and output capabilities are verified.
+**Decision:** Implement rendering through an optional Python sidecar that invokes the user's system-installed FFmpeg/ffprobe process. The sidecar binds to loopback only, requires an explicit exact-origin allowlist, validates project archives, exposes progress/cancellation, and validates the resulting MP4. Do not bundle or download FFmpeg or codecs in the web application.
 
 **Reasons:** Browser renderers have memory/threading constraints; native processes improve large-file reliability but need an explicit local host. FFmpeg licensing changes based on compile-time options and linked libraries.
 
-**Consequences:** H.264/AAC and other profiles are detected from the installed renderer. Progress is measurable only when provided by the host. Rendering never falls back to a cloud API.
+**Consequences:** H.264/AAC profiles require support from the exact installed FFmpeg build; GridSplit checks the resulting stream metadata with ffprobe. The user is responsible for installing and licensing that build. Rendering remains optional, local and never falls back to a cloud API.
 
 ## ADR-0005: Local assets with portable project archives
 

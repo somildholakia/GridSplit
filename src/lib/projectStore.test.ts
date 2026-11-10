@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createDefaultAudioMixTracks } from "../domain/production";
 import {
   createProjectBackup,
   duplicateProject,
@@ -135,6 +136,43 @@ describe("GridSplit project data", () => {
       timelineClips: [{ id: "bad", track: "video", sceneId: "s1", startSeconds: 0, durationSeconds: 1, order: 0 }],
     };
     expect(parseStoredProjects(JSON.stringify([malformed]))).toEqual([]);
+  });
+
+  it("validates persisted mix settings and remaps edit data during project duplication", () => {
+    let trackId = 0;
+    const tracks = createDefaultAudioMixTracks(() => "mix-track-" + (++trackId));
+    const production: StudioProject = {
+      ...fixture,
+      timelineClips: [
+        { id: "clip-image", track: "images", sceneId: "s1", assetId: "image-1", startSeconds: 0, durationSeconds: 2, order: 0 },
+        { id: "clip-audio", track: "audio", sceneId: "s1", startSeconds: 0, durationSeconds: 2, order: 0 },
+      ],
+      audioMixTracks: tracks,
+      mixAssets: [{
+        id: "music-1", name: "score.wav", mimeType: "audio/wav", bytes: 120,
+        kind: "music", trackId: tracks.find((item) => item.kind === "music")!.id,
+        startSeconds: 0, durationSeconds: 2, order: 0,
+      }],
+      videoClipEdits: [{
+        clipId: "clip-image", effect: "ken-burns", transitionIn: "fade", transitionOut: "cut",
+        transitionDurationSeconds: 0.5, zoom: 1.15,
+      }],
+      renderProfile: { width: 1920, height: 1080, fps: 30, aspectRatio: "16:9", quality: "balanced" },
+    };
+    const restored = parseStoredProjects(JSON.stringify([production]))[0];
+    expect(restored.audioMixTracks).toHaveLength(4);
+    expect(restored.mixAssets?.[0].name).toBe("score.wav");
+    expect(restored.videoClipEdits?.[0].effect).toBe("ken-burns");
+
+    let nextId = 0;
+    const copy = duplicateProject(production, () => "copy-" + (++nextId));
+    expect(copy.audioMixTracks?.[0].id).not.toBe(tracks[0].id);
+    expect(copy.mixAssets).toEqual([]);
+    expect(copy.videoClipEdits?.[0].clipId).toBe(copy.timelineClips?.find((clip) => clip.track === "images")?.id);
+    expect(copy.renderProfile).toEqual(production.renderProfile);
+
+    const invalid = { ...production, renderProfile: { ...production.renderProfile!, width: 1919 } };
+    expect(parseStoredProjects(JSON.stringify([invalid]))).toEqual([]);
   });
 
   it("recovers interrupted generation records when projects are restored", () => {

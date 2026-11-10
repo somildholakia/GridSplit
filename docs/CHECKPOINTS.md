@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-11-10  
 **Audited baseline branch:** `main` (M01–M05)  
-**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M25 scope)  
+**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M31 scope)  
 **Open draft PR:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
@@ -35,12 +35,12 @@ A milestone is complete only when its implementation exists, required tests or v
 - [x] **M23 — Scene-to-image mapping.** Many-to-many mapping, normalization, stale-reference cleanup, project persistence, and duplicate-project scene remapping. Automated CI passed.
 - [x] **M24 — Automatic synchronization.** Schedule creation from measured local WAV sample durations, evenly distributed image spans, and missing audio/image warnings. Automated CI passed.
 - [x] **M25 — Timeline editor.** Visual image/audio lanes, ruler, playhead preview, seek/play/pause/stop, clip start/duration editing, position nudges, and browser Web Audio scheduling for local WAV segments. Automated CI passed; real-browser playback review remains a manual acceptance step.
-- [ ] **M26 — Audio mixing.** Support narration, dialogue, music, SFX, levels, mute/solo, and fades.
-- [ ] **M27 — Transitions and image effects.** Implement transitions and pan/zoom/Ken Burns effects.
-- [ ] **M28 — FFmpeg rendering.** Integrate local browser/native rendering with progress and recoverable jobs.
-- [ ] **M29 — MP4 export.** Validate required resolution, FPS, video/audio codecs, and aspect ratios.
-- [ ] **M30 — Complete ZIP export.** Package final media, source assets, metadata, subtitles, and README.
-- [ ] **M31 — Project restoration.** Reopen an exported project and restore editable state.
+- [ ] **M26 — Audio mixing.** Four independent local tracks with volume, mute/solo, imported music/SFX, and fade automation are implemented; await the new CI run and evidence update.
+- [ ] **M27 — Transitions and image effects.** Per-image cut/fade/dissolve/wipe transitions and pan/zoom/Ken Burns settings are implemented and persisted; await the renderer smoke-test result.
+- [ ] **M28 — FFmpeg rendering.** Optional loopback-only Python sidecar, archive validation, job progress/cancellation and FFmpeg execution are implemented; await CI render fixture.
+- [ ] **M29 — MP4 export.** Render profiles, H.264/AAC encoding and ffprobe validation of container, dimensions, frame rate and duration are implemented; await CI render fixture.
+- [ ] **M30 — Complete ZIP export.** Browser-generated portable archive now includes editable project data, original image/audio blobs, measured sync JSON, SRT/VTT, README and per-file SHA-256 manifest; await automated archive validation.
+- [ ] **M31 — Project restoration.** Local ZIP restore validates paths/checksums, stores media, remaps all project IDs and restores as a new project; await automated validation.
 - [ ] **M32 — Integration testing.** Test the script-to-render workflow end to end.
 - [ ] **M33 — Performance optimization.** Profile large scripts, images, models, timelines, and renders.
 - [ ] **M34 — Security and privacy review.** Verify local-only behavior, file handling, cleanup, dependency safety, and asset/model licenses.
@@ -72,6 +72,10 @@ Do not check a box until all required evidence is available.
 Implementation and automated validation are complete for M22–M25 on the feature branch (run #182). Implementation notes and current manual acceptance gaps are in [docs/M22-M25.md](M22-M25.md). The live timeline uses project-local second-based clip positions; the separate rational-time timeline helper is not yet the live editor's canonical storage format. The timeline preview schedules saved narration/dialogue WAV segments in the browser and does not mix music/SFX or render video. JSON backups keep image metadata but do not include IndexedDB media blobs.
 
 Manual browser review of image import, mapping persistence, playback/seek, actual WAV synchronization, and the 196-image contact sheet remains open. M14–M16 also remain open for real Kokoro model/voice generate → playback → download acceptance.
+
+## M26–M31 implementation and validation
+
+Code for all six milestones has been added on the active feature branch. The new CI workflow installs FFmpeg, runs archive path/checksum tests and attempts a small transition + audio-mix MP4 render before the existing npm checks. Completion boxes remain open until that workflow succeeds and its evidence is recorded. A target-device local renderer/browser acceptance pass remains a separate release task. See [docs/M26-M31.md](M26-M31.md).
 
 ## M12–M16 implementation and validation
 

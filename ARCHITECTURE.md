@@ -262,3 +262,20 @@ M24 rebuilds an initial image/audio schedule from local WAV files re-read from t
 M25 renders image and audio lanes on a proportional time ruler. It provides playhead seek, play/pause/stop, the image under the playhead, editable clip start/duration values, and half-second nudges. Local narration/dialogue WAV blobs are decoded and scheduled with the Web Audio API against scene audio clip positions.
 
 **Important boundary:** the live Production Workspace currently persists timeline start/duration values as decimal seconds. The separate `src/lib/productionTimeline.ts` rational-time domain helper remains tested but is not yet wired as the live editor's canonical timeline storage. Music/SFX track mixing, track levels, fades, transitions, pan/zoom effects, render jobs, MP4 output, and portable media archives remain later milestones. GitHub Actions run #182 passed lint, 76 tests across 15 files, typecheck, build, sidecar syntax, and artifact upload (https://github.com/somildholakia/GridSplit/actions/runs/42826679257). A passing CI build does not replace a manual browser playback and synchronization review.
+
+
+## M26–M31: audio mix, effects, rendering and portable archives
+
+The active feature branch now adds the following optional local production layer:
+
+- Project metadata may include audioMixTracks, mixAssets, videoClipEdits and renderProfile. The project schema validates every new record and bounded setting.
+- Music/SFX source blobs live in the project-scoped gridsplit-studio-project-media IndexedDB store. The original image and generated WAV stores remain compatible with M22 and M15.
+- Audio preview uses Web Audio to schedule speech and imported audio against the timeline, applying per-track volume, mute/solo and fades.
+- Per-image motion and transition choices are stored by timeline clip ID. The local renderer maps these choices into FFmpeg filter chains.
+- The optional Python sidecar binds only to 127.0.0.1. The browser posts a portable project archive, and the sidecar validates the ZIP manifest, path safety and SHA-256 values before rendering. Its jobs expose status/progress and cancellation. FFmpeg and ffprobe are installed by the user; the sidecar is not a cloud or LAN service.
+- MP4 rendering outputs H.264/AAC with a selected landscape, portrait or square profile, then runs ffprobe validation before returning the output.
+- Portable archives include project.json, original image bytes, ready generated speech WAVs, imported music/SFX, measured synchronization JSON, SRT/VTT subtitles, a README and a SHA-256 manifest. Restore creates a new project, remaps IDs and stores media back into local IndexedDB. JSON backup remains metadata-only.
+
+The renderer is capability-driven: the local FFmpeg build must include libx264 and AAC support. GridSplit neither downloads nor distributes FFmpeg. The precise codec availability and licensing depend on the exact user-installed build and its linked libraries. See docs/M26-M31.md and local-render/README.md.
+
+The M26–M31 CI workflow installs FFmpeg on the ephemeral runner and runs a small real MP4 smoke fixture plus archive safety/checksum tests. A CI fixture does not replace local target-device acceptance or the remaining M14–M16/M22–M25 manual reviews.
