@@ -107,6 +107,36 @@ describe("GridSplit project data", () => {
     expect(copy.characters?.[0].id).not.toBe("c1");
   });
 
+  it("preserves and remaps image mappings and timeline clips when duplicating production projects", () => {
+    const production: StudioProject = {
+      ...fixture,
+      imageAssets: [{
+        id: "image-1", name: "frame-1.png", relativePath: "scene/frame-1.png", mimeType: "image/png",
+        bytes: 100, sequenceNumber: 1, order: 0, width: 640, height: 360, fingerprint: "sha256",
+      }],
+      imageMappings: [{ sceneId: "s1", imageIds: ["image-1"] }],
+      timelineClips: [
+        { id: "clip-image", track: "images", sceneId: "s1", assetId: "image-1", startSeconds: 0, durationSeconds: 2, order: 0 },
+        { id: "clip-audio", track: "audio", sceneId: "s1", startSeconds: 0, durationSeconds: 2, order: 0 },
+      ],
+    };
+    let nextId = 0;
+    const copy = duplicateProject(production, () => `prod-${++nextId}`);
+    expect(copy.imageAssets).toEqual(production.imageAssets);
+    expect(copy.imageMappings).toEqual([{ sceneId: copy.scenes[0].id, imageIds: ["image-1"] }]);
+    expect(copy.timelineClips).toHaveLength(2);
+    expect(copy.timelineClips?.[0]).toMatchObject({
+      track: "images", sceneId: copy.scenes[0].id, assetId: "image-1", startSeconds: 0, durationSeconds: 2,
+    });
+    expect(copy.timelineClips?.[0].id).not.toBe("clip-image");
+
+    const malformed = {
+      ...production,
+      timelineClips: [{ id: "bad", track: "video", sceneId: "s1", startSeconds: 0, durationSeconds: 1, order: 0 }],
+    };
+    expect(parseStoredProjects(JSON.stringify([malformed]))).toEqual([]);
+  });
+
   it("recovers interrupted generation records when projects are restored", () => {
     const interrupted = {
       ...fixture,
