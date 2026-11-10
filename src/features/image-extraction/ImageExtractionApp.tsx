@@ -191,7 +191,8 @@ function App() {
   const [notice, setNotice] = useState("");
   const [confidence, setConfidence] = useState({ x: 0, y: 0 });
   const [detectedRows, setDetectedRows] = useState(0);
-  const [isReviewed196Sample, setIsReviewed196Sample] = useState(false);\n  const [isSampleLayoutPristine, setIsSampleLayoutPristine] = useState(false);
+  const [isReviewed196Sample, setIsReviewed196Sample] = useState(false);
+  const [isSampleLayoutPristine, setIsSampleLayoutPristine] = useState(false);
 
   const selectedCells = useMemo(() => cells.filter((cell) => cell.selected), [cells]);
   const canApplyReviewed196Map = isReviewed196Sample && isSampleLayoutPristine && is196SampleCandidateLayout(cells);
@@ -234,6 +235,7 @@ function App() {
     setError("");
     setNotice("");
     setIsReviewed196Sample(false);
+    setIsSampleLayoutPristine(false);
 
     if (!file.type.startsWith("image/")) {
       setError("Choose an image format supported by your browser, such as PNG, JPG, or WebP.");
@@ -259,7 +261,8 @@ function App() {
 
         setLoaded({ file, url, image });
         setCells(nextCells);
-        setIsReviewed196Sample(exactSample);\n        setIsSampleLayoutPristine(exactSample && is196SampleCandidateLayout(nextCells));
+        setIsReviewed196Sample(exactSample);
+        setIsSampleLayoutPristine(exactSample && is196SampleCandidateLayout(nextCells));
         setColumnsInput(String(typicalColumns(layout)));
         setRowsInput(String(layout.rows.length));
         setDetectedRows(layout.rows.length);
@@ -278,6 +281,7 @@ function App() {
     };
     image.onerror = () => {
       setIsReviewed196Sample(false);
+      setIsSampleLayoutPristine(false);
       URL.revokeObjectURL(url);
       setError("This image could not be opened. Try exporting it as PNG or JPG first.");
     };
@@ -293,17 +297,20 @@ function App() {
   };
 
   const toggleCell = (id: string) => {
+    setIsSampleLayoutPristine(false);
     setCells((current) => current.map((cell) =>
       cell.id === id ? { ...cell, selected: !cell.selected } : cell,
     ));
   };
 
   const setAllSelected = (selected: boolean) => {
+    setIsSampleLayoutPristine(false);
     setCells((current) => current.map((cell) => ({ ...cell, selected })));
   };
 
   const applyEvenGrid = () => {
     if (!loaded) return;
+    setIsSampleLayoutPristine(false);
     const requestedColumns = Number.parseInt(columnsInput, 10);
     const requestedRows = Number.parseInt(rowsInput, 10);
     if (!Number.isFinite(requestedColumns) || !Number.isFinite(requestedRows) ||
@@ -328,7 +335,9 @@ function App() {
     if (!loaded) return;
     try {
       const layout = applyAnalysis(loaded.image);
-      setCells(createCellsFromLayout(layout));
+      const nextCells = createCellsFromLayout(layout);
+      setCells(nextCells);
+      setIsSampleLayoutPristine(isReviewed196Sample && is196SampleCandidateLayout(nextCells));
       setColumnsInput(String(typicalColumns(layout)));
       setRowsInput(String(layout.rows.length));
       setDetectedRows(layout.rows.length);
@@ -347,11 +356,13 @@ function App() {
       return;
     }
     setCells(corrected);
+    setIsSampleLayoutPristine(false);
     setError("");
     setNotice("Applied the reviewed non-AI correction map. 196 crops are selected; the excluded title, repeated-number panels and continuation card remain visible for review.");
   };
 
   const splitCell = (id: string) => {
+    setIsSampleLayoutPristine(false);
     setCells((current) => {
       const index = current.findIndex((cell) => cell.id === id);
       if (index < 0) return current;
@@ -380,6 +391,7 @@ function App() {
   };
 
   const mergeWithNext = (id: string) => {
+    setIsSampleLayoutPristine(false);
     setCells((current) => {
       const sorted = [...current].sort((a, b) => a.row - b.row || a.x - b.x);
       const index = sorted.findIndex((cell) => cell.id === id);
@@ -446,6 +458,7 @@ function App() {
     releaseLoadedImage();
     setCells([]);
     setIsReviewed196Sample(false);
+    setIsSampleLayoutPristine(false);
     setNotice("");
     setError("");
     setDetectedRows(0);
