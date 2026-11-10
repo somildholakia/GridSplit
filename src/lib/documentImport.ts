@@ -153,7 +153,7 @@ export async function extractPdfText(file: Blob): Promise<string> {
     if (error instanceof Error && /password|encrypted/i.test(error.message)) {
       throw new Error("This PDF is password-protected. Remove its password before importing.");
     }
-    throw new Error(error instanceof Error ? \`Could not read this PDF: \${error.message}\` : "Could not read this PDF file.");
+    throw new Error(error instanceof Error ? "Could not read this PDF: " + error.message : "Could not read this PDF file.");
   } finally {
     await loadingTask.destroy();
   }
