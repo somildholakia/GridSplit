@@ -15,7 +15,7 @@
 - Added initial image/audio schedule creation from measured WAV durations with missing-media warnings.
 - Added a visual image/audio timeline with a time ruler, playhead, frame preview, seek/play/pause/stop, editable clip positions/durations, nudging, and Web Audio playback of local speech segments.
 - Added production model, project-store validation, schedule, image-boundary, and duplication tests.
-- **GitHub Actions run #177 passed:** lint, 76 tests across 15 files, TypeScript typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run #164](https://github.com/somildholakia/GridSplit/actions/runs/42826406478).
+- **GitHub Actions run #182 passed:** lint, 76 tests across 15 files, TypeScript typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run #182](https://github.com/somildholakia/GridSplit/actions/runs/42826679257).
 - Manual browser/audio acceptance remains open; this does not claim MP4 rendering, audio mixing, transitions, or media-inclusive archive export.
 - M14–M16 real-model Kokoro synthesis/playback/download acceptance remains pending; no manual runtime verification is implied by CI.
 - The 196-image sample contact sheet remains unverified. [Run #131](https://github.com/somildholakia/GridSplit/actions/runs/42817826847) passed the current feature-branch lint, tests, typecheck, production build, sidecar syntax check, and artifact upload.
