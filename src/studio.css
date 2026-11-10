@@ -20,3 +20,8 @@
 .add-block{display:inline-flex;align-items:center;gap:5px;margin-top:7px;padding:5px 7px;border:1px dashed #c9ef7545;border-radius:5px;background:#c9ef7508;color:#c9ef75;font-size:8px}
 .add-block:hover{background:#c9ef7518}
 @media(max-width:680px){.dashboard-actions{width:100%;justify-content:flex-start}.dashboard-actions>*{flex:1}.dashboard-actions .primary-action{flex:1.1}.project-list-actions{width:100%;flex-wrap:wrap}.archive-filter{flex:0 0 auto}.project-list-actions .project-search{flex:1;min-width:145px}.scene-card-head button{width:23px;height:23px}.scene-block{align-items:flex-start;flex-wrap:wrap}.scene-block textarea{flex-basis:calc(100% - 80px)}.block-actions{margin-left:auto}}
+
+.block-actions .split-block,.scene-card-head .merge-scene{width:auto;min-width:34px;padding:0 5px;font-size:8px;font-weight:700}
+.scene-card-head .merge-scene{height:25px}
+.block-actions .split-block{height:22px}
+.block-actions button:not(:has(svg)){font-size:10px}
