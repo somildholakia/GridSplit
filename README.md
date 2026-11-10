@@ -1,55 +1,69 @@
-# GridSplit
+# GridSplit Studio
 
-GridSplit turns storyboard contact sheets and image grids into separate, sequentially named image files.
+GridSplit Studio is a local-first workspace for preparing scripts and storyboard contact sheets for video production. The existing GridSplit image splitter remains available inside the studio and can still turn detected image grids into individually named crops.
 
-**No AI. No OCR. No backend.** Image analysis, cropping, and ZIP generation run entirely in the browser using the Canvas API and traditional pixel-based boundary detection.
+**No account, backend, or hosted media-processing service is required.** Script extraction, scene preparation, image analysis, cropping, and ZIP creation run in the browser.
 
-## Features
+## Current capabilities
 
-- Upload PNG, JPG, WebP, GIF, and other formats supported by the browser (up to 100 MB).
+### Script Studio (M06–M11)
+- Responsive production-studio shell, reusable components, and project dashboard.
+- Create, open, rename, duplicate, archive, restore, and delete local projects. Deletion asks for confirmation.
+- Browser-local autosave and restore, with a visible save-failure state.
+- Versioned JSON backup export/import. Imported copies receive fresh project, scene, and block IDs; existing projects are kept.
+- Paste scripts or import TXT, DOCX, and text-based PDF files locally (10 MB import limit).
+- Parse chapter/part headings, scene/sequence headings, Markdown headings, paragraphs, narration, dialogue, SFX, and music cues.
+- Recognise `[NARRATOR]`, `[CHARACTER: NAME]`, `[SFX: NAME]`, and `[MUSIC: NAME]` markers.
+- Retain the original script separately from the editable scene breakdown.
+- Edit chapter and scene titles, segment type, dialogue speaker, SFX/music cue labels, and block text.
+- Add, remove, reorder, split, merge, and move scene blocks between adjacent scenes.
+
+**Document import notes:** PDF.js is bundled with the app and extracts selectable PDF text on-device. Scanned-image PDFs without a text layer are not OCR'd and are reported as unsupported. DOCX import reads the main WordprocessingML document part; footnotes, tracked changes, and embedded text boxes are not included.
+
+### Image Splitter
+- Upload browser-supported PNG, JPG, WebP, GIF, and other image formats (up to 100 MB).
 - Detect horizontal row bands, then estimate vertical separators independently for each row.
 - Preview every detected tile before export.
-- Select or deselect individual tiles; split wide tiles or merge adjacent tiles in the same row.
-- Apply a manually specified, evenly spaced row/column grid when automatic detection needs help.
+- Select/deselect individual tiles; split wide tiles or merge adjacent tiles in the same row.
+- Apply a manually specified, evenly spaced row/column grid as a fallback.
 - Configure border trim, filename prefix, starting number, and zero-padding.
-- Export selected tiles as lossless PNG crops in a ZIP, alongside a CSV manifest.
-- Keep source images on-device; there are no image uploads, accounts, or third-party processing services.
+- Export selected tiles as PNG crops in a ZIP, alongside a CSV manifest.
 
 ## Run locally
 
-Requirements: Node.js 20 or newer and npm.
+Requirements: **Node.js 22.13 or newer (or Node.js 24+)** and npm. PDF.js 6.5 requires this runtime range.
 
-\`\`\`bash
-npm install
+```bash
+npm ci
 npm run dev
-\`\`\`
+```
 
 Open the local URL printed by Vite.
 
-## Production build
+## Validate and build
 
-\`\`\`bash
+```bash
+npm run lint
+npm test
 npm run typecheck
 npm run build
 npm run preview
-\`\`\`
+```
 
-The static production output is written to \`dist/\` and can be deployed to Vercel, Netlify, GitHub Pages, or any static host.
+The static production output is written to `dist/` and can be deployed to Vercel, Netlify, GitHub Pages, or any static host. Hosting distributes the frontend only; project and media processing remain local to the browser.
 
-## How detection works
+## How image detection works
 
-GridSplit first finds horizontal image bands, then analyses each band independently. For each row it builds a luminance/contrast projection, estimates the repeated tile pitch through normalized autocorrelation, and uses a spacing-constrained dynamic program to select likely vertical separators. This allows neighbouring rows to have different widths and different numbers of tiles. It is traditional image processing, not semantic image understanding: textured artwork, missing borders, merged cells, and very irregular layouts can still require manual correction.
+GridSplit first finds horizontal image bands, then analyses each band independently. For each row it builds a luminance/contrast projection, estimates repeated tile pitch through normalized autocorrelation, and uses a spacing-constrained dynamic program to select likely vertical separators. Neighbouring rows can have different widths and numbers of tiles. This is traditional image processing, not semantic image understanding: textured artwork, missing borders, merged cells, and irregular layouts may still require manual correction.
 
-The "Apply uniform grid" option is a fallback for sheets with a known regular layout. In automatic mode, each row keeps its own detected boundaries. Use "Split" to divide a wide tile in half, "Merge" to join it with the next tile in the same row, or click a tile to include/exclude it.
+## Privacy and storage
 
-## Privacy
+Images and imported scripts are processed locally in the browser. Studio project data is saved in the current browser's `localStorage`; it is not synced between browsers or devices. Export a JSON backup to move project metadata between devices. (The JSON project backup stores project data and source text; it is not yet a portable archive containing generated audio/video media.)
 
-All processing happens in the browser tab. GridSplit does not transmit images to a server. PNG output preserves the decoded source pixels without introducing additional lossy compression.
+## Scope and roadmap
 
-## Current scope
-
-This release processes one contact sheet per session. Manual correction currently includes per-tile inclusion, horizontal split, and merge-with-next actions. Direct dragging of separator lines, batch upload, and deeper validation fixtures remain planned.
+This branch delivers the M06–M11 studio foundation: design system, dashboard, local project management, script import, deterministic parsing, and manual scene segmentation. Offline TTS, character/voice management, timeline editing, audio mixing, subtitles, MP4 rendering, and complete production ZIP export remain later milestones and are not advertised as working features.
 
 ## License
 
-MIT
+GridSplit is MIT licensed. The locally bundled PDF.js dependency is Apache-2.0; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
