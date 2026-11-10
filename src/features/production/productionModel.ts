@@ -40,7 +40,7 @@ export type SceneTimingInput = {
 export function extractSequenceNumber(name: string): number | null {
   const leaf = name.split(/[\\/]/).pop() ?? name;
   const stem = leaf.replace(/\.[^.]+$/, "");
-  const match = stem.match(/(\d+)(?=\D*$)/);
+  const match = stem.match(/(?:^|\D)(\d{1,8})(?=\D*$)/);
   if (!match) return null;
   const value = Number(match[1]);
   return Number.isSafeInteger(value) && value >= 0 ? value : null;
