@@ -5,7 +5,7 @@ This optional sidecar supplies offline speech synthesis to GridSplit Studio. The
 ## Requirements
 
 - Python 3.10–3.13
-- [uv](https://docs.astral.sh/uv/)
+- [uv](https://docs.astral.sh/uv/) 0.13.5 or newer
 - A local copy of the Kokoro ONNX model and matching voice file
 
 ## Install
@@ -13,7 +13,7 @@ This optional sidecar supplies offline speech synthesis to GridSplit Studio. The
 From this directory:
 
 ```bash
-uv sync
+uv sync --locked --no-dev
 mkdir -p models
 ```
 
@@ -24,7 +24,7 @@ GridSplit does not download model weights or voice files and does not redistribu
 ## Run
 
 ```bash
-uv run uvicorn server:app --host 127.0.0.1 --port 8765
+uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
 ```
 
 Keep this terminal running. Open **Audio studio** in GridSplit, keep `http://127.0.0.1:8765`, and choose **Test connection**. The service reports missing/invalid model files rather than switching to a remote provider.
@@ -38,7 +38,7 @@ Keep this terminal running. Open **Audio studio** in GridSplit, keep `http://127
 Local development origins are allowed by default. To use a separately hosted static frontend, configure its exact HTTPS origin before starting the sidecar:
 
 ```bash
-GRIDSPLIT_ALLOWED_ORIGINS=https://your-exact-gridsplit-domain.example uv run uvicorn server:app --host 127.0.0.1 --port 8765
+GRIDSPLIT_ALLOWED_ORIGINS=https://your-exact-gridsplit-domain.example uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
 ```
 
 Do not use wildcard origins or expose this server to a LAN/public network. The process must remain bound to loopback. The sidecar also validates the HTTP Host header and rejects names other than `localhost`, `127.0.0.1` or `[::1]` (with an optional port). There is no authentication because this is a same-device workflow; this service must never be exposed to a LAN/public network. The service acknowledges browser private-network preflight only for those permitted origins.
