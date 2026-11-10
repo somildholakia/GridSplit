@@ -19,7 +19,7 @@ describe("GridSplit script-to-storyboard integration", () => {
     const scenes = parseScript(source);
     expect(scenes).toHaveLength(2);
     expect(scenes[0].blocks.map((block) => block.kind)).toEqual(["narration", "dialogue", "sfx"]);
-    expect(scenes[0].blocks[1].speaker).toBe("Mira");
+    expect(scenes[0].blocks[1].speaker).toBe("MIRA");
     expect(scenes[1].chapter).toBe("Chapter 1: The Arrival");
 
     const speech = scenes.flatMap((scene) =>
@@ -36,7 +36,7 @@ describe("GridSplit script-to-storyboard integration", () => {
     );
     const synchronization = buildSynchronizationMetadata(speech);
     expect(synchronization.totalDurationSeconds).toBe(2);
-    expect(toSrt(synchronization)).toContain("Mira: Did you hear that?");
+    expect(toSrt(synchronization)).toContain("MIRA: Did you hear that?");
     expect(toVtt(synchronization)).toMatch(/^WEBVTT/);
 
     const images: ImageSequenceAsset[] = [
