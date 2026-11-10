@@ -1,6 +1,6 @@
 # GridSplit Studio — Architecture and Processing Design
 
-**Document status:** M03 decisions recorded  
+**Document status:** M03 architecture baseline with M22–M25 implementation notes  
 **Last reviewed:** 2026-11-10  
 **Requirements baseline:** [PRODUCT_REQUIREMENTS.md](PRODUCT_REQUIREMENTS.md) v1.0.0  
 **Audited code baseline:** commit `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
@@ -241,3 +241,24 @@ The browser defines an engine-agnostic `LocalTtsProvider`. The current adapter t
 The optional Python sidecar uses `kokoro-onnx==0.6.1` and user-supplied model/voice assets. It binds to `127.0.0.1`; model and voice files are excluded from Git and never downloaded by GridSplit. A configurable explicit CORS allowlist is used for users opening the static frontend from a trusted deployed origin. The model license does not replace licenses for runtime, phonemizer, or voice assets.
 
 Generated WAV blobs are stored in IndexedDB under project/segment keys; project metadata retains only status and audio facts. Duplicating a project creates new IDs and remaps scene/block references, then resets generated segment output. Audio binaries are not included in the v1 JSON project backup; media-inclusive portable packaging is M30.
+
+## 14. M22–M25 production image and timeline implementation
+
+The current browser implementation introduces optional production fields on the existing `StudioProject` record:
+- `imageAssets[]`: stable image ID, filename and relative path, MIME type, byte size, detected/corrected frame number, manual order, dimensions, and content fingerprint.
+- `imageMappings[]`: scene ID and an ordered array of image asset IDs. Both one-to-many and many-to-many reuse are supported.
+- `timelineClips[]`: clip ID, image/audio track, scene ID, optional image/audio asset reference, start/duration in seconds, and order.
+
+The current persistence boundary is transitional:
+- Project metadata is stored with the existing local `localStorage` project record and validated by `projectStore.ts`.
+- Original image Blobs are stored in IndexedDB database `gridsplit-studio-images`, object store `image-blobs`, keyed by stable image asset ID. The UI creates/revokes browser object URLs for thumbnail/frame previews.
+- Duplicated projects retain the same image asset IDs (sharing the underlying source Blob) while remapping scene IDs, mapping rows, timeline clip IDs, and audio-segment references. Cleanup checks other saved project references before deleting a shared Blob.
+- JSON project backup carries image metadata and edit state, not the IndexedDB image or generated-audio Blobs. A media-inclusive ZIP remains M30 work.
+
+Sequence import natural-sorts relative paths and parses a trailing one-to-eight-digit frame token. The Production Workspace caps a project at 500 image assets and reports frame gaps, duplicate frame numbers, duplicate content fingerprints, and unnumbered files for human review. The user can correct frame numbers and manually reorder assets. Scene mappings follow that manual order; schedule generation uses each scene's mapped image sequence.
+
+M24 rebuilds an initial image/audio schedule from local WAV files re-read from their real sample count and sample rate. Each scene duration is measured from its ready segments, and its available images share that duration evenly. Missing/unreadable WAVs and scenes without mapped images are reported. Rebuild is explicit so it does not overwrite manual edits silently.
+
+M25 renders image and audio lanes on a proportional time ruler. It provides playhead seek, play/pause/stop, the image under the playhead, editable clip start/duration values, and half-second nudges. Local narration/dialogue WAV blobs are decoded and scheduled with the Web Audio API against scene audio clip positions.
+
+**Important boundary:** the live Production Workspace currently persists timeline start/duration values as decimal seconds. The separate `src/lib/productionTimeline.ts` rational-time domain helper remains tested but is not yet wired as the live editor's canonical timeline storage. Music/SFX track mixing, track levels, fades, transitions, pan/zoom effects, render jobs, MP4 output, and portable media archives remain later milestones. A passing CI build validates code/tests but does not replace a manual browser playback and synchronization review.
