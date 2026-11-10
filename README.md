@@ -2,7 +2,7 @@
 
 GridSplit Studio is a local-first workspace for preparing scripts and storyboard contact sheets for video production. The existing GridSplit image splitter remains available inside the studio and can still turn detected image grids into individually named crops.
 
-**No account, backend, or hosted media-processing service is required.** Script extraction, scene preparation, image analysis, cropping, and ZIP creation run in the browser.
+**No account or hosted media-processing service is required.** Script extraction, scene preparation, image analysis, cropping, and ZIP creation run in the browser. Speech generation is optional and uses a separately installed local TTS sidecar; it does not send scripts to a cloud provider.
 
 ## Current capabilities
 
@@ -19,6 +19,14 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 - Add, remove, reorder, split, merge, and move scene blocks between adjacent scenes.
 
 **Document import notes:** PDF.js is bundled with the app and extracts selectable PDF text on-device. Scanned-image PDFs without a text layer are not OCR'd and are reported as unsupported. DOCX import reads the main WordprocessingML document part; footnotes, tracked changes, and embedded text boxes are not included.
+
+### Audio Studio (M12–M16 implementation)
+- Manage stable narrator and dialogue character identities per project.
+- Assign each character a voice, language, and speech speed.
+- Connect to the optional Kokoro ONNX sidecar on loopback (`127.0.0.1`).
+- Generate, cancel, retry, and regenerate narration/dialogue blocks independently.
+- Persist WAV audio locally in IndexedDB; review with the browser audio player and download individual WAV files.
+- The Kokoro model and matching voice file are user-installed and are not bundled or downloaded by GridSplit. Real model-backed synthesis/playback smoke testing remains an explicit acceptance step.
 
 ### Image Splitter
 - Upload browser-supported PNG, JPG, WebP, GIF, and other image formats (up to 100 MB).
@@ -62,7 +70,7 @@ Images and imported scripts are processed locally in the browser. Studio project
 
 ## Scope and roadmap
 
-This branch delivers the M06–M11 studio foundation: design system, dashboard, local project management, script import, deterministic parsing, and manual scene segmentation. Offline TTS, character/voice management, timeline editing, audio mixing, subtitles, MP4 rendering, and complete production ZIP export remain later milestones and are not advertised as working features.
+This branch contains the M06–M16 implementation: design system, dashboard, local project management, script import, deterministic parsing, manual scene segmentation, character/voice management, local TTS provider, per-segment generation controls, and audio preview UI. Real Kokoro synthesis/playback still requires user-installed model/voice files and a local smoke test. Timeline synchronization, audio mixing, subtitles, MP4 rendering, and complete production ZIP export remain later milestones.
 
 ## License
 
