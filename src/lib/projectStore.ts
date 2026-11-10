@@ -1,4 +1,5 @@
 import type { ParsedBlock, ParsedScene } from "./scriptParser";
+import type { StudioAudioSegment, StudioCharacter } from "../audio/types";
 
 export type StudioProject = {
   id: string;
@@ -8,6 +9,9 @@ export type StudioProject = {
   createdAt: string;
   updatedAt: string;
   archived?: boolean;
+  characters?: StudioCharacter[];
+  audioSegments?: StudioAudioSegment[];
+  ttsEndpoint?: string;
 };
 
 export const PROJECT_STORAGE_KEY = "gridsplit.studio.projects.v1";
@@ -28,6 +32,38 @@ function isBlock(value: unknown): value is ParsedBlock {
     && (value.cue === undefined || typeof value.cue === "string");
 }
 
+function isCharacter(value: unknown): value is StudioCharacter {
+  return isRecord(value)
+    && typeof value.id === "string"
+    && typeof value.name === "string"
+    && typeof value.voiceId === "string"
+    && typeof value.language === "string"
+    && typeof value.speed === "number"
+    && Number.isFinite(value.speed)
+    && value.speed >= 0.5
+    && value.speed <= 2
+    && (value.narrator === undefined || typeof value.narrator === "boolean");
+}
+
+function isAudioSegment(value: unknown): value is StudioAudioSegment {
+  return isRecord(value)
+    && typeof value.id === "string"
+    && typeof value.sceneId === "string"
+    && typeof value.blockId === "string"
+    && typeof value.fingerprint === "string"
+    && ["pending", "generating", "ready", "failed"].includes(String(value.status))
+    && typeof value.providerId === "string"
+    && typeof value.voiceId === "string"
+    && typeof value.language === "string"
+    && typeof value.speed === "number"
+    && typeof value.updatedAt === "string"
+    && (value.sampleCount === undefined || (typeof value.sampleCount === "number" && value.sampleCount >= 0))
+    && (value.sampleRate === undefined || (typeof value.sampleRate === "number" && value.sampleRate > 0))
+    && (value.channels === undefined || (typeof value.channels === "number" && value.channels > 0))
+    && (value.durationSeconds === undefined || (typeof value.durationSeconds === "number" && value.durationSeconds >= 0))
+    && (value.error === undefined || typeof value.error === "string");
+}
+
 function isScene(value: unknown): value is ParsedScene {
   return isRecord(value)
     && typeof value.id === "string"
@@ -46,6 +82,9 @@ export function isStudioProject(value: unknown): value is StudioProject {
     && typeof value.createdAt === "string"
     && typeof value.updatedAt === "string"
     && (value.archived === undefined || typeof value.archived === "boolean")
+    && (value.ttsEndpoint === undefined || typeof value.ttsEndpoint === "string")
+    && (value.characters === undefined || (Array.isArray(value.characters) && value.characters.every(isCharacter)))
+    && (value.audioSegments === undefined || (Array.isArray(value.audioSegments) && value.audioSegments.every(isAudioSegment)))
     && Array.isArray(value.scenes)
     && value.scenes.every(isScene);
 }
@@ -118,6 +157,12 @@ export function duplicateProject(
       ...scene,
       id: makeId(),
       blocks: scene.blocks.map((block) => ({ ...block, id: makeId() })),
+    })),
+    characters: project.characters?.map((character) => ({ ...character, id: makeId() })),
+    audioSegments: project.audioSegments?.map((segment) => ({
+      ...segment, id: makeId(), status: "pending" as const,
+      sampleCount: undefined, sampleRate: undefined, channels: undefined,
+      durationSeconds: undefined, error: undefined,
     })),
   };
 }
