@@ -63,13 +63,27 @@ def check_private_network_preflight(base_url: str, origin: str, requested_header
     )
     allow_origin = headers.get("Access-Control-Allow-Origin")
     allow_private = headers.get("Access-Control-Allow-Private-Network")
-    if status not in (200, 204) or allow_origin != origin or allow_private != "true":
+    allow_methods = {item.strip().upper() for item in headers.get("Access-Control-Allow-Methods", "").split(",")}
+    allow_headers = {item.strip().lower() for item in headers.get("Access-Control-Allow-Headers", "").split(",")}
+    requested = {item.strip().lower() for item in requested_headers.split(",") if item.strip()}
+    missing_headers = sorted(requested - allow_headers)
+    if (
+        status not in (200, 204)
+        or allow_origin != origin
+        or allow_private != "true"
+        or "POST" not in allow_methods
+        or missing_headers
+    ):
         raise RuntimeError(
             f"Private-network CORS preflight failed (HTTP {status}, "
-            f"allow-origin={allow_origin!r}, allow-private-network={allow_private!r}): "
+            f"allow-origin={allow_origin!r}, allow-private-network={allow_private!r}, "
+            f"allow-methods={sorted(allow_methods)!r}, missing-headers={missing_headers!r}): "
             f"{body[:300].decode(errors='replace')}"
         )
-    return {"status": status, "allow_origin": allow_origin, "private_network": allow_private}
+    return {
+        "status": status, "allow_origin": allow_origin, "private_network": allow_private,
+        "allow_methods": sorted(allow_methods), "allow_headers": sorted(allow_headers),
+    }
 
 
 def inspect_wav(data: bytes) -> dict[str, Any]:
