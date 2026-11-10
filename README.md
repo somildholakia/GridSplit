@@ -91,7 +91,7 @@ npm run build
 npm run preview
 ```
 
-The static production output is written to `dist/` and can be deployed to Vercel, Netlify, GitHub Pages, or any static host. Hosting distributes the frontend only; project and media processing remain local to the browser.
+The static production output is written to `dist/` and can be deployed to Vercel, Netlify, GitHub Pages, or any static host. Hosting distributes the frontend only; project and media processing remain local to the browser. For a target-device check of real Kokoro synthesis plus a loopback FFmpeg render, see [`local-render/acceptance_check.py`](local-render/README.md#target-device-media-acceptance-runner).
 
 ## How image detection works
 

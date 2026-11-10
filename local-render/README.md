@@ -55,3 +55,32 @@ A renderer job can be cancelled from the Studio UI. FFmpeg and ffprobe must supp
     python -m py_compile local-tts/server.py local-render/server.py
     python -m unittest discover -s local-tts -p 'test_*.py'
     python -m unittest discover -s local-render -p 'test_*.py'
+
+
+## Target-device media acceptance runner
+
+After installing the Kokoro model/voice files and FFmpeg, start both sidecars in separate terminals.
+
+Terminal 1 (PowerShell, from the repository root):
+
+```powershell
+cd local-tts
+$env:GRIDSPLIT_ALLOWED_ORIGINS = "https://gridsplit-kappa.vercel.app"
+uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
+```
+
+Terminal 2 (from the repository root):
+
+```powershell
+python local-render/server.py --allow-origin https://gridsplit-kappa.vercel.app
+```
+
+Terminal 3 (from the repository root):
+
+```powershell
+python local-render/acceptance_check.py --origin https://gridsplit-kappa.vercel.app
+```
+
+The runner checks both sidecar health endpoints and the exact-origin private-network CORS preflights, requests a real short Kokoro WAV, packages that WAV with a tiny test image in a valid GridSplit archive, uploads it only to the loopback renderer, polls the render job, downloads the MP4 and verifies H.264/AAC, dimensions and duration with ffprobe. It writes `gridsplit-local-acceptance-report.json`, `gridsplit-local-acceptance/kokoro-acceptance.wav` and `gridsplit-local-acceptance/kokoro-acceptance.mp4`.
+
+This runner is a target-machine sidecar integration check, not the full browser UI acceptance: it does not import the user's actual 196-image sheet, test the React timeline controls, or verify browser ZIP export/restore. Those remain M22–M25/M36 manual steps. The runner does not upload media to Vercel or another cloud service.
