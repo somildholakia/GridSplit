@@ -5,14 +5,14 @@
 **Baseline branch:** `main` (M01–M05)  
 **Active development branch:** `feat/m06-m11-studio-script-workflow` (M06–M21)  
 **Open pull request:** https://github.com/somildholakia/GridSplit/pull/1  
-**Current PR head:** `7d53e2701a2d2ef634182ee70f032f9638f2e9b7`  
+**Current PR head:** `f7baeb77a4bdc93fa7f2ed20767c9d126fcf83f2`  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
 
 M01–M05 remain the verified baseline on `main`. The Studio implementation for M06–M21 is on the feature branch in draft PR #1 and has **not** been merged into `main`.
 
-**Latest code validation: GitHub Actions run #124 passed.** The workflow completed the optional Python sidecar syntax check, npm clean install, ESLint, 58 Vitest tests across 12 files, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #124](https://github.com/somildholakia/GridSplit/actions/runs/42816605616).
+**Latest code validation: GitHub Actions run #127 passed.** The workflow completed the optional Python sidecar syntax check, npm clean install, ESLint, 58 Vitest tests across 12 files, TypeScript typecheck, Vite production build, and static artifact upload. [Open run #127](https://github.com/somildholakia/GridSplit/actions/runs/42816995718).
 
 ## Milestone state
 
@@ -39,9 +39,9 @@ The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPO
 
 ## Validation and delivery boundaries
 
-The run #124 test summary was **12 test files passed and 58 tests passed**. Lint, typecheck, production build, optional sidecar syntax check, and artifact upload also passed. The static web artifact is a CI build output; it is not a production deployment.
+The run #127 test summary was **12 test files passed and 58 tests passed**. Lint, typecheck, production build, optional sidecar syntax check, and artifact upload also passed. The static web artifact is a CI build output; it is not a production deployment.
 
-A Vercel preview was reported Ready in the PR conversation, but an interactive browser smoke test could not be completed because the preview redirected to Vercel Authentication. No end-to-end browser acceptance pass is claimed. The 196-image contact-sheet sample and its preliminary region count are not treated as verified output.
+The Vercel status check on the current PR head reports a deployment failure due to the free-tier daily deployment quota. This is separate from the passing GitHub CI workflow. Interactive browser QA also remains unverified because a preview requires Vercel Authentication. No end-to-end browser acceptance pass is claimed. The 196-image contact-sheet sample and its preliminary region count are not treated as verified output.
 
 ## Local-first and scope constraints
 
