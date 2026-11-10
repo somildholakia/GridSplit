@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 
 function decodeXmlEntities(value: string): string {
-  return value.replace(/&(#x[0-9a-f]+|#\\d+|amp|lt|gt|quot|apos);/gi, (entity, key: string) => {
+  return value.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (entity, key: string) => {
     const name = key.toLowerCase();
     if (name === "amp") return "&";
     if (name === "lt") return "<";
@@ -23,27 +23,27 @@ function decodeXmlEntities(value: string): string {
 
 /** Extracts paragraph text from the main WordprocessingML document part. */
 export function extractDocxXmlText(xml: string): string {
-  if (!/<(?:[\\w.-]+:)?document\\b/.test(xml)) {
+  if (!/<(?:[\w.-]+:)?document\b/.test(xml)) {
     throw new Error("The DOCX file does not contain a valid Word document part.");
   }
 
-  const paragraphs = xml.match(/<(?:[\\w.-]+:)?p\\b[^>]*>[\\s\\S]*?<\\/(?:[\\w.-]+:)?p\\s*>/g) ?? [];
+  const paragraphs = xml.match(/<(?:[\w.-]+:)?p\b[^>]*>[\s\S]*?<\/(?:[\w.-]+:)?p\s*>/g) ?? [];
   if (!paragraphs.length) {
     throw new Error("No readable paragraphs were found in this DOCX file.");
   }
 
   const lines = paragraphs.map((paragraph) => {
     const pieces: string[] = [];
-    const tokens = /<(?:[\\w.-]+:)?t\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?t\\s*>|<(?:[\\w.-]+:)?(tab|br|cr)\\b[^>]*\\/>/g;
+    const tokens = /<(?:[\w.-]+:)?t\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?t\s*>|<(?:[\w.-]+:)?(tab|br|cr)\b[^>]*\/>/g;
     for (const match of paragraph.matchAll(tokens)) {
       if (match[1] !== undefined) pieces.push(decodeXmlEntities(match[1]));
-      else if (match[2] === "tab") pieces.push("\\t");
-      else pieces.push("\\n");
+      else if (match[2] === "tab") pieces.push("\t");
+      else pieces.push("\n");
     }
     return pieces.join("");
   });
 
-  return lines.join("\\n").trim();
+  return lines.join("\n").trim();
 }
 
 /** Reads DOCX text locally in the browser; no upload or remote conversion is used. */
@@ -95,7 +95,6 @@ export async function extractPdfText(file: Blob): Promise<string> {
   try {
     const pdf = await loadingTask.promise;
     if (pdf.numPages > 500) {
-      await pdf.destroy();
       throw new Error("This PDF has more than 500 pages. Split it into smaller files before importing.");
     }
 
@@ -109,7 +108,7 @@ export async function extractPdfText(file: Blob): Promise<string> {
       let lastRight: number | null = null;
 
       const flushLine = () => {
-        const normalized = line.replace(/[\\t ]+$/g, "").trimStart();
+        const normalized = line.replace(/[\t ]+$/g, "").trimStart();
         if (normalized) lines.push(normalized);
         line = "";
         lastY = null;
@@ -127,7 +126,7 @@ export async function extractPdfText(file: Blob): Promise<string> {
 
         if (lastY !== null && Math.abs(y - lastY) > Math.max(2, fontSize * 0.45)) {
           flushLine();
-        } else if (lastRight !== null && x - lastRight > Math.max(1.5, fontSize * 0.15) && line && !/[\\s]$/.test(line)) {
+        } else if (lastRight !== null && x - lastRight > Math.max(1.5, fontSize * 0.15) && line && !/[\s]$/.test(line)) {
           line += " ";
         }
 
@@ -138,11 +137,11 @@ export async function extractPdfText(file: Blob): Promise<string> {
       }
 
       flushLine();
-      pageTexts.push(lines.join("\\n"));
+      pageTexts.push(lines.join("\n"));
       page.cleanup();
     }
 
-    const extracted = pageTexts.join("\\n\\n").trim();
+    const extracted = pageTexts.join("\n\n").trim();
     if (!extracted) {
       throw new Error("No selectable text was found. This PDF may contain scanned images; OCR is not included in local import.");
     }
@@ -154,7 +153,7 @@ export async function extractPdfText(file: Blob): Promise<string> {
     if (error instanceof Error && /password|encrypted/i.test(error.message)) {
       throw new Error("This PDF is password-protected. Remove its password before importing.");
     }
-    throw new Error(error instanceof Error ? `Could not read this PDF: ${error.message}` : "Could not read this PDF file.");
+    throw new Error(error instanceof Error ? \`Could not read this PDF: \${error.message}\` : "Could not read this PDF file.");
   } finally {
     await loadingTask.destroy();
   }
