@@ -9,7 +9,7 @@
 
 ## Current checkpoint
 
-**M05 remains the verified `main` baseline. M06–M11 are implemented on PR #1. M12–M16 implementation is now added to that branch and awaits validation.**
+**M05 remains the verified `main` baseline. M06–M13 are implemented and CI-verified on PR #1. M14–M16 code is implemented; real model-backed audio verification remains environment-dependent.**
 
 M01–M05 remain complete on `main`. The GridSplit Studio branch adds the production workspace, project management, script parsing, and manual scene editing while retaining the existing image extractor. The branch is not merged.
 
@@ -26,11 +26,11 @@ M01–M05 remain complete on `main`. The GridSplit Studio branch adds the produc
 - **M09:** Complete on PR #1 — paste, TXT, DOCX, and selectable-text PDF import are implemented locally in the browser; PDF.js worker is bundled with the app. OCR for scanned PDFs is explicitly out of scope.
 - **M10:** Complete on PR #1 — deterministic chapter/scene/paragraph parser with narration, dialogue, SFX, and music markers.
 - **M11:** Complete on PR #1 — editable chapters/scenes/blocks, scene and block reordering, cross-scene moves, split, and merge controls.
-- **M12:** Implementation added — stable narrator/dialogue character records, per-character voice IDs, language and speed; CI pending.
-- **M13:** Implementation added — engine-agnostic local TTS provider, voice and capability contracts; CI pending.
-- **M14:** Optional Kokoro ONNX FastAPI loopback sidecar added; model/voice files are user-installed. Real synthesis not yet verified.
-- **M15:** Implementation added — fingerprinted per-block generation lifecycle, cancellation/retry/regenerate and IndexedDB WAV storage; CI pending.
-- **M16:** Implementation added — local audio preview, actual sample-derived duration and WAV download; CI pending.
+- **M12:** Complete on PR #1 — stable narrator/dialogue identities and per-character voice/language/speed. CI #98 passed.
+- **M13:** Complete on PR #1 — engine-agnostic local TTS provider, voice/health contracts, abortable requests, WAV metadata parser, and loopback endpoint guard. CI #98 passed.
+- **M14:** Implemented on PR #1 — optional Kokoro ONNX FastAPI loopback sidecar and explicit trusted-origin CORS allowlist. Python syntax passes CI; real model/voice synthesis is not yet verified.
+- **M15:** Implemented on PR #1 — fingerprinted per-block generation, cancellation/retry/regenerate, interrupted-state recovery, and IndexedDB WAV storage. Browser CI passes; live model generation is pending.
+- **M16:** Implemented on PR #1 — local audio preview, sample-derived duration, WAV download, and missing-blob recovery. Browser CI passes; playback of a real generated segment is pending.
 - **M17–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
@@ -86,13 +86,13 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 
 - The 196-image contact-sheet target in `docs/SAMPLE_ANALYSIS.md` remains unverified; its recorded ~210 preliminary regions are not a pass.
 - No browser interaction or end-to-end crop/ZIP test has been run against the supplied 196-image sheet.
-- No batch/folder image upload, offline TTS, audio generation, waveform, sync mapping, subtitle generation, multitrack editor, FFmpeg renderer, MP4 export, or complete production ZIP has been implemented yet. Script import supports paste, TXT, DOCX, and selectable-text PDF; scanned PDF OCR is not included.
+- No batch/folder image upload, word-level alignment, canonical audio-to-scene duration correction, waveform timeline, subtitle generation, multitrack editor, FFmpeg renderer, MP4 export, or complete production ZIP has been implemented yet. Script import supports paste, TXT, DOCX, and selectable-text PDF; scanned PDF OCR is not included.
 - GitHub Actions run #73 passed lint, 31 unit tests across 6 files, TypeScript typecheck, production build, and static build-artifact upload. The Vercel preview deployment is Ready. A live browser smoke test was attempted but the preview is protected by Vercel Authentication, so interactive UI checks could not be completed without an authenticated browser profile. Image-extractor regression and script-to-render integration tests remain future work.
 - No model, voice pack, TTS binary, FFmpeg binary, or native desktop runtime has been bundled.
 
 ## Next step
 
-**M12 — Character management.** Add character records and stable voice assignments. M06–M11 implementation is complete on PR #1; preview UI verification is still blocked by Vercel Authentication.
+**M14 — Local engine smoke test.** Install Kokoro ONNX and the matching voice file on a target machine, run the optional sidecar, and verify one generate/playback/download cycle. Then proceed to M17 timeline duration correction.
 
 ## Operating rules
 
@@ -108,7 +108,7 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 
 **Branch:** `feat/m06-m11-studio-script-workflow`  
 **Pull request:** https://github.com/somildholakia/GridSplit/pull/1  
-**Latest implementation head verified by CI:** `296a14f8ac67340f5b55ef9eb515bee364e0873b`  
+**Latest implementation head verified by CI:** `958a39ec4e3f0d6f00ba3691c620de41b6542d60`  
 **PR state:** open, draft, mergeable; not merged into `main`.
 
 ### Delivered
