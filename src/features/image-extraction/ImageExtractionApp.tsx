@@ -19,6 +19,7 @@ import {
 import { countCells, detectContactSheet, makeEvenBoundaries } from "../../lib/detectGrid";
 import type { ContactSheetLayout } from "../../lib/detectGrid";
 import { createImageZip, type ExportCell } from "../../lib/exportZip";
+import { applyReviewed196SampleCorrection, is196SampleCandidateLayout } from "../../lib/sampleCorrections";
 
 type Cell = ExportCell & {
   id: string;
@@ -39,6 +40,25 @@ type Analysis = {
 };
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const REVIEWED_196_SAMPLE_SIZE = 536907;
+const REVIEWED_196_SAMPLE_SHA256 = "f07ff9935d150e593e45a1de2c591ff6c2e9ac016dc0374cf8f1f83dd5dc5372";
+
+async function isReviewed196SampleFile(file: File, image: HTMLImageElement): Promise<boolean> {
+  if (
+    image.naturalWidth !== 1536 ||
+    image.naturalHeight !== 864 ||
+    file.size !== REVIEWED_196_SAMPLE_SIZE ||
+    !globalThis.crypto?.subtle
+  ) return false;
+
+  try {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return hash === REVIEWED_196_SAMPLE_SHA256;
+  } catch {
+    return false;
+  }
+}
 
 function makeCellId(row: number, column: number, x: number, y: number): string {
   return [row, column, x, y].join("-");
@@ -170,9 +190,9 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confidence, setConfidence] = useState({ x: 0, y: 0 });
-  const [detectedRows, setDetectedRows] = useState(0);
+  const [detectedRows, setDetectedRows] = useState(0);\n  const [isReviewed196Sample, setIsReviewed196Sample] = useState(false);
 
-  const selectedCells = useMemo(() => cells.filter((cell) => cell.selected), [cells]);
+  const selectedCells = useMemo(() => cells.filter((cell) => cell.selected), [cells]);\n  const canApplyReviewed196Map = isReviewed196Sample && is196SampleCandidateLayout(cells);
 
   const releaseLoadedImage = useCallback(() => {
     setLoaded((current) => {
@@ -312,6 +332,17 @@ function App() {
     } catch (analysisError) {
       setError(analysisError instanceof Error ? analysisError.message : "The image could not be analysed.");
     }
+  };
+
+  const applyReviewed196Map = () => {
+    const corrected = applyReviewed196SampleCorrection(cells);
+    if (!corrected) {
+      setError("The detected grid no longer matches the reviewed 196-crop sample layout. Re-detect the original image before applying this map.");
+      return;
+    }
+    setCells(corrected);
+    setError("");
+    setNotice("Applied the reviewed non-AI correction map. 196 crops are selected; the excluded title, repeated-number panels and continuation card remain visible for review.");
   };
 
   const splitCell = (id: string) => {
