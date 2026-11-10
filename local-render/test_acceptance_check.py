@@ -62,6 +62,8 @@ class AcceptanceCheckTests(unittest.TestCase):
             return_value=(204, Headers({
                 "Access-Control-Allow-Origin": "https://gridsplit-kappa.vercel.app",
                 "Access-Control-Allow-Private-Network": "true",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, X-GridSplit-Project",
             }), b""),
         ):
             result = acceptance_check.check_private_network_preflight(
@@ -77,7 +79,9 @@ class AcceptanceCheckTests(unittest.TestCase):
             acceptance_check,
             "http_request",
             return_value=(204, {"Access-Control-Allow-Origin": "https://other.example",
-                                "Access-Control-Allow-Private-Network": "true"}, b""),
+                                "Access-Control-Allow-Private-Network": "true",
+                                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                                "Access-Control-Allow-Headers": "Content-Type"}, b""),
         ):
             with self.assertRaises(RuntimeError):
                 acceptance_check.check_private_network_preflight(
