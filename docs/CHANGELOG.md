@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-10 — 196-image ZIP export regression
+
+- Added `src/lib/exportZip.test.ts` to validate exactly 196 uniquely numbered PNG archive entries, 197 manifest lines, representative crop coordinates, one draw/encode per selection, and safe filename-prefix sanitization.
+- Recorded the original 1536 × 864 contact-sheet reference probe: 13 image rows and 210 candidate regions. The exact 196 browser-crop result still requires manual correction and visual acceptance; mocked-canvas export tests do not verify pixel content.
+- CI run #232 passed the complete workflow, including the new regression, typecheck, security/sidecar checks, FFmpeg integration, and production build.
+- PR #9 updated local TTS/renderer setup instructions for the deployed frontend origin. The latest main source is merged, but Vercel currently rejects a new deployment due to its free daily deployment quota (HTTP 402).
+
 ## 2026-11-10 — Production UI acceptance and local sidecar setup
 
 - Recorded a second public production UI acceptance sweep with 16 passing checks across script parsing, image sequence and mapping states, timeline prerequisites, mixing, effects, render profiles, and ZIP export/restore controls. Real media operations remain unverified.
