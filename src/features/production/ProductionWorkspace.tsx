@@ -78,9 +78,18 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
   const rulerTicks=Array.from({length:Math.floor(timelineDuration/5)+1},(_,index)=>index*5);
   if(timelineDuration>0&&rulerTicks[rulerTicks.length-1]!==timelineDuration)rulerTicks.push(timelineDuration);
   useEffect(()=>{
-    let alive=true;const urls:Record<string,string>={};
-    void Promise.all(assets.map(async asset=>{const blob=await readImage(asset.id);if(blob)urls[asset.id]=URL.createObjectURL(blob);}))
-      .then(()=>{if(alive)setThumbs(urls);else Object.values(urls).forEach(URL.revokeObjectURL);});
+    let alive=true;const urls:Record<string,string>={};let missing=0;
+    void Promise.all(assets.map(async asset=>{
+      try{
+        const blob=await readImage(asset.id);
+        if(blob)urls[asset.id]=URL.createObjectURL(blob);else missing+=1;
+      }catch{missing+=1;}
+    })).then(()=>{
+      if(alive){
+        setThumbs(urls);
+        if(missing)setMessage(missing+" image source file(s) are not available in this browser. Re-import those images; JSON backup contains image metadata, not the original image bytes.");
+      }else Object.values(urls).forEach(URL.revokeObjectURL);
+    });
     return()=>{alive=false;Object.values(urls).forEach(URL.revokeObjectURL);};
   },[assets.map(a=>a.id).join("|")]);
   useEffect(()=>{
@@ -93,6 +102,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
   const updateMappings=(next:SceneImageMapping[])=>patchProject(onUpdate,{imageMappings:normalizeMappings(next,project.scenes.map(s=>s.id),assets.map(a=>a.id))});
   const addFiles=async(files:FileList|null)=>{
     if(!files?.length)return;setBusy(true);setMessage("Reading images and storing originals locally…");
+    const savedIds:string[]=[];
     try{
       const valid=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=100*1024*1024);
       const accepted=valid.slice(0,Math.max(0,500-assets.length));
@@ -101,12 +111,15 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
       const ordered=sortSequence(accepted.map(f=>({name:f.name,relativePath:(f as File&{webkitRelativePath?:string}).webkitRelativePath||f.name,file:f})));
       for(const item of ordered){
         const file=item.file,id=crypto.randomUUID(),hash=await fingerprint(file);
-        const size=await dimensions(file);await saveImage(id,file);
+        const size=await dimensions(file);await saveImage(id,file);savedIds.push(id);
         additions.push({id,name:file.name,relativePath:item.relativePath,mimeType:file.type,bytes:file.size,sequenceNumber:extractSequenceNumber(file.name),order:assets.length+additions.length,width:size.width,height:size.height,fingerprint:hash});
       }
       updateAssets([...assets,...additions].map((a,index)=>({...a,order:index})));
       setMessage("Added "+additions.length+" image(s)."+(rejected?" Rejected "+rejected+" file(s): unsupported, empty, oversized, or beyond the 500-image project limit.":""));
-    }catch(error){setMessage(error instanceof Error?error.message:"Could not import these images.");}finally{setBusy(false);}
+    }catch(error){
+      await Promise.all(savedIds.map(id=>deleteImage(id).catch(()=>undefined)));
+      setMessage(error instanceof Error?error.message:"Could not import these images.");
+    }finally{setBusy(false);}
   };
   const removeAsset=async(id:string)=>{
     await deleteImageIfUnreferenced(id,project.id);updateAssets(assets.filter(a=>a.id!==id).map((a,index)=>({...a,order:index})));
