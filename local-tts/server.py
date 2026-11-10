@@ -30,13 +30,28 @@ VOICE_CATALOG = [
 ]
 
 app = FastAPI(title="GridSplit Local TTS", docs_url=None, redoc_url=None)
+# Add only exact trusted HTTPS origins for a separately hosted frontend; never use a wildcard.
+ALLOWED_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("GRIDSPLIT_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip().startswith("https://") and "*" not in origin
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$",
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https?://(localhost|127\\.0\\.1|\\[::1\\])(:\\d+)?$",
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
+
+@app.middleware("http")
+async def allow_private_network_preflight(request, call_next):
+    response = await call_next(request)
+    if request.headers.get("access-control-request-private-network") == "true":
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
 engine: Any = None
 engine_error: str | None = None
 
