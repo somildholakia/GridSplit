@@ -191,10 +191,10 @@ function App() {
   const [notice, setNotice] = useState("");
   const [confidence, setConfidence] = useState({ x: 0, y: 0 });
   const [detectedRows, setDetectedRows] = useState(0);
-  const [isReviewed196Sample, setIsReviewed196Sample] = useState(false);
+  const [isReviewed196Sample, setIsReviewed196Sample] = useState(false);\n  const [isSampleLayoutPristine, setIsSampleLayoutPristine] = useState(false);
 
   const selectedCells = useMemo(() => cells.filter((cell) => cell.selected), [cells]);
-  const canApplyReviewed196Map = isReviewed196Sample && is196SampleCandidateLayout(cells);
+  const canApplyReviewed196Map = isReviewed196Sample && isSampleLayoutPristine && is196SampleCandidateLayout(cells);
 
   const releaseLoadedImage = useCallback(() => {
     setLoaded((current) => {
@@ -259,7 +259,7 @@ function App() {
 
         setLoaded({ file, url, image });
         setCells(nextCells);
-        setIsReviewed196Sample(exactSample);
+        setIsReviewed196Sample(exactSample);\n        setIsSampleLayoutPristine(exactSample && is196SampleCandidateLayout(nextCells));
         setColumnsInput(String(typicalColumns(layout)));
         setRowsInput(String(layout.rows.length));
         setDetectedRows(layout.rows.length);
