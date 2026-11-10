@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-11-10  
 **Audited baseline branch:** `main`  
-**Active implementation branch:** `feat/m06-m11-studio-script-workflow`  
+**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M16 scope)  
 **Open draft PR:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
@@ -21,8 +21,8 @@ A milestone is complete only when its implementation exists, required tests or v
 - [x] **M09 — Script editor.** Supports paste, TXT, local DOCX, and selectable-text PDF import with original-source preservation. PDF.js and its worker are bundled locally; unit tests cover selectable text, text-free/scanned PDFs, and invalid input. OCR for scanned PDFs is explicitly out of scope.
 - [x] **M10 — Deterministic script parser.** Parses chapter/scene headings, paragraphs, narration, character, SFX, and music directives; source-line tracking is tested. CI run #73 passed.
 - [x] **M11 — Scene segmentation.** Added editable chapter/scene labels and blocks, scene/block reordering, cross-scene block moves, split/merge controls, and add/remove actions. Unit tests and CI run #73 passed.
-- [x] **M12 — Character management.** Complete — stable narrator/dialogue identities and per-character voice/language/speed; covered by CI #98.
-- [x] **M13 — Offline TTS provider abstraction.** Complete — provider contracts, health/voice catalog, cancellation, WAV metadata parsing, and loopback privacy tests; covered by CI #98.
+- [x] **M12 — Character management.** Complete — stable narrator/dialogue identities and per-character voice/language/speed; covered by CI #100.
+- [x] **M13 — Offline TTS provider abstraction.** Complete — provider contracts, health/voice catalog, cancellation, WAV metadata parsing, and loopback privacy tests; covered by CI #100.
 - [ ] **M14 — Local TTS integration.** Implementation added — optional loopback-only Kokoro ONNX sidecar, explicit CORS allowlist, and user-installed model/voice files. Python syntax passes CI; real model/voice synthesis smoke test remains.
 - [ ] **M15 — Segment generation.** Implementation added — per-block fingerprints, generation lifecycle, recovery, and IndexedDB WAV storage. Browser CI passes; live synthesis against an installed model remains to be exercised.
 - [ ] **M16 — Audio preview.** Implementation added — native local playback, sample-derived duration, and WAV download. Browser build/tests pass; review of a real model-generated WAV remains part of the on-device smoke test.
@@ -49,7 +49,7 @@ A milestone is complete only when its implementation exists, required tests or v
 
 ## Current branch validation
 
-The M06–M11 implementation is on the feature branch and remains in draft PR #1; it is not merged into `main`. GitHub Actions run #73 passed all steps: npm install, lint, 31 unit tests across 6 files, typecheck, production build, and static artifact upload. The Vercel preview deployment is Ready for the verified head.
+The M06–M16 implementation is on the feature branch and remains in draft PR #1; it is not merged into `main`. GitHub Actions run #100 passed on final PR head `4bc195b7201e2d170a3f6d32667db7b885478b46`: Python sidecar syntax check, npm install, lint, 42 unit tests across 9 files, typecheck, production build, and static artifact upload.
 
 M09 is complete for selectable-text PDFs. Scanned/image-only PDF OCR is not included. M10 also has a regression test for starting a new scene when a chapter changes without an explicit scene heading. A live browser smoke test was attempted against the Vercel preview but the preview redirected to Vercel Authentication; without an authenticated browser profile, interactive UI validation of project restore, file import controls, scene editing, and the retained image extractor remains unverified.
 
@@ -65,6 +65,6 @@ For every milestone, record:
 
 Do not check a box until all required evidence is available.
 
-## M12–M16 implementation candidate
+## M12–M16 implementation and validation
 
-Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md). CI run #98 passed lint, all 42 unit tests, typecheck, production build, artifact upload, and Python syntax compilation. M14–M16 remain open until the optional local model and matching voice files are installed and one real generate/playback cycle is verified.
+Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md). CI run #100 passed lint, all 42 unit tests across 9 files, typecheck, production build, artifact upload, and Python syntax compilation. M12–M13 satisfy their automated completion evidence. M14–M16 implementation is committed; their checkboxes remain open pending a real local model/voice generate → playback → download smoke test.
