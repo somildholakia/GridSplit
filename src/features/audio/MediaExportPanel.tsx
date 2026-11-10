@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, FileJson, FileText, RefreshCw, ShieldCheck } from "lucide-react";
+import { FileJson, FileText, RefreshCw, ShieldCheck } from "lucide-react";
 import type { StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import { buildSynchronizationMetadata, measureWavBlob, toSrt, toVtt, type SynchronizationMetadata } from "../../lib/mediaTimeline";
