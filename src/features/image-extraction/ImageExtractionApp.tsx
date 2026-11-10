@@ -297,14 +297,12 @@ function App() {
   };
 
   const toggleCell = (id: string) => {
-    setIsSampleLayoutPristine(false);
     setCells((current) => current.map((cell) =>
       cell.id === id ? { ...cell, selected: !cell.selected } : cell,
     ));
   };
 
   const setAllSelected = (selected: boolean) => {
-    setIsSampleLayoutPristine(false);
     setCells((current) => current.map((cell) => ({ ...cell, selected })));
   };
 
