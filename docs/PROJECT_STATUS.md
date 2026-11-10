@@ -82,7 +82,7 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 - The 196-image contact-sheet target in `docs/SAMPLE_ANALYSIS.md` remains unverified; its recorded ~210 preliminary regions are not a pass.
 - No browser interaction or end-to-end crop/ZIP test has been run against the supplied 196-image sheet.
 - No batch/folder image upload, offline TTS, audio generation, waveform, sync mapping, subtitle generation, multitrack editor, FFmpeg renderer, MP4 export, or complete production ZIP has been implemented yet. Script import supports paste, TXT, DOCX, and selectable-text PDF; scanned PDF OCR is not included.
-- GitHub Actions run #65 passed lint, 30 unit tests across 6 files, TypeScript typecheck, production build, and static build-artifact upload. The Vercel preview deployment is Ready. A live browser smoke test was attempted but the preview is protected by Vercel Authentication, so interactive UI checks could not be completed without an authenticated browser profile. Image-extractor regression and script-to-render integration tests remain future work.
+- GitHub Actions run #70 passed lint, 31 unit tests across 6 files, TypeScript typecheck, production build, and static build-artifact upload. The Vercel preview deployment is Ready. A live browser smoke test was attempted but the preview is protected by Vercel Authentication, so interactive UI checks could not be completed without an authenticated browser profile. Image-extractor regression and script-to-render integration tests remain future work.
 - No model, voice pack, TTS binary, FFmpeg binary, or native desktop runtime has been bundled.
 
 ## Next step
@@ -103,7 +103,7 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 
 **Branch:** `feat/m06-m11-studio-script-workflow`  
 **Pull request:** https://github.com/somildholakia/GridSplit/pull/1  
-**Latest implementation head:** `57e407ce355679b5fc338648bcbb8c944ca4c6a9`  
+**Latest implementation head verified by CI:** `56983744a246c2410745c7977019bb5f70e5c3b1`  
 **PR state:** open, draft, mergeable; not merged into `main`.
 
 ### Delivered
@@ -117,18 +117,18 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 
 ### Validation evidence
 
-**GitHub Actions run #65: successful.**  
+**GitHub Actions run #70: successful.**  
 [View workflow run](https://github.com/somildholakia/GridSplit/actions/runs/42784773000)
 
 - `npm ci --no-audit --no-fund`: passed.
 - `npm run lint`: passed.
-- `npm test -- --reporter=verbose`: 6 test files and 30 tests passed, including selectable-text PDF extraction, scanned/text-free PDF handling, and invalid PDF input.
+- `npm test -- --reporter=verbose`: 6 test files and 31 tests passed, including selectable-text PDF extraction, scanned/text-free PDF handling, and invalid PDF input.
 - `npm run typecheck`: passed.
 - `npm run build`: passed.
 - Static `dist/` artifact upload: passed.
 - Vercel preview status for the verified implementation head: success.
 
-The first CI attempt exposed a TypeScript control-flow issue in the parser's chapter-heading branch. It was fixed in commit `8d9ef27`. Subsequent dependency/API and worker path issues during PDF.js integration were corrected; the current workflow passes. The PR remains a draft and has not been merged.
+The first CI attempt exposed a TypeScript control-flow issue in the parser's chapter-heading branch. It was fixed in commit `8d9ef27`. A later parser review found that text after a new chapter heading could remain attached to the prior scene when no explicit scene heading was present; this was fixed and covered by a dedicated regression test. Subsequent dependency/API and worker path issues during PDF.js integration were corrected; CI run #70 passes. The PR remains a draft and has not been merged.
 
 ### Remaining gaps
 
