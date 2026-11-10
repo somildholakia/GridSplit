@@ -39,6 +39,8 @@ export default function AudioStudio({ project, onUpdate }: Props) {
   const [activeGeneration, setActiveGeneration] = useState<string | null>(null);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const controllerRef = useRef<AbortController | null>(null);
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
   const provider = useMemo(() => {
     try { return new KokoroLocalProvider(endpointDraft); } catch { return null; }
   }, [endpointDraft]);
@@ -67,18 +69,28 @@ export default function AudioStudio({ project, onUpdate }: Props) {
   useEffect(() => {
     let active = true;
     const created: string[] = [];
+    const missing: StudioAudioSegment[] = [];
     const readySegments = segments.filter((segment) => segment.status === "ready");
     void Promise.all(readySegments.map(async (segment) => {
       try {
         const blob = await readGeneratedAudio(project.id, segment.id);
-        if (!active || !blob) return null;
+        if (!active) return null;
+        if (!blob) { missing.push(segment); return null; }
         const url = URL.createObjectURL(blob);
         created.push(url);
         return [segment.id, url] as const;
       } catch { return null; }
     })).then((entries) => {
-      if (active) setPreviewUrls(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null)));
-      else created.forEach((url) => URL.revokeObjectURL(url));
+      if (!active) return;
+      setPreviewUrls(Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null)));
+      if (missing.length) {
+        const missingIds = new Set(missing.map((segment) => segment.id));
+        const repaired = segments.map((segment) => missingIds.has(segment.id)
+          ? { ...segment, status: "pending" as const, sampleCount: undefined, sampleRate: undefined,
+              channels: undefined, durationSeconds: undefined, error: "The saved WAV file is missing. Generate this segment again." }
+          : segment);
+        onUpdateRef.current({ audioSegments: repaired });
+      }
     });
     return () => { active = false; created.forEach((url) => URL.revokeObjectURL(url)); };
   }, [project.id, project.audioSegments]);
