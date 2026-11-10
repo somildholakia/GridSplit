@@ -1,9 +1,9 @@
 # GridSplit Studio — Development Checkpoints
 
 **Last updated:** 2026-11-10  
-**Audited baseline branch:** `main` (M01–M05)  
-**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M34 automated scope)  
-**Open draft PR:** https://github.com/somildholakia/GridSplit/pull/1  
+**Main branch:** `main` — M01–M34 implementation merged via PR #1  
+**Release work branch:** `chore/reconcile-release-status` (documentation reconciliation)  
+**Merged implementation PR:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 A milestone is complete only when its implementation exists, required tests or validation pass, and the evidence is recorded in `docs/PROJECT_STATUS.md`. Planning, mock UI, untested code, and documentation alone do not complete implementation milestones. The M26–M31 checkboxes record implementation plus automated CI evidence; target-device and real-model acceptance gaps are listed separately and are not implied by those checks.
@@ -47,9 +47,9 @@ A milestone is complete only when its implementation exists, required tests or v
 - [ ] **M35 — Production deployment.** Deploy the static frontend without making hosted processing mandatory.
 - [ ] **M36 — End-to-end validation.** Complete and inspect a representative exported production package.
 
-## Current branch validation
+## Current main-branch validation
 
-M06–M34 automated implementation is committed on the feature branch in draft PR #1 and is not merged into `main`. **GitHub Actions run #199 passed on commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`:** Python sidecar compilation, **9 Python tests** (2 TTS Host-validation tests and 7 renderer tests, including HTTP upload → FFmpeg render → MP4 download), ESLint, **91 Vitest tests across 18 files**, TypeScript typecheck, Vite production build, static artifact upload, and `npm audit --omit=dev --audit-level=high` (**0 production npm vulnerabilities**). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). Run #195 remains the earlier M26–M31 implementation validation baseline; run #131 remains the historical M17–M21 baseline.
+M06–M34 automated implementation is merged into `main` by PR #1 at commit `0f6bb317508f028627d02bcece7b414598438399` (2026-11-10 16:57:47 UTC). **GitHub Actions run #199 passed on commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`:** Python sidecar compilation, **9 Python tests** (2 TTS Host-validation tests and 7 renderer tests, including HTTP upload → FFmpeg render → MP4 download), ESLint, **91 Vitest tests across 18 files**, TypeScript typecheck, Vite production build, static artifact upload, and `npm audit --omit=dev --audit-level=high` (**0 production npm vulnerabilities**). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). Run #195 remains the earlier M26–M31 implementation validation baseline; run #131 remains the historical M17–M21 baseline.
 
 The additional M17–M19 tests cover sub-second SRT/VTT cue boundaries. The additional M21 tests cover natural ordering across nested folder paths and the 500-image cap. These are automated tests, not a substitute for visual acceptance of a real contact sheet.
 
@@ -69,13 +69,13 @@ Do not check a box until all required evidence is available.
 
 ## M22–M25 implementation and validation
 
-Implementation and automated validation are complete for M22–M25 on the feature branch (run #182). Implementation notes and current manual acceptance gaps are in [docs/M22-M25.md](M22-M25.md). The live timeline uses project-local second-based clip positions; the separate rational-time timeline helper is not yet the live editor's canonical storage format. The timeline preview schedules saved narration/dialogue WAV segments in the browser and does not mix music/SFX or render video. JSON backups keep image metadata but do not include IndexedDB media blobs.
+Implementation and automated validation for M22–M25 are merged into `main` (run #182 is the recorded pre-merge evidence). Implementation notes and current manual acceptance gaps are in [docs/M22-M25.md](M22-M25.md). The live timeline uses project-local second-based clip positions; the separate rational-time timeline helper is not yet the live editor's canonical storage format. The timeline preview schedules saved narration/dialogue WAV segments in the browser and does not mix music/SFX or render video. JSON backups keep image metadata but do not include IndexedDB media blobs.
 
 Manual browser review of image import, mapping persistence, playback/seek, actual WAV synchronization, and the 196-image contact sheet remains open. M14–M16 also remain open for real Kokoro model/voice generate → playback → download acceptance.
 
 ## M26–M31 implementation and validation
 
-All six milestones are implemented on the feature branch and the CI workflow passed in run #195. The workflow compiled both Python sidecars, passed 6 Python tests (including a real FFmpeg/ffprobe transition + audio-mix render), passed ESLint and 89 Vitest tests across 17 files, completed TypeScript typecheck and the Vite production build, and uploaded the static artifact. The checkboxes above record this automated completion. A target-device browser run with the user's installed FFmpeg/ffprobe, actual project media and local Kokoro models remains a separate release acceptance task. See [docs/M26-M31.md](M26-M31.md).
+All six milestones are implemented and merged into `main`; the CI workflow passed in run #195 on the pre-merge feature revision. The workflow compiled both Python sidecars, passed 6 Python tests (including a real FFmpeg/ffprobe transition + audio-mix render), passed ESLint and 89 Vitest tests across 17 files, completed TypeScript typecheck and the Vite production build, and uploaded the static artifact. The checkboxes above record this automated completion. A target-device browser run with the user's installed FFmpeg/ffprobe, actual project media and local Kokoro models remains a separate release acceptance task. See [docs/M26-M31.md](M26-M31.md).
 
 ## M12–M16 implementation and validation
 
@@ -90,6 +90,6 @@ M33 adds a 500-scene, 500-image, 1,000-clip timeline performance regression test
 
 M34's code-scope review is documented in [SECURITY_REVIEW.md](SECURITY_REVIEW.md). The production JavaScript dependency audit reports zero vulnerabilities at the configured high-severity threshold. The TTS and render sidecars remain loopback-only and reject unexpected Host/Origin headers; archive validation and local job cleanup are tested. Python runtime dependency advisories and exact versions/licenses for user-installed models, voices, FFmpeg builds and codecs remain external release checks because those assets are not bundled.
 
-M35 is still open: the feature branch has a READY Vercel preview, but `main` still points to the M01–M05 baseline. The draft PR has not been merged or promoted to production. M36 is still open: the HTTP test uses a deterministic minimal fixture, not a complete archive exported from the actual browser UI using a real script, generated Kokoro speech, numbered images, music/SFX, and target-device FFmpeg.
+M35 is still open: the merged main commit `0f6bb317` has not reached production. The current `gridsplit-kappa.vercel.app` production alias still points to the older M01–M05 deployment. Vercel rejected the production deployment attempt with HTTP 402 `api-deployments-free-per-day` after the Hobby team exceeded 100 deployments in 24 hours; Vercel advised retrying after 24 hours. No billing or plan settings were changed. M36 is still open: the HTTP test uses a deterministic minimal fixture, not a complete archive exported from the actual browser UI using a real script, generated Kokoro speech, numbered images, music/SFX, and target-device FFmpeg.
 
 M14–M16 remain open for real local Kokoro model/voice generation → playback → WAV download. M22–M25 still require manual target-browser validation of image import, mapping persistence, preview/seek/audio synchronization, and the recorded 196-image contact-sheet sample. Do not treat automated CI or a preview HTTP 200 as proof of those acceptance checks.
