@@ -78,15 +78,15 @@ describe("automatic production schedule", () => {
 });
 
 describe("timeline edit operations", () => {
-  it("nudges, trims, and moves clips without losing track references", () => {
+  it("nudges, trims, and moves clips between compatible audio tracks", () => {
     const timeline = makeTimeline();
-    const clip = timeline.tracks[0].clips[0];
+    const clip = timeline.tracks[1].clips[0];
     const shifted = shiftTimelineClip(timeline, clip.id, 250);
-    expect(shifted.tracks[0].clips[0].start).toEqual({ numerator: "1", denominator: "4" });
+    expect(shifted.tracks[1].clips[0].start).toEqual({ numerator: "1", denominator: "4" });
     const resized = resizeTimelineClip(shifted, clip.id, 250);
-    expect(resized.tracks[0].clips[0].duration).toEqual({ numerator: "3", denominator: "4" });
+    expect(resized.tracks[1].clips[0].duration).toEqual({ numerator: "3", denominator: "4" });
     const moved = moveTimelineClipToTrack(resized, clip.id, "track-music-sfx");
-    expect(moved.tracks[0].clips).toHaveLength(1);
+    expect(moved.tracks[1].clips).toHaveLength(0);
     expect(moved.tracks[2].clips[0].trackId).toBe("track-music-sfx");
   });
 
