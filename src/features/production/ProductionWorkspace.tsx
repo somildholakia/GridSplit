@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Pause, Play
 import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import { measureWavBlob } from "../../lib/mediaTimeline";
-import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, sortSequence, timelineDurationSeconds, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
+import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
 import "./production-workspace.css";
 
 type ProductionProject = StudioProject & { imageAssets?: SequenceAsset[]; imageMappings?: SceneImageMapping[]; timelineClips?: TimelineClip[] };
@@ -117,8 +117,7 @@ export default function ProductionWorkspace({project,onUpdate}:Props){
     [next[index],next[target]]=[next[target],next[index]];
     const ordered=next.map((asset,itemIndex)=>({...asset,order:itemIndex}));
     updateAssets(ordered);
-    const rank=new Map(ordered.map((asset,itemIndex)=>[asset.id,itemIndex]));
-    patchProject(onUpdate,{imageMappings:mappings.map(mapping=>({...mapping,imageIds:[...mapping.imageIds].sort((left,right)=>(rank.get(left)??Number.MAX_SAFE_INTEGER)-(rank.get(right)??Number.MAX_SAFE_INTEGER))}))});
+    patchProject(onUpdate,{imageMappings:orderMappingsByAssetOrder(mappings,ordered)});
   };
   const setFrameNumber=(id:string,value:string)=>{
     const number=value.trim()===""?null:Number(value);
