@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from security import is_loopback_host_header
+
 import soundfile as sf
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +32,20 @@ VOICE_CATALOG = [
 ]
 
 app = FastAPI(title="GridSplit Local TTS", docs_url=None, redoc_url=None)
+
+
+@app.middleware("http")
+async def enforce_loopback_host(request, call_next):
+    if not is_loopback_host_header(request.headers.get("host", "")):
+        return Response(
+            content='{"detail":"Host header rejected. Use the loopback TTS address."}',
+            status_code=403,
+            media_type="application/json",
+            headers={"Cache-Control": "no-store"},
+        )
+    return await call_next(request)
+
+
 # Add only exact trusted HTTPS origins for a separately hosted frontend; never use a wildcard.
 ALLOWED_ORIGINS = [
     origin.strip().rstrip("/")

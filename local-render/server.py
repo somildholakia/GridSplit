@@ -21,9 +21,39 @@ from pathlib import Path, PurePosixPath
 MAX_ARCHIVE = 1024 * 1024 * 1024
 MAX_EXPANDED = 2 * 1024 * 1024 * 1024
 MAX_ENTRIES = 1610
+MAX_ACTIVE_JOBS = 2
+MAX_FINISHED_JOBS = 8
+JOB_RETENTION_SECONDS = 6 * 60 * 60
 JOBS: dict[str, dict] = {}
 JOBS_LOCK = threading.RLock()
 ALLOWED_ORIGINS: set[str] = set()
+
+
+def prune_finished_jobs(now: float | None = None) -> None:
+    """Bound completed-job metadata and remove expired render temp directories."""
+    current = time.time() if now is None else now
+    with JOBS_LOCK:
+        finished = [
+            (job_id, job)
+            for job_id, job in JOBS.items()
+            if job.get("status") in ("completed", "failed", "cancelled")
+        ]
+        finished.sort(key=lambda item: float(item[1].get("finishedAt", item[1].get("createdAt", 0))))
+        expired = {
+            job_id for job_id, job in finished
+            if current - float(job.get("finishedAt", job.get("createdAt", current))) > JOB_RETENTION_SECONDS
+        }
+        retained = [job_id for job_id, _ in finished if job_id not in expired]
+        overflow = set(retained[:max(0, len(retained) - MAX_FINISHED_JOBS)])
+        directories = []
+        for job_id in expired | overflow:
+            job = JOBS.pop(job_id, None)
+            if job:
+                directory = Path(str(job.get("directory", ""))).parent
+                if directory.name.startswith("gridsplit-render-"):
+                    directories.append(directory)
+    for directory in directories:
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 def safe_path(name: str) -> PurePosixPath:
@@ -421,6 +451,8 @@ def execute_job(job_id: str) -> None:
             if process and process.poll() is None:
                 process.kill()
             job.pop("process", None)
+            if job.get("status") in ("completed", "failed", "cancelled"):
+                job["finishedAt"] = time.time()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -475,6 +507,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if not self._check_request():
             return
+        prune_finished_jobs()
         if self.path == "/v1/health":
             self._json(200, {"ready": bool(shutil.which("ffmpeg") and shutil.which("ffprobe")),
                              "ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe"),
@@ -509,9 +542,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         if not self._check_request():
             return
+        prune_finished_jobs()
         if self.path != "/v1/jobs":
             self._json(404, {"error": "Route not found."})
             return
+        with JOBS_LOCK:
+            active_count = sum(job.get("status") in ("queued", "running") for job in JOBS.values())
+        if active_count >= MAX_ACTIVE_JOBS:
+            self._json(429, {"error": "The local renderer is already running its maximum of two jobs. Wait for one to finish."})
+            return
+        directory: Path | None = None
+        registered = False
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > MAX_ARCHIVE:
@@ -537,13 +578,20 @@ class Handler(BaseHTTPRequestHandler):
                 "id": job_id, "status": "queued", "progress": 0, "message": "Project archive accepted.",
                 "error": None, "output": None, "directory": str(directory / "project"),
                 "manifest": manifest, "project": project, "cancel": threading.Event(), "process": None,
+                "createdAt": time.time(),
             }
             with JOBS_LOCK:
+                active_count = sum(item.get("status") in ("queued", "running") for item in JOBS.values())
+                if active_count >= MAX_ACTIVE_JOBS:
+                    raise RuntimeError("The local renderer is already running its maximum of two jobs. Wait for one to finish.")
                 JOBS[job_id] = job
+                registered = True
             worker = threading.Thread(target=execute_job, args=(job_id,), daemon=True)
             worker.start()
             self._json(202, {key: job.get(key) for key in ("id", "status", "progress", "message")})
         except Exception as error:
+            if directory is not None and not registered:
+                shutil.rmtree(directory, ignore_errors=True)
             self._json(400, {"error": str(error)})
 
     def do_DELETE(self) -> None:
