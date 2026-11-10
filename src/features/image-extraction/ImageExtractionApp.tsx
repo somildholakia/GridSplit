@@ -190,9 +190,11 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confidence, setConfidence] = useState({ x: 0, y: 0 });
-  const [detectedRows, setDetectedRows] = useState(0);\n  const [isReviewed196Sample, setIsReviewed196Sample] = useState(false);
+  const [detectedRows, setDetectedRows] = useState(0);
+  const [isReviewed196Sample, setIsReviewed196Sample] = useState(false);
 
-  const selectedCells = useMemo(() => cells.filter((cell) => cell.selected), [cells]);\n  const canApplyReviewed196Map = isReviewed196Sample && is196SampleCandidateLayout(cells);
+  const selectedCells = useMemo(() => cells.filter((cell) => cell.selected), [cells]);
+  const canApplyReviewed196Map = isReviewed196Sample && is196SampleCandidateLayout(cells);
 
   const releaseLoadedImage = useCallback(() => {
     setLoaded((current) => {
@@ -231,6 +233,7 @@ function App() {
     if (!file) return;
     setError("");
     setNotice("");
+    setIsReviewed196Sample(false);
 
     if (!file.type.startsWith("image/")) {
       setError("Choose an image format supported by your browser, such as PNG, JPG, or WebP.");
@@ -243,10 +246,11 @@ function App() {
 
     const url = URL.createObjectURL(file);
     const image = new Image();
-    image.onload = () => {
+    image.onload = async () => {
       try {
         const layout = applyAnalysis(image);
         const nextCells = createCellsFromLayout(layout);
+        const exactSample = await isReviewed196SampleFile(file, image);
         if (nextCells.length === 0) {
           URL.revokeObjectURL(url);
           setError("No usable image tiles were found. Try a clearer contact sheet or use the uniform-grid controls.");
@@ -255,6 +259,7 @@ function App() {
 
         setLoaded({ file, url, image });
         setCells(nextCells);
+        setIsReviewed196Sample(exactSample);
         setColumnsInput(String(typicalColumns(layout)));
         setRowsInput(String(layout.rows.length));
         setDetectedRows(layout.rows.length);
@@ -272,6 +277,7 @@ function App() {
       }
     };
     image.onerror = () => {
+      setIsReviewed196Sample(false);
       URL.revokeObjectURL(url);
       setError("This image could not be opened. Try exporting it as PNG or JPG first.");
     };
@@ -439,6 +445,7 @@ function App() {
   const startOver = () => {
     releaseLoadedImage();
     setCells([]);
+    setIsReviewed196Sample(false);
     setNotice("");
     setError("");
     setDetectedRows(0);
@@ -570,6 +577,12 @@ function App() {
               {error && <div className="notice error-notice"><X size={15} /> {error}</div>}
 
               <div className="review-hint"><CircleHelp size={15} /> Click a tile to include or exclude it. Use Split to divide a wide tile or Merge → to join it with the next tile in the same row.</div>
+              {canApplyReviewed196Map && (
+                <div className="notice sample-correction-notice">
+                  <span><b>Exact sample recognized.</b> Apply the reviewed pixel-based correction map to select the requested 196 storyboard crops. You can still review and change every tile before export.</span>
+                  <button className="button button-secondary" onClick={applyReviewed196Map}>Apply 196-crop map</button>
+                </div>
+              )}
 
               <div className="image-grid">
                 {cells.map((cell, index) => (
