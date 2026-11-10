@@ -7,7 +7,7 @@
 
 ## Current checkpoint
 
-**M03 complete — architecture and processing decisions recorded.** M01 audit and M02 requirements remain complete.
+**M04 complete — initial feature/domain restructuring committed and CI-verified.** M01–M03 remain complete.
 
 The existing GridSplit repository was audited before runtime code changes. Repository metadata, source tree, application entry points, image detector, ZIP exporter, styling, package scripts, TypeScript configuration, license, GitHub Actions workflow, and previous project notes were inspected.
 
@@ -48,7 +48,7 @@ The latest workflow run for the audited HEAD was successful on 2026-11-09. The N
 - `npm run typecheck`
 - `npm run build`
 
-This is CI evidence for the checked-in TypeScript/Vite build only. No local runtime was used during this documentation-only audit. Browser interaction, manual crop correctness, ZIP inspection, and the complete audio/video workflow have not been independently validated.
+This is CI evidence for the checked-in TypeScript/Vite build only. The feature-boundary refactor was validated by the Node 22 GitHub Actions typecheck and production build. Browser interaction, manual crop correctness, ZIP inspection, and the complete audio/video workflow have not been independently validated.
 
 The workflow history also includes an earlier failed run for a prior commit; the latest run on the current audited HEAD is successful.
 
@@ -74,13 +74,14 @@ The existing `docs/SAMPLE_ANALYSIS.md` records a 1536 × 864 sheet, 13 image-bea
 - **M01:** Complete — repository audit recorded.
 - **M02:** Complete — `PRODUCT_REQUIREMENTS.md` v1.0.0 committed.
 - **M03:** Complete — architecture and processing decisions recorded.
-- **M04–M36:** Not started.
+- **M04:** Complete — extractor moved behind a feature boundary; initial domain project/time contracts added; corrected Node 22 CI passed.
+- **M05–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
 ## Immediate next step
 
-M04: move the existing extractor UI behind a feature boundary and introduce the initial domain layer without changing its behavior. M05 will add automated tests and CI gates.
+M05: add automated tests for the exact timebase and existing grid detector, then strengthen CI to run tests, typecheck, production build, and publish build artifacts.
 
 ## Operating rules
 

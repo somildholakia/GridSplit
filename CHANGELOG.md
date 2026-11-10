@@ -28,3 +28,9 @@ The project is currently evolving from the original GridSplit contact-sheet extr
 - Added `docs/decisions/ADRs.md` with five accepted architectural decisions.
 - Recorded current upstream licensing findings and release gates. Kokoro ONNX is an evaluation candidate only; Piper/eSpeak NG are not default-bundled.
 - No TTS engine, voice pack, model, FFmpeg binary, or native runtime was added.
+
+## M04 — Repository restructuring
+- Moved the current extractor screen to `src/features/image-extraction/ImageExtractionApp.tsx`; retained `src/App.tsx` as the application composition entry.
+- Added initial v1 domain contracts in `src/domain/project.ts` and rational media-time utilities in `src/domain/time.ts`.
+- Preserved the existing detector, crop editing, and ZIP exporter code paths.
+- Initial CI caught a stale relative type import after the move; corrected it in `488de1e`. The corrected Node 22 typecheck and production build passed.

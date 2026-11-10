@@ -60,7 +60,7 @@ src/
   workers/                 browser worker entry points
 ```
 
-This is the target organization, not a claim that every folder or feature has been implemented. M04 begins by moving the existing extractor UI behind a feature boundary and establishing domain modules. Remaining modules are introduced only as milestones require them.
+This is the target organization, not a claim that every folder or feature has been implemented. M04 moved the existing extractor UI into `src/features/image-extraction/ImageExtractionApp.tsx`, added `src/domain/project.ts` and `src/domain/time.ts`, and retained `src/App.tsx` as the initial composition entry. Remaining feature modules are introduced only as milestones require them.
 
 ## 2. Canonical project schema
 
@@ -221,3 +221,9 @@ This is a technical license inventory, not legal advice. Licensing is rechecked 
 4. M04 feature/domain boundary refactor — preserve existing extractor.
 5. M05 automated validation and CI hardening — tests before new studio feature expansion.
 6. M06 onward — implement the user-facing production studio modules incrementally.
+
+## 11. M04 restructuring note
+
+The extractor implementation was moved without rewriting its detection, crop selection, split/merge, border-trim, or ZIP-export logic. Its detector and exporter remain in `src/lib` and are imported by the feature using relative paths. New domain types define the initial v1 project shape and exact rational-time utilities; they are not yet connected to persistence or UI workflows.
+
+The first post-move CI attempt caught a stale relative type import. That import was corrected in commit `488de1e`, after which Node 22 `typecheck` and `build` both passed. This failure and repair are retained in repository history rather than hidden.
