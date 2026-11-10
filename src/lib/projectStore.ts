@@ -115,6 +115,68 @@ export function duplicateProject(
   };
 }
 
+function blockSource(block: ParsedBlock): string {
+  if (block.kind === "dialogue") return `[CHARACTER: ${block.speaker ?? "UNKNOWN"}] ${block.text}`;
+  if (block.kind === "sfx") return `[SFX: ${block.cue ?? "SOUND"}] ${block.text}`.trim();
+  if (block.kind === "music") return `[MUSIC: ${block.cue ?? "MUSIC"}] ${block.text}`.trim();
+  return block.text;
+}
+
+function sceneWithBlocks(scene: ParsedScene, blocks: ParsedBlock[]): ParsedScene {
+  return { ...scene, blocks, sourceText: blocks.map(blockSource).filter(Boolean).join("\n\n") };
+}
+
+export function moveBlockAcrossScenes(
+  scenes: ParsedScene[],
+  sceneIndex: number,
+  blockIndex: number,
+  direction: -1 | 1,
+): ParsedScene[] {
+  const targetIndex = sceneIndex + direction;
+  if (sceneIndex < 0 || sceneIndex >= scenes.length || targetIndex < 0 || targetIndex >= scenes.length) return scenes;
+  const source = scenes[sceneIndex];
+  const target = scenes[targetIndex];
+  if (!source.blocks[blockIndex]) return scenes;
+  const block = source.blocks[blockIndex];
+  const sourceBlocks = source.blocks.filter((_, index) => index !== blockIndex);
+  const targetBlocks = direction === -1
+    ? [...target.blocks, block]
+    : [block, ...target.blocks];
+  return scenes.map((scene, index) => {
+    if (index === sceneIndex) return sceneWithBlocks(source, sourceBlocks);
+    if (index === targetIndex) return sceneWithBlocks(target, targetBlocks);
+    return scene;
+  });
+}
+
+export function splitSceneAfterBlock(
+  scenes: ParsedScene[],
+  sceneIndex: number,
+  blockIndex: number,
+  makeId: () => string = () => crypto.randomUUID(),
+): ParsedScene[] {
+  const scene = scenes[sceneIndex];
+  if (!scene || blockIndex < 0 || blockIndex >= scene.blocks.length - 1) return scenes;
+  const first = sceneWithBlocks(scene, scene.blocks.slice(0, blockIndex + 1));
+  const continuation: ParsedScene = {
+    id: makeId(),
+    title: `${scene.title} — continued`,
+    chapter: scene.chapter,
+    blocks: scene.blocks.slice(blockIndex + 1),
+    sourceText: "",
+  };
+  continuation.sourceText = continuation.blocks.map(blockSource).filter(Boolean).join("\n\n");
+  return [...scenes.slice(0, sceneIndex), first, continuation, ...scenes.slice(sceneIndex + 1)];
+}
+
+export function mergeSceneWithPrevious(scenes: ParsedScene[], sceneIndex: number): ParsedScene[] {
+  if (sceneIndex <= 0 || sceneIndex >= scenes.length) return scenes;
+  const previous = scenes[sceneIndex - 1];
+  const current = scenes[sceneIndex];
+  const merged = sceneWithBlocks(previous, [...previous.blocks, ...current.blocks]);
+  return [...scenes.slice(0, sceneIndex - 1), merged, ...scenes.slice(sceneIndex + 1)];
+}
+
 export function moveItem<T>(items: T[], index: number, direction: -1 | 1): T[] {
   const target = index + direction;
   if (index < 0 || index >= items.length || target < 0 || target >= items.length) return items;
