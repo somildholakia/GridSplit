@@ -90,3 +90,22 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 - Keep project data and export packages portable and versioned.
 - Record real test results; never infer success from code or mock screens.
 - Update the status, checkpoint list, architecture, and changelog after each milestone.
+
+
+## M06–M11 implementation in progress (PR #1)
+
+**Branch:** `feat/m06-m11-studio-script-workflow`  
+**Pull request:** https://github.com/somildholakia/GridSplit/pull/1  
+**Head commit:** `59c2edee3fb4c3786f1af1febdd49ea550aed87d`
+
+The current draft introduces the first usable studio slice:
+- A responsive dark studio shell, workspace navigation, privacy messaging, and a preserved Image splitter entry point (`src/App.tsx`, `src/studio.css`).
+- A dashboard with project listing, search, create/open/delete actions.
+- Browser-local project persistence with create, rename, autosave, and restore on reload. Data remains in the browser's localStorage; it is not yet a portable project archive.
+- A source script editor with paste and TXT import, explicit original-source preservation, and a 10 MB TXT limit.
+- A deterministic parser for chapter/part headings, scene/sequence headings, Markdown headings, paragraphs, and the four supported marker forms: `[NARRATOR]`, `[CHARACTER: NAME]`, `[SFX: NAME]`, and `[MUSIC: NAME]`.
+- Scene review with editable scene titles and add/remove scene actions, plus parser unit tests.
+
+**Not yet complete:** M06 reusable component extraction/design-token audit; M08 duplicate/archive and safe project export/import; M09 DOCX/PDF extraction; M11 full manual paragraph/block reordering and boundary editing. The UI deliberately identifies TXT-only import rather than claiming DOCX/PDF support. Existing image extractor regression behavior still needs automated browser validation.
+
+**Validation status:** the PR is draft. GitHub's combined commit status currently reports a Vercel check failure and no GitHub Actions workflow run is visible yet. No local lint, test, typecheck, or production-build run is claimed. Therefore M06–M11 remain unchecked in `docs/CHECKPOINTS.md` until validation and the remaining acceptance criteria are complete.
