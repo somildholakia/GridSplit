@@ -36,3 +36,15 @@ export async function deleteGeneratedAudio(projectId: string, segmentId: string)
     tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error ?? new Error("Could not remove the old audio segment."));
   }).finally(() => db.close());
 }
+
+/** Remove every generated WAV object belonging to a deleted project. */
+export async function deleteProjectAudio(projectId: string): Promise<void> {
+  const db = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORE, "readwrite");
+    const range = IDBKeyRange.bound(`${projectId}::`, `${projectId}::\\uffff`);
+    transaction.objectStore(STORE).delete(range);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Could not clean up deleted project audio."));
+  }).finally(() => db.close());
+}
