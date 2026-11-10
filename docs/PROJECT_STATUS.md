@@ -9,7 +9,7 @@
 
 ## Current checkpoint
 
-**M05 remains the verified `main` baseline. M06–M11 are implemented and CI-verified on PR #1.**
+**M05 remains the verified `main` baseline. M06–M11 are implemented on PR #1. M12–M16 implementation is now added to that branch and awaits validation.**
 
 M01–M05 remain complete on `main`. The GridSplit Studio branch adds the production workspace, project management, script parsing, and manual scene editing while retaining the existing image extractor. The branch is not merged.
 
@@ -26,7 +26,12 @@ M01–M05 remain complete on `main`. The GridSplit Studio branch adds the produc
 - **M09:** Complete on PR #1 — paste, TXT, DOCX, and selectable-text PDF import are implemented locally in the browser; PDF.js worker is bundled with the app. OCR for scanned PDFs is explicitly out of scope.
 - **M10:** Complete on PR #1 — deterministic chapter/scene/paragraph parser with narration, dialogue, SFX, and music markers.
 - **M11:** Complete on PR #1 — editable chapters/scenes/blocks, scene and block reordering, cross-scene moves, split, and merge controls.
-- **M12–M36:** Not started.
+- **M12:** Implementation added — stable narrator/dialogue character records, per-character voice IDs, language and speed; CI pending.
+- **M13:** Implementation added — engine-agnostic local TTS provider, voice and capability contracts; CI pending.
+- **M14:** Optional Kokoro ONNX FastAPI loopback sidecar added; model/voice files are user-installed. Real synthesis not yet verified.
+- **M15:** Implementation added — fingerprinted per-block generation lifecycle, cancellation/retry/regenerate and IndexedDB WAV storage; CI pending.
+- **M16:** Implementation added — local audio preview, actual sample-derived duration and WAV download; CI pending.
+- **M17–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
@@ -138,3 +143,7 @@ The first CI attempt exposed a TypeScript control-flow issue in the parser's cha
 - No manual browser QA of the supplied 196-image contact sheet has been completed; the existing image-extractor behavior is retained but not yet regression-verified in a browser.
 
 M06–M11 are checked in `docs/CHECKPOINTS.md` based on implementation and CI evidence. M09 automated tests cover DOCX extraction, PDF selectable-text extraction, text-free/scanned PDF handling, and invalid PDF input. Live UI validation remains blocked by Vercel Authentication.
+
+## M12–M16 implementation notes
+
+See [docs/M12-M16.md](M12-M16.md). Existing project records remain compatible because audio fields are optional. Audio binaries live in IndexedDB, not localStorage. Project copies receive new nested character/segment IDs and segment scene/block references are remapped; generated audio output is reset to pending rather than shared. The loopback sidecar does not fetch or redistribute model files.
