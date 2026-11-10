@@ -17,3 +17,8 @@ The project is currently evolving from the original GridSplit contact-sheet extr
 ### Not changed
 - No application source code, dependencies, extraction behavior, or deployment configuration changed in this audit commit.
 - No audio/video studio feature is claimed as implemented.
+
+## M02 — Product requirements
+- Added `PRODUCT_REQUIREMENTS.md` v1.0.0 with stable requirement IDs and priorities.
+- Added functional, privacy, platform, timing, recovery, accessibility, and release acceptance criteria.
+- M02 is a requirements baseline only; no new runtime feature is claimed.

@@ -9,7 +9,7 @@ A milestone is complete only when its implementation exists, required tests or v
 ## Milestones
 
 - [x] **M01 — Audit existing GridSplit repository.** Read-only source, repository, license, CI, and capability audit completed; baseline recorded. The outstanding 196-image sample export is not claimed as verified.
-- [ ] **M02 — Update product requirements.** Convert the supplied master prompt into versioned repository requirements and acceptance criteria.
+- [x] **M02 — Update product requirements.** Added `PRODUCT_REQUIREMENTS.md` v1.0.0 with stable requirement IDs, priorities, local-first/security rules, and release acceptance criteria.
 - [ ] **M03 — Architecture and processing design.** Decide module boundaries, project schema, TTS/render adapters, browser/desktop split, local asset/model handling, and media timebases.
 - [ ] **M04 — Repository restructuring.** Introduce modular feature/domain boundaries without regressing extraction.
 - [ ] **M05 — CI/CD.** Add reliable install, lint/typecheck, unit, integration, build, and appropriate deployment checks.

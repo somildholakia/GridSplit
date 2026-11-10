@@ -7,7 +7,7 @@
 
 ## Current checkpoint
 
-**M01 complete — repository audit.**
+**M02 complete — product requirements version 1.0.0.** M01 repository audit remains complete.
 
 The existing GridSplit repository was audited before runtime code changes. Repository metadata, source tree, application entry points, image detector, ZIP exporter, styling, package scripts, TypeScript configuration, license, GitHub Actions workflow, and previous project notes were inspected.
 
@@ -72,13 +72,13 @@ The existing `docs/SAMPLE_ANALYSIS.md` records a 1536 × 864 sheet, 13 image-bea
 ## Milestone state
 
 - **M01:** Complete — repository audit recorded.
-- **M02–M36:** Not started.
+- **M01:** Complete — repository audit recorded.\n- **M02:** Complete — `PRODUCT_REQUIREMENTS.md` v1.0.0 committed.\n- **M03–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
 ## Immediate next step
 
-M02: convert the supplied GridSplit Studio master prompt into a versioned `PRODUCT_REQUIREMENTS.md` with explicit functional requirements, non-functional requirements, privacy rules, compatibility constraints, and acceptance criteria. Do not begin a broad UI rewrite before M02 and M03 are reviewed and recorded.
+M03: record the technical architecture and processing decisions against `PRODUCT_REQUIREMENTS.md`. Do not begin broad runtime integration until the architecture and license gates are documented.
 
 ## Operating rules
 
