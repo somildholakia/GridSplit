@@ -82,7 +82,6 @@ export async function extractPdfText(file: Blob, options: { workerSrc?: string }
   const data = new Uint8Array(await file.arrayBuffer());
   const loadingTask = getDocument({
     data,
-    isEvalSupported: false,
     useWorkerFetch: false,
   });
 
