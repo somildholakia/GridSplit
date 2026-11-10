@@ -50,9 +50,8 @@ export function isStudioProject(value: unknown): value is StudioProject {
     && value.scenes.every(isScene);
 }
 
-export function readStoredProjects(): StudioProject[] {
+export function parseStoredProjects(raw: string | null): StudioProject[] {
   try {
-    const raw = localStorage.getItem(PROJECT_STORAGE_KEY);
     if (!raw) return [];
     const value: unknown = JSON.parse(raw);
     if (!Array.isArray(value)) return [];
@@ -60,6 +59,14 @@ export function readStoredProjects(): StudioProject[] {
       ...project,
       archived: project.archived ?? false,
     }));
+  } catch {
+    return [];
+  }
+}
+
+export function readStoredProjects(): StudioProject[] {
+  try {
+    return parseStoredProjects(localStorage.getItem(PROJECT_STORAGE_KEY));
   } catch {
     return [];
   }
