@@ -2,14 +2,14 @@
 
 **Last updated:** 2026-11-11  
 **Repository:** `somildholakia/GridSplit`  
-**Main branch:** `main` — latest commit `ddf61f1026ed61d6ffd1ea9df44312eaacccb1b2`; latest deployed frontend runtime commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` (PR #15's 196-sample preset is merged but deployment is blocked by Vercel's daily API quota)  
+**Main branch:** `main` — latest application code commit `ddf61f1026ed61d6ffd1ea9df44312eaacccb1b2`; deployed frontend runtime commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6`. Documentation-only commits may advance `main` without changing application code.  
 **Latest release record:** PR #11 — acceptance/deployment boundary  
 **Merged pull request:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
 
-Current `main` is `ddf61f1026ed61d6ffd1ea9df44312eaacccb1b2`. The deployed frontend runtime remains `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` because Vercel rejected the latest production deployment with HTTP 402 `api-deployments-free-per-day` and a 24-hour retry window. M01–M34 implementation, the Python TTS lock/audit, sidecar-origin corrections, local-media acceptance runner (PR #14), and exact 196-sample preset (PR #15) are merged.
+Current application code on `main` is `ddf61f1026ed61d6ffd1ea9df44312eaacccb1b2`. The deployed frontend runtime remains `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` because Vercel rejected the latest production deployment with HTTP 402 `api-deployments-free-per-day` and a 24-hour retry window. M01–M34 implementation, the Python TTS lock/audit, sidecar-origin corrections, local-media acceptance runner (PR #14), and exact 196-sample preset (PR #15) are merged.
 
 **Base Studio validation:** GitHub Actions run #199 passed on pre-merge commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`, including 9 Python tests, 91 Vitest tests across 18 files, ESLint, TypeScript typecheck, Vite production build, static artifact upload and production npm audit (0 vulnerabilities at the high-severity threshold). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). **Latest local-TTS dependency PR validation:** run #217 passed `uv lock --check`, `pip-audit --strict` (no known vulnerabilities found), 9 Python tests, 91 Vitest tests across 18 files, ESLint, typecheck, production build and artifact upload. [Open run #217](https://github.com/somildholakia/GridSplit/actions/runs/42865601179).
 
