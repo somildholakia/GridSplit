@@ -2,15 +2,16 @@
 
 **Last updated:** 2026-11-10  
 **Repository:** `somildholakia/GridSplit`  
-**Active branch:** `main`  
+**Baseline branch:** `main` (M01–M05)  
+**Active development branch:** `feat/m06-m11-studio-script-workflow`  
 **M05 verified implementation commit:** `8aa1d3e986bbbc36366b74856f1fc2b298f8ab3a`  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
 
-**M05 complete — CI/CD and automated validation baseline committed and passing.**
+**M05 remains the verified `main` baseline. M06–M08 and M10–M11 are implemented and CI-verified on PR #1; M09 is partially implemented.**
 
-M01–M05 are complete. The existing GridSplit extractor has been retained and moved behind a feature boundary. Product requirements, architecture/processing decisions, initial project/time domain types, automated unit tests, and a clean-install CI pipeline are now in the repository.
+M01–M05 remain complete on `main`. The GridSplit Studio branch adds the production workspace, project management, script parsing, and manual scene editing while retaining the existing image extractor. The branch is not merged.
 
 ## Milestone state
 
@@ -19,7 +20,13 @@ M01–M05 are complete. The existing GridSplit extractor has been retained and m
 - **M03:** Complete — architecture, data/timing, storage, processing-host, renderer, and license decisions recorded.
 - **M04:** Complete — extractor screen moved to `src/features/image-extraction/ImageExtractionApp.tsx`; initial domain project/time types added; corrected Node 22 typecheck and build passed.
 - **M05:** Complete — `package-lock.json`, `npm ci`, lint, unit tests, typecheck, production build, and workflow artifact delivery implemented and verified.
-- **M06–M36:** Not started.
+- **M06:** Complete on PR #1 — design tokens, reusable studio components, navigation, and responsive shell.
+- **M07:** Complete on PR #1 — project dashboard, statistics, search, and project actions.
+- **M08:** Complete on PR #1 — local project create/rename/duplicate/archive, autosave/restore, and versioned JSON backup import/export.
+- **M09:** In progress on PR #1 — paste, TXT, and DOCX import implemented; PDF text extraction remains outstanding.
+- **M10:** Complete on PR #1 — deterministic chapter/scene/paragraph parser with narration, dialogue, SFX, and music markers.
+- **M11:** Complete on PR #1 — editable chapters/scenes/blocks, scene and block reordering, cross-scene moves, split, and merge controls.
+- **M12–M36:** Not started.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
@@ -74,13 +81,13 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 
 - The 196-image contact-sheet target in `docs/SAMPLE_ANALYSIS.md` remains unverified; its recorded ~210 preliminary regions are not a pass.
 - No browser interaction or end-to-end crop/ZIP test has been run against the supplied 196-image sheet.
-- No batch/folder image upload, script editor/parser, project library, offline TTS, audio generation, waveform, sync mapping, subtitle generation, multitrack editor, FFmpeg renderer, MP4 export, or complete production ZIP has been implemented yet.
-- Current tests are domain/unit regression tests; browser integration and script-to-render integration tests remain future work.
+- No batch/folder image upload, offline TTS, audio generation, waveform, sync mapping, subtitle generation, multitrack editor, FFmpeg renderer, MP4 export, or complete production ZIP has been implemented yet. The current script editor supports paste, TXT, and DOCX; PDF import remains outstanding.
+- GitHub Actions run #40 passed lint, 27 unit tests across 6 files, TypeScript typecheck, production build, and static build-artifact upload. Browser interaction, image-extractor regression, and script-to-render integration tests remain future work.
 - No model, voice pack, TTS binary, FFmpeg binary, or native desktop runtime has been bundled.
 
 ## Next step
 
-**M06 — Design system.** Establish the production-studio design tokens, reusable components, navigation, and responsive behavior before introducing the dashboard and feature workspaces.
+**M09 — Finish document import.** Add local PDF text extraction, then validate TXT/DOCX/PDF import and source preservation end to end.
 
 ## Operating rules
 
@@ -92,20 +99,42 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 - Update the status, checkpoint list, architecture, and changelog after each milestone.
 
 
-## M06–M11 implementation in progress (PR #1)
+## M06–M11 implementation on PR #1
 
 **Branch:** `feat/m06-m11-studio-script-workflow`  
 **Pull request:** https://github.com/somildholakia/GridSplit/pull/1  
-**Head commit:** `59c2edee3fb4c3786f1af1febdd49ea550aed87d`
+**Implementation head verified by CI:** `9205b302e04c35ac0d5c86eeb5e74dd7eec8c1e2`  
+**PR state:** open, draft, mergeable; not merged into `main`.
 
-The current draft introduces the first usable studio slice:
-- A responsive dark studio shell, workspace navigation, privacy messaging, and a preserved Image splitter entry point (`src/App.tsx`, `src/studio.css`).
-- A dashboard with project listing, search, create/open/delete actions.
-- Browser-local project persistence with create, rename, autosave, and restore on reload. Data remains in the browser's localStorage; it is not yet a portable project archive.
-- A source script editor with paste and TXT import, explicit original-source preservation, and a 10 MB TXT limit.
-- A deterministic parser for chapter/part headings, scene/sequence headings, Markdown headings, paragraphs, and the four supported marker forms: `[NARRATOR]`, `[CHARACTER: NAME]`, `[SFX: NAME]`, and `[MUSIC: NAME]`.
-- Scene review with editable scene titles and add/remove scene actions, plus parser unit tests.
+### Delivered
 
-**Not yet complete:** M06 reusable component extraction/design-token audit; M08 duplicate/archive and safe project export/import; M09 DOCX/PDF extraction; M11 full manual paragraph/block reordering and boundary editing. The UI deliberately identifies TXT-only import rather than claiming DOCX/PDF support. Existing image extractor regression behavior still needs automated browser validation.
+- **M06:** Added CSS design tokens, reusable `StudioButton` and `StudioPanelHeader` components, responsive workspace navigation, and a dark production-studio shell.
+- **M07:** Added project dashboard, search, project statistics, create/open/delete, and active/archive views.
+- **M08:** Added create/rename/duplicate/archive/restore, browser-local autosave, validated version-1 JSON backup import/export, and nested ID regeneration when importing copies.
+- **M09 (partial):** Script paste, TXT import, and local DOCX import are available. DOCX text is extracted from the WordprocessingML main document part using the existing JSZip dependency. PDF text import remains unimplemented and is disclosed in the UI.
+- **M10:** Deterministic parser recognises chapter/part headings, scene/sequence headings, Markdown headings, paragraphs, and `[NARRATOR]`, `[CHARACTER: NAME]`, `[SFX: NAME]`, and `[MUSIC: NAME]` markers. Source-line tracking is covered when paragraph text repeats.
+- **M11:** Scene titles and chapter labels are editable; blocks can be edited, added, removed, reordered, and moved to an adjacent scene. Scenes can be reordered, split after a selected block, merged into the previous scene, added, or removed. The original full script remains stored separately from the editable breakdown.
 
-**Validation status:** the PR is draft. GitHub's combined commit status currently reports a Vercel check failure and no GitHub Actions workflow run is visible yet. No local lint, test, typecheck, or production-build run is claimed. Therefore M06–M11 remain unchecked in `docs/CHECKPOINTS.md` until validation and the remaining acceptance criteria are complete.
+### Validation evidence
+
+**GitHub Actions run #40: successful.**  
+[View workflow run](https://github.com/somildholakia/GridSplit/actions/runs/42780915696)
+
+- `npm ci --no-audit --no-fund`: passed.
+- `npm run lint`: passed.
+- `npm test -- --reporter=verbose`: 6 test files and 27 tests passed.
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+- Static `dist/` artifact upload: passed.
+- Vercel preview status for the verified implementation head: success.
+
+The first CI attempt exposed a TypeScript control-flow issue in the parser's chapter-heading branch. It was fixed in commit `8d9ef27`, and the later workflow run passed. The current PR remains a draft and has not been merged.
+
+### Remaining gaps
+
+- M09 needs PDF text extraction and a dedicated PDF fixture/test.
+- DOCX extraction currently reads the primary document part; unusual Word features such as footnotes, tracked changes, and embedded text boxes are not yet included.
+- Browser end-to-end tests have not been run for localStorage reload/restore, backup file selection, DOCX import in the UI, scene controls, or the preserved image extractor.
+- No manual browser QA of the supplied 196-image contact sheet has been completed; the existing image-extractor behavior is retained but not yet regression-verified in a browser.
+
+M06, M07, M08, M10, and M11 are checked in `docs/CHECKPOINTS.md` based on implementation plus CI evidence. M09 remains unchecked until PDF import and its validation are complete.
