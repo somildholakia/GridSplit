@@ -26,11 +26,11 @@ A milestone is complete only when its implementation exists, required tests or v
 - [ ] **M14 — Local TTS integration.** Implementation added — optional loopback-only Kokoro ONNX sidecar, explicit CORS allowlist, and user-installed model/voice files. Python syntax passes CI; real model/voice synthesis smoke test remains.
 - [ ] **M15 — Segment generation.** Implementation added — per-block fingerprints, generation lifecycle, recovery, and IndexedDB WAV storage. Browser CI passes; live synthesis against an installed model remains to be exercised.
 - [ ] **M16 — Audio preview.** Implementation added — native local playback, sample-derived duration, and WAV download. Browser build/tests pass; review of a real model-generated WAV remains part of the on-device smoke test.
-- [x] **M17 — Actual duration measurement.** Implementation added: re-read locally stored WAV headers and derive exact rational duration from sample count/sample rate; CI run #115 passed.
-- [x] **M18 — Synchronization metadata engine.** Implementation added: deterministic versioned sync JSON with rational segment/scene timing from measured WAV samples; CI run #115 passed.
-- [x] **M19 — Subtitle generation.** Implementation added: segment-level SRT/VTT export; no word-level alignment is invented; CI run #115 passed.
-- [x] **M20 — Preserve and improve GridSplit.** Existing detector/export flow retained; added flat-image fallback and even-grid regression fixtures; CI run #115 passed.
-- [x] **M21 — Multi-image upload.** Implementation added: multi-file/folder selection, natural sorting, duplicate/size/type validation, removable queue, and local ordered ZIP/CSV export; CI run #115 passed.
+- [x] **M17 — Actual duration measurement.** Implementation added: re-read locally stored WAV headers and derive exact rational duration from sample count/sample rate; CI run #121 passed.
+- [x] **M18 — Synchronization metadata engine.** Implementation added: deterministic versioned sync JSON with rational segment/scene timing from measured WAV samples; CI run #121 passed.
+- [x] **M19 — Subtitle generation.** Implementation added: segment-level SRT/VTT export; no word-level alignment is invented; CI run #121 passed.
+- [x] **M20 — Preserve and improve GridSplit.** Existing detector/export flow retained; added flat-image fallback and even-grid regression fixtures; CI run #121 passed.
+- [x] **M21 — Multi-image upload.** Implementation added: multi-file/folder selection, natural sorting, duplicate/size/type validation, removable queue, and local ordered ZIP/CSV export; CI run #121 passed.
 - [ ] **M22 — Image sequence management.** Add natural sorting, duplicates/gaps, previews, and correction tools.
 - [ ] **M23 — Scene-to-image mapping.** Support flexible one-to-many and many-to-one mappings.
 - [ ] **M24 — Automatic synchronization.** Create and recalculate image/audio schedules with explicit warnings.
@@ -49,7 +49,7 @@ A milestone is complete only when its implementation exists, required tests or v
 
 ## Current branch validation
 
-The M06–M21 implementation is on the feature branch and remains in draft PR #1; it is not merged into `main`. GitHub Actions run #115 passed on PR head `f611f937dccc158501a71ef592557a5630e9cbd9`: Python sidecar syntax check, npm install, lint, 53 unit tests across 12 files, typecheck, production build, and static artifact upload.
+The M06–M21 implementation is on the feature branch and remains in draft PR #1; it is not merged into `main`. GitHub Actions run #121 passed on PR head `7694345f7604c6aaf365b4b8602e563cf7611cd8`: Python sidecar syntax check, npm install, lint, 55 unit tests across 12 files, typecheck, production build, and static artifact upload.
 
 M09 is complete for selectable-text PDFs. Scanned/image-only PDF OCR is not included. M10 also has a regression test for starting a new scene when a chapter changes without an explicit scene heading. A live browser smoke test was attempted against the Vercel preview but the preview redirected to Vercel Authentication; without an authenticated browser profile, interactive UI validation of project restore, file import controls, scene editing, and the retained image extractor remains unverified.
 
@@ -67,4 +67,4 @@ Do not check a box until all required evidence is available.
 
 ## M12–M16 implementation and validation
 
-Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md), [docs/M17-M19.md](M17-M19.md), and [docs/M20-M21.md](M20-M21.md). CI run #115 passed lint, all 53 unit tests across 12 files, typecheck, production build, artifact upload, and Python syntax compilation. M12–M13 satisfy their automated completion evidence. M14–M16 implementation is committed; their checkboxes remain open pending a real local model/voice generate → playback → download smoke test. M17–M21 are complete on the feature branch with CI run #115 passing.
+Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md), [docs/M17-M19.md](M17-M19.md), and [docs/M20-M21.md](M20-M21.md). CI run #121 passed lint, all 55 unit tests across 12 files, typecheck, production build, artifact upload, and Python syntax compilation. M12–M13 satisfy their automated completion evidence. M14–M16 implementation is committed; their checkboxes remain open pending a real local model/voice generate → playback → download smoke test. M17–M21 are complete on the feature branch with CI run #121 passing.
