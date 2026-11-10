@@ -2,14 +2,14 @@
 
 **Last updated:** 2026-11-11  
 **Repository:** `somildholakia/GridSplit`  
-**Main branch:** `main` — latest commit `49eeb4eb24ee6b0e9a272f90ff23bd5b11079cdb`; latest deployed frontend runtime commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` (PR #12 after deployment changed documentation only)  
+**Main branch:** `main` — latest application code commit `ddf61f1026ed61d6ffd1ea9df44312eaacccb1b2`; deployed frontend runtime commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6`. Documentation-only commits may advance `main` without changing application code.  
 **Latest release record:** PR #11 — acceptance/deployment boundary  
 **Merged pull request:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
 
-Current `main` is `49eeb4eb24ee6b0e9a272f90ff23bd5b11079cdb`. The deployed frontend runtime is unchanged at `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6`; PR #12 after that deployment changed documentation only. M01–M34 implementation, the Python TTS lock/audit, sidecar-origin corrections, and 196-entry ZIP regression are merged.
+Current application code on `main` is `ddf61f1026ed61d6ffd1ea9df44312eaacccb1b2`. The deployed frontend runtime remains `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` because Vercel rejected the latest production deployment with HTTP 402 `api-deployments-free-per-day` and a 24-hour retry window. M01–M34 implementation, the Python TTS lock/audit, sidecar-origin corrections, local-media acceptance runner (PR #14), and exact 196-sample preset (PR #15) are merged.
 
 **Base Studio validation:** GitHub Actions run #199 passed on pre-merge commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`, including 9 Python tests, 91 Vitest tests across 18 files, ESLint, TypeScript typecheck, Vite production build, static artifact upload and production npm audit (0 vulnerabilities at the high-severity threshold). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). **Latest local-TTS dependency PR validation:** run #217 passed `uv lock --check`, `pip-audit --strict` (no known vulnerabilities found), 9 Python tests, 91 Vitest tests across 18 files, ESLint, typecheck, production build and artifact upload. [Open run #217](https://github.com/somildholakia/GridSplit/actions/runs/42865601179).
 
@@ -45,8 +45,8 @@ Current `main` is `49eeb4eb24ee6b0e9a272f90ff23bd5b11079cdb`. The deployed front
 - **M32:** Automated integration slice complete — script/sync/subtitle/mapping/timeline test and HTTP ZIP-to-MP4 local render test passed in run #199. Full browser-driven project export is still M36.
 - **M33:** Performance regression baseline complete — 500 scenes, 500 images, 1,000 clips under a 10-second test ceiling; renderer bounded to two active jobs/eight retained finished jobs. Real target-device/media profiling is still open.
 - **M34:** Complete on `main` via PR #3 (merge commit `e080b90eae670f0983840750fb41a7f08759717a`). The security review documents the renderer/TTS threat boundaries, loopback Host/Origin checks, archive validation and local storage. The optional TTS sidecar now has a committed cross-platform `local-tts/uv.lock` for Python 3.10–3.13, pinned `uv` 0.13.5 and development-only `pip-audit` 2.10.1; CI validates the lock with `uv lock --check` and scans the synchronized environment with `pip-audit --strict`. Runs #217 and #224 passed with no known Python dependency vulnerabilities plus the Python, frontend and build suites. Exact provenance/licenses of user-installed model/voice/phonemizer/FFmpeg assets remain external release checks.
-- **M35:** Complete — frontend runtime commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` is deployed READY to [gridsplit-kappa.vercel.app](https://gridsplit-kappa.vercel.app). Main now includes documentation-only PR #12 at `49eeb4eb24ee6b0e9a272f90ff23bd5b11079cdb`; no frontend code changed after the deployed runtime. (deployment `dpl_6nTrXw6ySQMUr9V36tWicjNzoB36`). Public smoke test on 2026-11-10 passed dashboard access, all four workspace navigations, two-scene script parsing, and Audio/Production Studio shell checks. Local TTS and real media processing were not run. [Latest smoke test](https://agent.tinyfish.ai/runs/4fead7de-4604-4b7d-9af8-e54a6424a381) · [CI run #235](https://github.com/somildholakia/GridSplit/actions/runs/42877426412).
-- **M36:** Open — target-device real-media workflow has not been completed. The exact 1536 × 864 sample has a documented manual correction map and an independent 196-crop diagnostic ZIP, but the deployed browser UI has not yet exported those crops. Real Kokoro generation/playback, image/timeline playback, MP4 export, media-inclusive archive restore and re-render remain pending.
+- **M35:** Base production deployment is READY at [gridsplit-kappa.vercel.app](https://gridsplit-kappa.vercel.app) on frontend runtime commit `9f43fc8dacebc4fdabdf77a7bbfc8d7719327cb6` (deployment `dpl_6nTrXw6ySQMUr9V36tWicjNzoB36`). Current main `ddf61f1` includes PR #15's exact 196-sample preset, but its production deployment was rejected with HTTP 402 `api-deployments-free-per-day` (retry after 24 hours); the preset is not live yet. The public smoke test passed on the previous runtime: dashboard access, all four workspace navigations and two-scene script parsing. Local TTS and real media processing were not run. [Latest smoke test](https://agent.tinyfish.ai/runs/4fead7de-4604-4b7d-9af8-e54a6424a381) · [CI run #248](https://github.com/somildholakia/GridSplit/actions/runs/42885061913).
+- **M36:** Open — the exact sample now has a SHA-256-gated no-AI preset in main that selects 196 crops, but it is not deployed yet and browser export/pixel review remain unverified. The independent diagnostic ZIP is not an app export. Real Kokoro generation/playback, image/timeline playback, MP4 export, media-inclusive archive restore and re-render remain pending.
 
 The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
 
@@ -68,7 +68,7 @@ The CI result verifies code and fixtures on GitHub's runner. The 196-entry ZIP t
 
 ## Current next steps
 
-M35 is deployed from current main and run #235 passed. The next acceptance gates are the browser's 196-crop sample export, the new `local-render/acceptance_check.py` target-device Kokoro/FFmpeg runner, real image/timeline playback, and a target-device browser MP4 export → archive restore → re-render pass. These require the user's installed local model/voice files and FFmpeg/ffprobe; setup is documented in [local-tts/README.md](../local-tts/README.md) and [local-render/README.md](../local-render/README.md).
+M35 is deployed from current main and run #235 passed. The next acceptance gates are deploying the merged 196-sample preset after Vercel's quota window, running `local-render/acceptance_check.py` on the target machine, then verifying the browser's 196-crop export, real image/timeline playback, and a browser MP4 export → archive restore → re-render pass. These require the user's installed local model/voice files and FFmpeg/ffprobe; setup is documented in [local-tts/README.md](../local-tts/README.md) and [local-render/README.md](../local-render/README.md).
 
 ## Operating rules
 
