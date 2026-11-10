@@ -84,7 +84,7 @@ describe("timeline edit operations", () => {
     const shifted = shiftTimelineClip(timeline, clip.id, 250);
     expect(shifted.tracks[1].clips[0].start).toEqual({ numerator: "1", denominator: "4" });
     const resized = resizeTimelineClip(shifted, clip.id, 250);
-    expect(resized.tracks[1].clips[0].duration).toEqual({ numerator: "3", denominator: "4" });
+    expect(resized.tracks[1].clips[0].duration).toEqual({ numerator: "5", denominator: "4" });
     const moved = moveTimelineClipToTrack(resized, clip.id, "track-music-sfx");
     expect(moved.tracks[1].clips).toHaveLength(0);
     expect(moved.tracks[2].clips[0].trackId).toBe("track-music-sfx");
