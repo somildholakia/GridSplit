@@ -56,7 +56,7 @@ export function sortSequence<T extends { name: string; relativePath: string }>(i
 export function analyseSequence(items: SequenceAsset[]): SequenceIssue[] {
   const issues: SequenceIssue[] = [];
   const numbered = items
-    .filter((item) => Number.isSafeInteger(item.sequenceNumber) && item.sequenceNumber !== null && item.sequenceNumber >= 0)
+    .filter((item) => item.sequenceNumber !== null && Number.isSafeInteger(item.sequenceNumber) && item.sequenceNumber >= 0)
     .sort((left, right) => left.sequenceNumber! - right.sequenceNumber! || left.order - right.order);
 
   const frameGroups = new Map<number, SequenceAsset[]>();
@@ -205,10 +205,10 @@ export function timelineDurationSeconds(clips: TimelineClip[]): number {
 
 export function imageClipAtTime(clips: TimelineClip[], timeSeconds: number): TimelineClip | undefined {
   if (!Number.isFinite(timeSeconds) || timeSeconds < 0) return undefined;
-  return clips
+  const matches = clips
     .filter((clip) => clip.track === "images"
       && timeSeconds >= clip.startSeconds
       && timeSeconds < clip.startSeconds + clip.durationSeconds)
-    .sort((left, right) => left.startSeconds - right.startSeconds || left.order - right.order)
-    .at(-1);
+    .sort((left, right) => left.startSeconds - right.startSeconds || left.order - right.order);
+  return matches[matches.length - 1];
 }
