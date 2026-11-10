@@ -19,6 +19,22 @@ From the repository root, allow the exact origin of the frontend tab. For the Vi
 
 For another local Vite address or an explicitly trusted static deployment, pass that exact origin with another --allow-origin argument. Do not add wildcard origins. Keep the sidecar running while rendering. It listens at http://127.0.0.1:8766.
 
+## Use the deployed GridSplit website
+
+You can use the public static frontend while rendering stays on your own computer. From the repository root, start the renderer with the exact production origin:
+
+```bash
+python local-render/server.py --allow-origin https://gridsplit-kappa.vercel.app
+```
+
+For local development, use `--allow-origin http://localhost:5173`. To use both the local development page and the public website, pass both flags:
+
+```bash
+python local-render/server.py --allow-origin http://localhost:5173 --allow-origin https://gridsplit-kappa.vercel.app
+```
+
+Keep the browser endpoint at `http://127.0.0.1:8766`. The production site does not proxy media to Vercel: the browser sends the archive directly to the loopback renderer on the same computer. Never bind the renderer to a LAN interface or configure a remote processing host.
+
 ## Security and privacy
 
 - The server binds to IPv4 loopback only; it does not listen on LAN interfaces.

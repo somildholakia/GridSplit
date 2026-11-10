@@ -31,6 +31,25 @@ uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
 
 Keep this terminal running. Open **Audio studio** in GridSplit, keep `http://127.0.0.1:8765`, and choose **Test connection**. The service reports missing/invalid model files rather than switching to a remote provider.
 
+## Use the deployed GridSplit website
+
+The frontend may be served from Vercel while synthesis remains on your own computer. The TTS process must still bind to `127.0.0.1`; add the **exact** production origin to its CORS allowlist before starting it.
+
+Windows PowerShell:
+
+```powershell
+$env:GRIDSPLIT_ALLOWED_ORIGINS = "https://gridsplit-kappa.vercel.app"
+uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
+```
+
+macOS/Linux:
+
+```bash
+GRIDSPLIT_ALLOWED_ORIGINS=https://gridsplit-kappa.vercel.app uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
+```
+
+For local development, the localhost origins are already allowed by the sidecar. Never use a wildcard origin or expose the TTS server to your LAN. In the public website, keep the Audio Studio endpoint at `http://127.0.0.1:8765`.
+
 ## Local API
 
 - `GET /health` — engine and model readiness

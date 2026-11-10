@@ -68,7 +68,7 @@ Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). 
 - A synthetic performance regression covers 500 scenes, 500 images and 1,000 timeline clips with a 10-second CI ceiling. The local renderer allows at most two active jobs and retains at most eight finished jobs for up to six hours.
 - The TTS sidecar validates loopback Host headers, and both sidecars validate their local request boundaries. The optional local TTS Python graph is pinned in `local-tts/uv.lock`; CI checks the lock with `uv lock --check` and audits the synchronized environment with `pip-audit --strict` (`pip-audit` remains dev-only). See [the security review](docs/SECURITY_REVIEW.md).
 
-**Release boundary:** M06–M34 implementation and the optional TTS Python lock/audit hardening are merged into `main` via PRs #1 and #3. Run #217 passed the committed lock check, `pip-audit --strict`, Python/frontend tests, lint, typecheck and build; final documentation-head CI run #224 also passed. M35 is deployed at [gridsplit-kappa.vercel.app](https://gridsplit-kappa.vercel.app); a public smoke test passed dashboard access, project creation/rename, two-scene script parsing, and Audio/Production Studio navigation. M14–M16 real Kokoro acceptance, M22–M25 real image/timeline acceptance, and M36 full-media export/restore/re-render remain open. Exact licensing of user-installed model/voice/FFmpeg assets remains a separate release check. See [the milestone checklist](docs/CHECKPOINTS.md) and [release gates](docs/M32-M36.md).
+**Release boundary:** M06–M34 implementation and the optional TTS Python lock/audit hardening are merged into `main` via PRs #1 and #3. Run #217 passed the committed lock check, `pip-audit --strict`, Python/frontend tests, lint, typecheck and build; final documentation-head CI run #224 also passed. M35 is deployed at [gridsplit-kappa.vercel.app](https://gridsplit-kappa.vercel.app); public browser checks passed dashboard access, project creation/rename, two-scene script parsing, all 16 production-workspace UI acceptance checks, and Audio/Production Studio navigation. These checks did not upload real media or run local sidecars. M14–M16 real Kokoro acceptance, M22–M25 real image/timeline playback acceptance, and M36 full-media export/restore/re-render remain open. Exact licensing of user-installed model/voice/FFmpeg assets remains a separate release check. See [the milestone checklist](docs/CHECKPOINTS.md) and [release gates](docs/M32-M36.md).
 
 ## Run locally
 
@@ -113,7 +113,7 @@ GridSplit is MIT licensed. The locally bundled PDF.js dependency is Apache-2.0; 
 
 GridSplit includes a character/voice workspace and an optional Kokoro ONNX local TTS provider. Follow [local-tts/README.md](local-tts/README.md) to set up the sidecar, then open **Audio studio** in an active project. Model and voice files are installed by the user and are not included in this repository. The browser calls only a loopback service; WAV blobs are stored in local IndexedDB.
 
-See [docs/M12-M16.md](docs/M12-M16.md) for milestones and limitations.
+See [docs/M12-M16.md](docs/M12-M16.md) for milestones and limitations. To use the public Vercel frontend with local TTS, allow the exact origin `https://gridsplit-kappa.vercel.app` using `GRIDSPLIT_ALLOWED_ORIGINS` before starting the loopback sidecar; see [the setup guide](local-tts/README.md).
 
 ## Local rendering and portable projects (M26–M31)
 
@@ -123,4 +123,4 @@ Install FFmpeg and ffprobe yourself, then from the repository root run:
 
     python local-render/server.py --allow-origin http://localhost:5173
 
-Use the exact browser origin for your frontend. The sidecar listens on 127.0.0.1 only and rejects origins outside its allowlist. See [local-render/README.md](local-render/README.md) and [docs/M26-M31.md](docs/M26-M31.md) for setup, archive contents and limits. GridSplit does not bundle FFmpeg or download codecs. The exact installed build must provide H.264 (libx264) and AAC encoding for the default MP4 export profile.
+Use the exact browser origin for your frontend. For the public website, run the sidecar with `--allow-origin https://gridsplit-kappa.vercel.app`; it still binds to 127.0.0.1 and media remains on your computer. See [local-render/README.md](local-render/README.md) and [docs/M26-M31.md](docs/M26-M31.md) for setup, archive contents and limits. GridSplit does not bundle FFmpeg or download codecs. The exact installed build must provide H.264 (libx264) and AAC encoding for the default MP4 export profile.

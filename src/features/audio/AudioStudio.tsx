@@ -215,9 +215,10 @@ export default function AudioStudio({ project, onUpdate }: Props) {
       <div className="audio-engine-config"><label>Local engine address<input value={endpointDraft} onChange={(event) => { setEndpointDraft(event.target.value); setEngineReady(false); setEngineMessage("Test the updated local engine address before generating."); }} spellCheck={false}/></label>
         <button className="audio-primary-button" onClick={() => { onUpdate({ ttsEndpoint: endpointDraft }); void checkEngine(); }}><RefreshCw size={14}/> Test connection</button></div>
       <p className="audio-engine-message"><ShieldCheck size={14}/>{engineMessage}</p>
-      <div className="audio-engine-help"><b>First-time setup</b><span>Install the optional local engine and download the model and voice files yourself. No weights are included in this app.</span>
-        <code>cd local-tts && uv sync</code><code>uv run uvicorn server:app --host 127.0.0.1 --port 8765</code>
-        <a href="https://github.com/somildholakia/GridSplit/tree/feat/m06-m11-studio-script-workflow/local-tts" target="_blank" rel="noreferrer">Setup guide in the repository</a></div>
+      <div className="audio-engine-help"><b>First-time setup</b><span>Install the optional local engine and install the model and voice files yourself. No weights are bundled. Run the commands from the repository root's local-tts folder.</span>
+        <code>cd local-tts && uv sync --locked --no-dev</code><code>uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765</code>
+        <span>For the deployed site, allow its exact browser origin before starting the sidecar. Windows PowerShell: <code>$env:GRIDSPLIT_ALLOWED_ORIGINS="https://gridsplit-kappa.vercel.app"</code>. macOS/Linux: prefix the server command with <code>GRIDSPLIT_ALLOWED_ORIGINS=https://gridsplit-kappa.vercel.app</code>.</span>
+        <a href="https://github.com/somildholakia/GridSplit/tree/main/local-tts" target="_blank" rel="noreferrer">Setup guide in the repository</a></div>
     </section>
 
     <section className="audio-panel">
