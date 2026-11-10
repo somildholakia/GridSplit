@@ -53,6 +53,16 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 - Added segment-level SRT and WebVTT export; word-level alignment is not claimed.
 - Added regression coverage for exact sample-derived accumulation and sub-second subtitle cue boundaries.
 
+## M22–M25 — Project images, scene mapping, measured schedule, and timeline
+
+- Added IndexedDB-backed project image storage, generated thumbnails, sequence-number correction, manual order controls, and issue review for gaps, repeated frame numbers, identical content, and unnumbered files.
+- Added safe shared-image handling so duplicated projects can retain the same source image blobs without deleting media still referenced elsewhere.
+- Added validated project image metadata, many-to-many scene mappings, and correct scene/mapping/clip remapping when projects are duplicated.
+- Added image/audio schedule construction from measured WAV durations and visible missing-media warnings.
+- Added a visual two-track timeline, ruler, playhead, current-frame preview, seek/play/pause/stop, clip start/duration editing, nudging, and local Web Audio scheduling of speech segments.
+- Added automated coverage for sequence parsing/review, mapping normalization, time-to-image selection, schedule distribution, project schema validation, and production-project duplication.
+- Manual browser playback and real model WAV validation remain open. The live timeline still stores second-based positions; mixing, transitions, effects, MP4 rendering, and media-inclusive portable packaging remain later milestones.
+
 ## M20–M21 — Extractor regression and image intake
 - Added flat-image fallback and uniform-grid boundary regression fixtures while retaining the existing detector/export flow.
 - Added multi-file and browser-supported folder intake, natural relative-path ordering, duplicate/type/size validation, and a removable intake queue.
