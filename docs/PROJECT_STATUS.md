@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-10  
 **Repository:** `somildholakia/GridSplit`  
 **Active branch:** `main`  
-**Current HEAD:** `8aa1d3e986bbbc36366b74856f1fc2b298f8ab3a`  
+**M05 verified implementation commit:** `8aa1d3e986bbbc36366b74856f1fc2b298f8ab3a`  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
