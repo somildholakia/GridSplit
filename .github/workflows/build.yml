@@ -33,6 +33,9 @@ jobs:
         run: npm ci --no-audit --no-fund
 
 
+      - name: Check optional TTS sidecar syntax
+        run: python -m py_compile local-tts/server.py
+
       - name: Lint
         run: npm run lint
 
