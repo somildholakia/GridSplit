@@ -155,10 +155,10 @@ A provider must not claim unsupported capabilities. A segment job is idempotent 
 
 ### 5.2 Engine decisions
 
-- **Evaluation candidate, not yet integrated:** Kokoro-82M ONNX with ONNX Runtime Web or a native ONNX Runtime host. The ONNX Community model card currently declares Apache-2.0 for the v1.0 ONNX model. The runtime, tokenizer/phonemizer dependencies, and each voice asset still require their own license/provenance review and offline compatibility testing.
+- **M03 evaluation candidate; M14 optional adapter now implemented:** Kokoro ONNX is connected through the separately installed `kokoro-onnx==0.6.1` Python sidecar, not bundled ONNX Runtime Web weights. The model/voice files remain user-supplied. The model, package, phonemizer/runtime dependencies, and each voice asset require separate license/provenance review and offline target-hardware testing.
 - **Optional external-provider candidate:** Piper's current OHF-Voice repository is GPL-3.0. The engine and each voice package must be assessed separately. Do not bundle it into the MIT app by default.
 - **Optional lightweight external-provider candidate:** eSpeak NG is GPL-3.0-or-later. It may be evaluated as an optional separately installed engine, but is not included in the default distribution until the product's copyleft policy and notices are reviewed.
-- **Decision:** Do not make a final TTS engine commitment in M03. M13/M14 must benchmark quality, language coverage, speed, memory, CPU/GPU support, alignment support, and model/voice license provenance on target hardware before adding a runtime or weights.
+- **M14 implementation boundary:** Kokoro is the first optional local adapter, not a universal/default runtime. Before treating it as release-ready, benchmark quality, language coverage, speed, memory, CPU/GPU support, and model/voice license provenance on target hardware. No model weights or voice packs are bundled.
 - **Decision:** The TTS interface itself remains engine-agnostic and free of network-provider dependencies.
 
 ## 6. Local rendering architecture
@@ -185,7 +185,7 @@ A provider must not claim unsupported capabilities. A segment job is idempotent 
 
 | Component/candidate | Upstream license/status observed | Project rule |
 |---|---|---|
-| Kokoro-82M v1.0 ONNX model | Apache-2.0 on the ONNX Community model card | Evaluation candidate; audit voices and preprocessing/runtime dependencies separately |
+| Kokoro-82M ONNX model | Apache-2.0 on the ONNX Community model card | Used by the optional M14 sidecar when user-installed; verify exact model/voice revisions and all runtime/phonemizer licenses |
 | ONNX Runtime Web | Browser inference runtime; source repository is MIT-licensed | Pin a reviewed version and check the runtime license/third-party notices during integration |
 | Piper (OHF-Voice) | GPL-3.0 | Do not bundle by default; engine and voice assets need separate review |
 | eSpeak NG | GPL-3.0-or-later | Do not bundle by default; review redistribution/compliance before optional integration |
