@@ -29,10 +29,26 @@ const EXCLUDED_SAMPLE_CELLS = new Set([
 
 export function is196SampleCandidateLayout(cells: CorrectionCell[]): boolean {
   if (cells.length !== 210 || cells.some((cell) => !cell.selected)) return false;
-  const counts = new Map<number, number>();
-  for (const cell of cells) counts.set(cell.row, (counts.get(cell.row) ?? 0) + 1);
-  if (counts.size !== EXPECTED_ROW_COUNTS.length) return false;
-  return EXPECTED_ROW_COUNTS.every((expected, row) => counts.get(row) === expected);
+  const byRow = new Map<number, CorrectionCell[]>();
+  for (const cell of cells) {
+    const row = byRow.get(cell.row) ?? [];
+    row.push(cell);
+    byRow.set(cell.row, row);
+  }
+  if (byRow.size !== EXPECTED_ROW_COUNTS.length) return false;
+  for (const [rowNumber, expected] of EXPECTED_ROW_COUNTS.entries()) {
+    const row = (byRow.get(rowNumber) ?? []).sort((a, b) => a.x - b.x);
+    if (row.length !== expected || row.some((cell, index) => cell.column !== index)) return false;
+  }
+
+  const firstRow = (byRow.get(0) ?? []).sort((a, b) => a.x - b.x);
+  const titleWidth = firstRow[0].width + firstRow[1].width;
+  return (
+    Math.abs(firstRow[0].x + firstRow[0].width - firstRow[1].x) <= 8
+    && titleWidth >= 150
+    && titleWidth <= 250
+    && Math.abs(firstRow[1].x + firstRow[1].width - firstRow[2].x) <= 8
+  );
 }
 
 /**
