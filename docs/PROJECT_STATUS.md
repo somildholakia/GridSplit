@@ -68,7 +68,7 @@ The CI result verifies code and fixtures on GitHub's runner. The 196-entry ZIP t
 
 ## Current next steps
 
-M35 is deployed from current main and run #235 passed. The next acceptance gates are the browser's 196-crop sample export, real Kokoro generation/playback/download, real image/timeline playback, and a target-device MP4 export → archive restore → re-render pass. These require the user's installed local model/voice files and FFmpeg/ffprobe; setup is documented in [local-tts/README.md](../local-tts/README.md) and [local-render/README.md](../local-render/README.md).
+M35 is deployed from current main and run #235 passed. The next acceptance gates are the browser's 196-crop sample export, the new `local-render/acceptance_check.py` target-device Kokoro/FFmpeg runner, real image/timeline playback, and a target-device browser MP4 export → archive restore → re-render pass. These require the user's installed local model/voice files and FFmpeg/ffprobe; setup is documented in [local-tts/README.md](../local-tts/README.md) and [local-render/README.md](../local-render/README.md).
 
 ## Operating rules
 
