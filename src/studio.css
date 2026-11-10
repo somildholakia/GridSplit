@@ -33,3 +33,6 @@
 .studio-button--primary{background:var(--gs-accent);color:var(--gs-accent-ink)}
 .studio-button--secondary{background:var(--gs-raised);color:var(--gs-text)}
 .studio-button--quiet{border-color:transparent;background:transparent;color:var(--gs-muted)}
+
+.scene-chapter-input{display:block;width:calc(100% - 24px);margin:4px 0 8px 24px;padding:4px 6px;border:1px solid #ffffff12;border-radius:4px;outline:0;background:#121e2d;color:#91a2b9;font-size:8px}
+.scene-chapter-input:focus{border-color:#c9ef7566;color:#d4dfed}
