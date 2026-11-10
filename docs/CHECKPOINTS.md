@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-11-10  
 **Audited baseline branch:** `main`  
-**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M16 scope)  
+**Active implementation branch:** `feat/m06-m11-studio-script-workflow` (M06–M21 scope)  
 **Open draft PR:** https://github.com/somildholakia/GridSplit/pull/1  
 **Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
@@ -26,11 +26,11 @@ A milestone is complete only when its implementation exists, required tests or v
 - [ ] **M14 — Local TTS integration.** Implementation added — optional loopback-only Kokoro ONNX sidecar, explicit CORS allowlist, and user-installed model/voice files. Python syntax passes CI; real model/voice synthesis smoke test remains.
 - [ ] **M15 — Segment generation.** Implementation added — per-block fingerprints, generation lifecycle, recovery, and IndexedDB WAV storage. Browser CI passes; live synthesis against an installed model remains to be exercised.
 - [ ] **M16 — Audio preview.** Implementation added — native local playback, sample-derived duration, and WAV download. Browser build/tests pass; review of a real model-generated WAV remains part of the on-device smoke test.
-- [ ] **M17 — Actual duration measurement.** Measure decoded audio durations using sample counts and sample rates.
-- [ ] **M18 — Synchronization metadata engine.** Generate versioned timeline, scene mapping, and project metadata from real media timing.
-- [ ] **M19 — Subtitle generation.** Generate SRT/VTT; support word timing only when alignment is trustworthy.
-- [ ] **M20 — Preserve and improve GridSplit.** Retain existing detector/export behavior and add regression coverage before deeper editing.
-- [ ] **M21 — Multi-image upload.** Support multi-file and folder selection where available.
+- [ ] **M17 — Actual duration measurement.** Implementation added: re-read locally stored WAV headers and derive exact rational duration from sample count/sample rate; automated validation pending.
+- [ ] **M18 — Synchronization metadata engine.** Implementation added: deterministic versioned sync JSON with rational segment/scene timing from measured WAV samples; automated validation pending.
+- [ ] **M19 — Subtitle generation.** Implementation added: segment-level SRT/VTT export; no word-level alignment is invented; automated validation pending.
+- [ ] **M20 — Preserve and improve GridSplit.** Existing detector/export flow retained; added flat-image fallback and even-grid regression fixtures; CI validation pending.
+- [ ] **M21 — Multi-image upload.** Implementation added: multi-file/folder selection, natural sorting, duplicate/size/type validation, removable queue, and local ordered ZIP/CSV export; CI validation pending.
 - [ ] **M22 — Image sequence management.** Add natural sorting, duplicates/gaps, previews, and correction tools.
 - [ ] **M23 — Scene-to-image mapping.** Support flexible one-to-many and many-to-one mappings.
 - [ ] **M24 — Automatic synchronization.** Create and recalculate image/audio schedules with explicit warnings.
@@ -67,4 +67,4 @@ Do not check a box until all required evidence is available.
 
 ## M12–M16 implementation and validation
 
-Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md). CI run #100 passed lint, all 42 unit tests across 9 files, typecheck, production build, artifact upload, and Python syntax compilation. M12–M13 satisfy their automated completion evidence. M14–M16 implementation is committed; their checkboxes remain open pending a real local model/voice generate → playback → download smoke test.
+Detailed implementation and setup instructions are in [docs/M12-M16.md](M12-M16.md), [docs/M17-M19.md](M17-M19.md), and [docs/M20-M21.md](M20-M21.md). CI run #100 passed lint, all 42 unit tests across 9 files, typecheck, production build, artifact upload, and Python syntax compilation. M12–M13 satisfy their automated completion evidence. M14–M16 implementation is committed; their checkboxes remain open pending a real local model/voice generate → playback → download smoke test.
