@@ -151,6 +151,7 @@ export function duplicateProject(
   now = new Date().toISOString(),
   namePrefix = "Copy of ",
 ): StudioProject {
+  const projectId = makeId();
   const sceneIds = new Map<string, string>();
   const blockIds = new Map<string, string>();
   const scenes = project.scenes.map((scene) => {
@@ -182,7 +183,7 @@ export function duplicateProject(
   });
   return {
     ...project,
-    id: makeId(),
+    id: projectId,
     name: `${namePrefix}${project.name}`,
     createdAt: now,
     updatedAt: now,
