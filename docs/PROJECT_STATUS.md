@@ -1,69 +1,90 @@
-# GridSplit — Project Status
+# GridSplit Studio — Project Status
 
-Last updated: 2026-11-09
+**Last updated:** 2026-11-10  
+**Repository:** `somildholakia/GridSplit`  
+**Active branch:** `main`  
+**Audited baseline:** `cfddbcfd22018da87002c93a8ebbdaaa229829cb`
 
 ## Current checkpoint
 
-**Row-aware extraction and manual tile correction committed on `main`.**
+**M01 complete — repository audit.**
 
-Current implementation is on `main`; use the repository history for the exact revision.
+The existing GridSplit repository was audited before runtime code changes. Repository metadata, source tree, application entry points, image detector, ZIP exporter, styling, package scripts, TypeScript configuration, license, GitHub Actions workflow, and previous project notes were inspected.
 
-## Product goal
+This completion applies only to M01. It does not claim that the original extractor's sample export or browser workflow has been manually validated.
 
-A static, browser-only utility that converts storyboard contact sheets and image grids into individual image crops. Do not use generative AI, machine learning, OCR, remote image-processing APIs, or an image-upload backend.
+## Repository baseline
 
-## Implemented
+- Public GitHub repository with push/admin permissions available to the project maintainer.
+- Only one branch was listed during the audit: `main`.
+- Existing license: MIT.
+- Existing frontend: React 18 + TypeScript + Vite.
+- Existing dependencies: React, React DOM, JSZip, and lucide-react.
+- No backend, cloud processing API, or model dependency exists in the audited source.
+- No test files, test runner, or test script were present in the audited tree.
+- No package lockfile was present in the audited tree.
 
-- React 18 + TypeScript + Vite application shell and responsive dark interface.
-- Local image loading through the browser File API.
-- Traditional luminance / contrast projection for horizontal row-band detection.
-- Per-row vertical separator analysis rather than one shared global column grid.
-- Normalized autocorrelation to estimate the tile pitch in each row.
-- Spacing-constrained dynamic programming to select plausible separators.
-- Dark, nearly uniform footer-band suppression.
-- Tile gallery with include/exclude selection.
-- Manual per-tile split and merge-with-next controls.
-- Uniform row/column fallback.
-- Adjustable border trim.
-- Custom filename prefix, start number, and zero-padding.
-- Sequential PNG cropping with JSZip download.
+See [ARCHITECTURE.md](../ARCHITECTURE.md) for the detailed baseline and proposed migration boundaries.
+
+## Existing functionality confirmed by source inspection
+
+- Browser-local contact-sheet upload and image decoding.
+- Canvas-based pixel/luminance analysis.
+- Horizontal row-band detection and independent per-row vertical boundary analysis.
+- Tile gallery with include/exclude controls.
+- Per-tile horizontal midpoint split and merge-with-next actions.
+- Uniform rows/columns fallback grid.
+- Adjustable crop border trim.
+- Sequential PNG crop generation and JSZip export.
 - CSV crop manifest and ZIP README.
-- Local-only image processing and filename-prefix sanitization.
-- MIT license and GitHub Actions build workflow.
+- Responsive dark interface and local-only processing design.
 
-## Sample-sheet investigation
+## Validation evidence
 
-The supplied storyboard sheet is 1536 × 864 pixels. A Python reference implementation of the row-wise scoring and boundary-selection logic found 13 image-bearing horizontal bands and identified the final 32-pixel strip as a dark footer rather than another image row.
+### GitHub Actions
 
-The reference probe produced approximately 210 candidate crop rectangles before manual review. This is a preliminary segmentation result, **not** proof that the requested final total of 196 has been achieved. The contact sheet contains title/continuation panels, repeated or irregular borders, and uneven row layouts. The app now provides per-tile split/merge and include/exclude controls for correction.
+The latest workflow run for the audited HEAD was successful on 2026-11-09. The Node 22 workflow completed:
+- `npm install`
+- `npm run typecheck`
+- `npm run build`
 
-The TypeScript application itself has not yet been run through a dependency install, TypeScript build, or browser end-to-end test in this environment. Do not mark the 196-image sample target complete until the website build runs and the exported ZIP is inspected.
+This is CI evidence for the checked-in TypeScript/Vite build only. No local runtime was used during this documentation-only audit. Browser interaction, manual crop correctness, ZIP inspection, and the complete audio/video workflow have not been independently validated.
 
-## Current limitations
+The workflow history also includes an earlier failed run for a prior commit; the latest run on the current audited HEAD is successful.
 
-- Separator detection remains heuristic and may select artwork edges or miss faint / interrupted borders.
-- Row-wise pitch estimation can be less reliable on short rows or highly irregular layouts.
-- Split divides a tile at its horizontal midpoint; Merge joins a tile to the next tile in the same row.
-- The current editor does not provide freehand boundary dragging or arbitrary crop handles.
-- One contact sheet is processed per session.
-- Production build and browser download flow still need verification.
+### Sample contact sheet
 
-## Next milestones
+The existing `docs/SAMPLE_ANALYSIS.md` records a 1536 × 864 sheet, 13 image-bearing bands, and approximately 210 preliminary crop regions against a desired 196. The target of 196 individual images remains unverified and must not be marked complete until the TypeScript implementation is run against the actual source sheet and the exported ZIP is inspected.
 
-1. Verify `npm install`, `npm run typecheck`, and `npm run build` in a Node 22 environment.
-2. Run the website against the supplied contact sheet; inspect the detected row bands and the 210 preliminary regions.
-3. Correct the segmentation to reach the expected 196 individual images, then export and inspect all files.
-4. Add automated fixtures for regular grids, merged title panels, variable row widths, footer strips, and dark fantasy images.
-5. Add draggable crop-boundary editing and batch upload.
-6. Configure Vercel deployment after the extraction workflow is verified.
+## Key gaps before the full studio vision
 
-## Local development
+- Single image/contact-sheet session only; no batch or folder upload.
+- No script editor or deterministic script/scene parser.
+- No project library, persistent project schema, or restoration.
+- No character/speaker manager or offline TTS engine.
+- No segment-level audio generation or actual audio-duration metadata.
+- No trusted word alignment, timeline metadata engine, or subtitle generation.
+- No scene/image mapping or automatic synchronization.
+- No multitrack timeline editor, waveform view, or mixing.
+- No FFmpeg/WebAssembly/native renderer or MP4 export.
+- No full production ZIP or end-to-end automated tests.
 
-```bash
-npm install
-npm run dev
-npm run typecheck
-npm run build
-```
+## Milestone state
 
-No milestone should be marked complete until implementation and verification are both done.
+- **M01:** Complete — repository audit recorded.
+- **M02–M36:** Not started.
+
+The detailed acceptance checklist is maintained in [docs/CHECKPOINTS.md](CHECKPOINTS.md).
+
+## Immediate next step
+
+M02: convert the supplied GridSplit Studio master prompt into a versioned `PRODUCT_REQUIREMENTS.md` with explicit functional requirements, non-functional requirements, privacy rules, compatibility constraints, and acceptance criteria. Do not begin a broad UI rewrite before M02 and M03 are reviewed and recorded.
+
+## Operating rules
+
+- Preserve the existing extractor and keep source assets on-device.
+- No paid APIs, mandatory subscriptions, or usage-based cloud processing.
+- Verify every engine, model, voice, and bundled asset license before adoption.
+- Keep the project schema and export package portable and versioned.
+- Record real test results; never infer success from code or mock screens.
+- Update the status, checkpoint list, architecture, and changelog as implementation progresses.
