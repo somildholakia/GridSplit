@@ -9,7 +9,7 @@
 
 ## Current checkpoint
 
-**M05 remains the verified `main` baseline. M06–M13 are implemented and CI-verified on PR #1. M14–M16 code is implemented; real model-backed audio verification remains environment-dependent.**
+**M05 remains the verified `main` baseline. M06–M13 are implemented and CI-verified on PR #1. M14–M16 implementation is committed and passes browser CI; real model-backed audio verification remains environment-dependent.**
 
 M01–M05 remain complete on `main`. The GridSplit Studio branch adds the production workspace, project management, script parsing, and manual scene editing while retaining the existing image extractor. The branch is not merged.
 
@@ -26,7 +26,7 @@ M01–M05 remain complete on `main`. The GridSplit Studio branch adds the produc
 - **M09:** Complete on PR #1 — paste, TXT, DOCX, and selectable-text PDF import are implemented locally in the browser; PDF.js worker is bundled with the app. OCR for scanned PDFs is explicitly out of scope.
 - **M10:** Complete on PR #1 — deterministic chapter/scene/paragraph parser with narration, dialogue, SFX, and music markers.
 - **M11:** Complete on PR #1 — editable chapters/scenes/blocks, scene and block reordering, cross-scene moves, split, and merge controls.
-- **M12:** Complete on PR #1 — stable narrator/dialogue identities and per-character voice/language/speed. CI #98 passed.
+- **M12:** Complete on PR #1 — stable narrator/dialogue identities and per-character voice/language/speed. CI #100 passed.
 - **M13:** Complete on PR #1 — engine-agnostic local TTS provider, voice/health contracts, abortable requests, WAV metadata parser, and loopback endpoint guard. CI #98 passed.
 - **M14:** Implemented on PR #1 — optional Kokoro ONNX FastAPI loopback sidecar and explicit trusted-origin CORS allowlist. Python syntax passes CI; real model/voice synthesis is not yet verified.
 - **M15:** Implemented on PR #1 — fingerprinted per-block generation, cancellation/retry/regenerate, interrupted-state recovery, and IndexedDB WAV storage. Browser CI passes; live model generation is pending.
@@ -92,7 +92,7 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 
 ## Next step
 
-**M14 — Local engine smoke test.** Install Kokoro ONNX and the matching voice file on a target machine, run the optional sidecar, and verify one generate/playback/download cycle. Then proceed to M17 timeline duration correction.
+**Remaining M14–M16 acceptance test:** install Kokoro ONNX and the matching voice file on a target machine, run the optional sidecar, and verify one generate → playback → WAV-download cycle. The repository implementation and CI are updated through M16; this machine-specific test is not represented as passed.
 
 ## Operating rules
 
@@ -104,11 +104,11 @@ The committed `package-lock.json` is lockfile version 3. CI uses `npm ci` with n
 - Update the status, checkpoint list, architecture, and changelog after each milestone.
 
 
-## M06–M11 implementation on PR #1
+## M06–M16 implementation on PR #1
 
 **Branch:** `feat/m06-m11-studio-script-workflow`  
 **Pull request:** https://github.com/somildholakia/GridSplit/pull/1  
-**Latest implementation head verified by CI:** `958a39ec4e3f0d6f00ba3691c620de41b6542d60`  
+**Latest implementation head verified by CI:** `4bc195b7201e2d170a3f6d32667db7b885478b46`  
 **PR state:** open, draft, mergeable; not merged into `main`.
 
 ### Delivered
@@ -144,6 +144,8 @@ The first CI attempt exposed a TypeScript control-flow issue in the parser's cha
 
 M06–M11 are checked in `docs/CHECKPOINTS.md` based on implementation and CI evidence. M09 automated tests cover DOCX extraction, PDF selectable-text extraction, text-free/scanned PDF handling, and invalid PDF input. Live UI validation remains blocked by Vercel Authentication.
 
-## M12–M16 implementation notes
+## M12–M16 implementation notes and CI evidence
 
 See [docs/M12-M16.md](M12-M16.md). Existing project records remain compatible because audio fields are optional. Audio binaries live in IndexedDB, not localStorage. Project copies receive new nested character/segment IDs and segment scene/block references are remapped; generated audio output is reset to pending rather than shared. The loopback sidecar does not fetch or redistribute model files.
+
+**Final PR head:** `4bc195b7201e2d170a3f6d32667db7b885478b46`. **GitHub Actions run #100 passed:** Python sidecar syntax check, ESLint, 42 tests across 9 files, TypeScript typecheck, production build, and static artifact upload. No real TTS model/voice package was available in the CI environment; therefore M14–M16 are implemented but remain open for the on-device synthesis/playback/download acceptance test.
