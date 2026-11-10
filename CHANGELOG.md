@@ -58,5 +58,6 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 - Added multi-file and browser-supported folder intake, natural relative-path ordering, duplicate/type/size validation, and a removable intake queue.
 - Added a 500-image batch cap and local ordered ZIP/CSV source bundle.
 - Added regression tests for nested-folder natural sorting and the documented batch limit.
-- GitHub Actions run #124 passed lint, 58 tests across 12 files, typecheck, production build, Python sidecar syntax check, and artifact upload.
+- GitHub Actions run #131 passed lint, 58 tests across 12 files, typecheck, production build, Python sidecar syntax check, and artifact upload.
 - The 196-image contact-sheet sample remains unverified; no manual review pass is claimed.
+- GitHub Actions run #131 passed on the feature branch: lint, 58 tests across 12 files, typecheck, production build, optional Python sidecar syntax check, and static artifact upload. [Run details](https://github.com/somildholakia/GridSplit/actions/runs/42817826847).
