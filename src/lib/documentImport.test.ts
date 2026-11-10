@@ -52,14 +52,14 @@ describe("local document text import", () => {
   });
 
   it("extracts selectable PDF text locally", async () => {
-    await expect(extractPdfText(createTextPdf("Scene 1: Arrival"))).resolves.toContain("Scene 1: Arrival");
+    await expect(extractPdfText(createTextPdf("Scene 1: Arrival"), { workerSrc: new URL("../../node_modules/pdfjs-dist/build/pdf.worker.mjs", import.meta.url).href })).resolves.toContain("Scene 1: Arrival");
   });
 
   it("reports scanned or text-free PDFs clearly", async () => {
-    await expect(extractPdfText(createTextPdf(""))).rejects.toThrow("No selectable text was found");
+    await expect(extractPdfText(createTextPdf(""), { workerSrc: new URL("../../node_modules/pdfjs-dist/build/pdf.worker.mjs", import.meta.url).href })).rejects.toThrow("No selectable text was found");
   });
 
   it("rejects non-PDF input", async () => {
-    await expect(extractPdfText(new Blob(["not a PDF"]))).rejects.toThrow("Could not read this PDF");
+    await expect(extractPdfText(new Blob(["not a PDF"]), { workerSrc: new URL("../../node_modules/pdfjs-dist/build/pdf.worker.mjs", import.meta.url).href })).rejects.toThrow("Could not read this PDF");
   });
 });
