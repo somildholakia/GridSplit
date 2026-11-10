@@ -83,7 +83,46 @@ describe("GridSplit project data", () => {
     expect(copy.source).toBe(fixture.source);
   });
 
-  it("moves blocks between adjacent scenes without losing them", () => {
+  it("remaps copied audio segment scene/block references and resets generated output", () => {
+    const audioProject: StudioProject = {
+      ...fixture,
+      characters: [{ id: "c1", name: "Narrator", voiceId: "af_heart", language: "en-us", speed: 1, narrator: true }],
+      audioSegments: [{
+        id: "a1", sceneId: "s1", blockId: "b1", fingerprint: "hash", status: "ready",
+        providerId: "kokoro-local", voiceId: "af_heart", language: "en-us", speed: 1,
+        sampleCount: 48000, sampleRate: 24000, channels: 1, durationSeconds: 2,
+        updatedAt: "2026-01-02T00:00:00.000Z",
+      }],
+    };
+    let nextId = 0;
+    const copy = duplicateProject(audioProject, () => `copy-${++nextId}`);
+    expect(copy.audioSegments).toHaveLength(1);
+    expect(copy.audioSegments?.[0]).toMatchObject({
+      status: "pending",
+      sceneId: copy.scenes[0].id,
+      blockId: copy.scenes[0].blocks[0].id,
+    });
+    expect(copy.audioSegments?.[0].id).not.toBe("a1");
+    expect(copy.audioSegments?.[0].sampleCount).toBeUndefined();
+    expect(copy.characters?.[0].id).not.toBe("c1");
+  });
+
+  it("recovers interrupted generation records when projects are restored", () => {
+    const interrupted = {
+      ...fixture,
+      audioSegments: [
+        { id: "a1", sceneId: "s1", blockId: "b1", fingerprint: "a", status: "generating",
+          providerId: "local", voiceId: "voice", language: "en-us", speed: 1, updatedAt: "now" },
+        { id: "a2", sceneId: "s1", blockId: "b1", fingerprint: "b", status: "generating",
+          providerId: "local", voiceId: "voice", language: "en-us", speed: 1, sampleCount: 24,
+          sampleRate: 24, channels: 1, durationSeconds: 1, updatedAt: "now" },
+      ],
+    };
+    const restored = parseStoredProjects(JSON.stringify([interrupted]))[0];
+    expect(restored.audioSegments?.map((item) => item.status)).toEqual(["pending", "ready"]);
+  });
+
+  it("moves blocks between adjacent scenes without losing them", () =>
     const moved = moveBlockAcrossScenes(twoScenes, 0, 1, 1);
     expect(moved[0].blocks.map((block) => block.id)).toEqual(["b1"]);
     expect(moved[1].blocks.map((block) => block.id)).toEqual(["b2", "b3"]);
