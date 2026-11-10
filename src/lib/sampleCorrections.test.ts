@@ -11,11 +11,12 @@ function candidateCells(): CorrectionCell[] {
     const count = row === 12 ? 18 : 16;
     const width = row === 12 ? 84 : 96;
     for (let column = 0; column < count; column += 1) {
+      const x = row === 0 && column >= 2 ? 180 + (column - 2) * width : column * width;
       cells.push({
         id: `${row}-${column}`,
         row,
         column,
-        x: column * width,
+        x,
         y: row * 70,
         width,
         height: 70,
