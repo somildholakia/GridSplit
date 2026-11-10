@@ -19,7 +19,7 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 ### Delivery boundary
 - CI build artifacts are downloadable static web builds, not production deployments.
 - PR #1 merged the M06–M34 implementation into `main` on 2026-11-10.
-- M35 production promotion is still open because Vercel's Hobby team exceeded the 100-deployments-per-24-hours API limit; the failed attempt returned HTTP 402. No billing or plan settings were changed.
+- M35 production deployment is complete: main commit `bc03f8b` is READY at `gridsplit-kappa.vercel.app`; the public dashboard/script/audio/production-shell smoke test passed.
 - M14–M16 real Kokoro acceptance, M22–M25 target-browser acceptance and M36 full-media archive acceptance remain open.
 - Real Kokoro model/voice synthesis, playback, and WAV download remain a target-device acceptance test.
 - No model, voice pack, TTS binary, FFmpeg binary, or native desktop runtime is bundled.
@@ -42,7 +42,7 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 ## M05 — CI/CD and automated validation
 - Added `package-lock.json`, clean `npm ci` installs, ESLint, Vitest, TypeScript typecheck, production build, and static build-artifact upload.
 - GitHub Actions run #15 passed: 3 test files / 11 tests, lint, typecheck, production build, and artifact upload.
-- Production deployment remains deferred to M35.
+- Production deployment M35 is complete on Vercel at `gridsplit-kappa.vercel.app`.
 
 ## M12–M16 — Character and local audio workflow
 - Added stable narrator/dialogue character records with voice, language, and speed preferences.
@@ -98,4 +98,4 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 - Limited simultaneous local render jobs to two and bounded finished-job retention to eight results/six hours, with temporary-directory pruning.
 - Added local TTS Host-header validation and regression tests. CI now audits production npm dependencies; run #199 passed with 0 vulnerabilities at the configured high-severity threshold.
 - GitHub Actions run #199 passed 9 Python tests, 91 Vitest tests across 18 files, ESLint, typecheck, Vite build, production npm audit and static artifact upload. [Run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750).
-- Production deployment (M35), real target-device Kokoro/timeline acceptance (M14–M16 and M22–M25), and inspection of a full package exported from the browser using representative media (M36) remain open.
+- Real target-device Kokoro/timeline acceptance (M14–M16 and M22–M25), and inspection of a full package exported from the browser using representative media (M36), remain open.
