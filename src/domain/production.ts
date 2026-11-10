@@ -191,6 +191,7 @@ export function buildGainAutomation(
   } else if (durationSeconds > points[points.length - 1].timeSeconds) {
     points.push({ timeSeconds: durationSeconds, gain });
   }
+  return points;
 }
 
 export function validateRenderProfile(profile: RenderProfile): RenderIssue[] {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDefaultAudioMixTracks } from "../domain/production";
+import { createDefaultAudioMixTracks, validateRenderProfile } from "../domain/production";
 import {
   createProjectBackup,
   duplicateProject,
@@ -172,7 +172,7 @@ describe("GridSplit project data", () => {
     expect(copy.renderProfile).toEqual(production.renderProfile);
 
     const invalid = { ...production, renderProfile: { ...production.renderProfile!, width: 1919 } };
-    expect(parseStoredProjects(JSON.stringify([invalid]))).toEqual([]);
+    expect(validateRenderProfile(invalid.renderProfile!)).toContainEqual(expect.objectContaining({ code: "odd-dimensions", severity: "error" }));
   });
 
   it("recovers interrupted generation records when projects are restored", () => {
