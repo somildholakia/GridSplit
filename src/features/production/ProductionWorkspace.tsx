@@ -108,7 +108,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const updateAssets=(next:SequenceAsset[])=>patchProject(onUpdate,{imageAssets:next});
   const updateMappings=(next:SceneImageMapping[])=>patchProject(onUpdate,{imageMappings:normalizeMappings(next,project.scenes.map(s=>s.id),assets.map(a=>a.id))});
   const addFiles=async(files:FileList|null)=>{
-    if(!files?.length)return;setBusy(true);setMessage("Reading images and storing originals locally…");
+    if(!files?.length||busy||assets.length>=MAX_PROJECT_IMAGES)return;setBusy(true);setMessage("Reading images and storing originals locally…");
     const savedIds:string[]=[];
     try{
       const valid=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=MAX_IMAGE_FILE_BYTES);
@@ -270,7 +270,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     </nav>
     {message&&<p className="production-message" role="status">{message}</p>}
     {activeTab==="sequence"&&<div className="production-section">
-      <div className="production-actions"><label className="production-button"><ImagePlus size={15}/> Add images<input type="file" accept="image/*" multiple onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/></label><button type="button" className="production-button" onClick={()=>folderRef.current?.click()}><ImagePlus size={15}/> Add folder</button><input ref={folderRef} type="file" accept="image/*" multiple hidden onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/><button className="production-button danger" disabled={!assets.length} onClick={()=>void clearAssets()}><Trash2 size={14}/> Clear all</button><span>{assets.length.toLocaleString()} / {MAX_PROJECT_IMAGES.toLocaleString()} images · originals stored locally</span></div>
+      <div className="production-actions"><label className="production-button" aria-disabled={busy||assets.length>=MAX_PROJECT_IMAGES}><ImagePlus size={15}/> Add images<input type="file" accept="image/*" multiple disabled={busy||assets.length>=MAX_PROJECT_IMAGES} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/></label><button type="button" className="production-button" disabled={busy||assets.length>=MAX_PROJECT_IMAGES} onClick={()=>folderRef.current?.click()}><ImagePlus size={15}/> Add folder</button><input ref={folderRef} type="file" accept="image/*" multiple hidden disabled={busy||assets.length>=MAX_PROJECT_IMAGES} onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/><button className="production-button danger" disabled={!assets.length||busy} onClick={()=>void clearAssets()}><Trash2 size={14}/> Clear all</button><span>{assets.length.toLocaleString()} / {MAX_PROJECT_IMAGES.toLocaleString()} images · originals stored locally</span></div>
        {pageControls}
       {issues.length>0&&<div className="production-issues"><b><AlertTriangle size={15}/> {issues.length} sequence issue(s) to review</b><ul>{issues.map((issue,i)=><li key={i}>{issue.message}</li>)}</ul></div>}
       {!assets.length?<div className="production-empty">Add your numbered storyboard images to start sequence management.</div>:<div className="production-assets">{pageAssets.map((asset,index)=><article className={"production-asset"+(issues.some(issue=>issue.assetIds.includes(asset.id))?" has-issue":"")} key={asset.id}>
