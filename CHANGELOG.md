@@ -7,6 +7,7 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 ## [Unreleased]
 
 ### Added
+- Added a cohesive editorial colour system across the dashboard, script editor, image splitter, audio studio, production timeline and mix/export workspace. The refresh uses warm paper surfaces, ink-toned typography, cobalt, coral, marigold and mint accents, plus responsive states; processing and local-storage workflows are unchanged.
 - Added an exact-file, non-AI correction preset for the supplied 1536 × 864 storyboard sheet. The detector layout is 209 candidates (15 / 16 × 11 / 18); the preset excludes the title, 11 repeated-number panels and continuation card to leave 196 selected images.
 - Added a target-device acceptance runner for real local Kokoro WAV synthesis, exact-origin loopback sidecar checks, local FFmpeg rendering and ffprobe output validation.
 - M01 repository audit documentation in `ARCHITECTURE.md`.
