@@ -121,11 +121,11 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     setEngineMessage("Checking the Kokoro engine…"); setEngineReady(false);
     try {
       const status = await provider.check();
-      if (!status.ready) { setEngineMessage(status.message || "The local engine is reachable but its model files are not ready."); return; }
+      if (!status.ready) { setEngineMessage(status.message || "The TTS engine is reachable but its model files are not ready."); return; }
       const available = await provider.listVoices();
       setVoices(available); setEngineReady(true);
       setEngineMessage(`${status.engine}${status.model ? ` · ${status.model}` : ""} is ready · ${available.length} voices detected.`);
-    } catch (error) { setEngineMessage(error instanceof Error ? error.message : "Could not connect to the local TTS engine."); }
+    } catch (error) { setEngineMessage(error instanceof Error ? error.message : "Could not connect to the TTS engine."); }
   };
 
   const generate = async (segment: StudioAudioSegment) => {
@@ -213,7 +213,7 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     <section className="audio-panel">
       <div className="audio-panel-title"><div><span className="audio-step">M13–M14</span><div><h2>Kokoro engine</h2><p>Use the local sidecar or an explicitly configured HTTPS Cloudflare Quick Tunnel for a temporary Colab GPU.</p></div></div>
         <span className={engineReady ? "audio-engine-state ready" : "audio-engine-state"}>{engineReady ? <CheckCircle2 size={13}/> : <Server size={13}/>} {engineReady ? "Ready" : "Not connected"}</span></div>
-      <div className="audio-engine-config"><label>Engine address<input value={endpointDraft} onChange={(event) => { setEndpointDraft(event.target.value); setEngineReady(false); setEngineMessage("Test the updated local engine address before generating."); }} spellCheck={false}/></label>
+      <div className="audio-engine-config"><label>Engine address<input value={endpointDraft} onChange={(event) => { setEndpointDraft(event.target.value); setEngineReady(false); setEngineMessage("Test the updated engine address before generating."); }} spellCheck={false}/></label>
         <button className="audio-primary-button" onClick={() => { onUpdate({ ttsEndpoint: endpointDraft }); void checkEngine(); }}><RefreshCw size={14}/> Test connection</button></div>
       <p className="audio-engine-message"><ShieldCheck size={14}/>{engineMessage}</p>
       {remoteGpu && <p className="audio-remote-warning" role="note">Temporary remote GPU mode: narration and dialogue text are sent over HTTPS to the configured Colab runtime. Generated WAV files and project data remain in this browser. The Quick Tunnel is unauthenticated while active, so stop its tunnel and Colab runtime when you finish.</p>}
@@ -249,7 +249,7 @@ export default function AudioStudio({ project, onUpdate }: Props) {
                   onClick={() => void generate(segment)}>{ready ? <><RotateCcw size={13}/> Regenerate</> : segment.status === "failed"
                     ? <><RefreshCw size={13}/> Retry</> : <><Sparkles size={13}/> Generate audio</>}</button>}
               {ready && <span className="audio-generated-note"><CheckCircle2 size={13}/> Saved in this browser</span>}
-              {segment.status !== "ready" && !engineReady && <span className="audio-disabled-note">Connect the local engine to generate.</span>}
+              {segment.status !== "ready" && !engineReady && <span className="audio-disabled-note">Connect the TTS engine to generate.</span>}
             </div>
           </article>;
         })}
