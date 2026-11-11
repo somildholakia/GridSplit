@@ -38,14 +38,13 @@ async function errorMessage(response: Response): Promise<string> {
 }
 /** Kokoro adapter for loopback sidecars and explicitly selected HTTPS Cloudflare Quick Tunnels. */
 export class KokoroLocalProvider implements LocalTtsProvider {
-  readonly id: string;
+  readonly id = "kokoro-local";
   readonly label: string;
   private readonly endpoint: string;
   constructor(endpoint: string) {
     this.endpoint = normalizeLocalEndpoint(endpoint);
-    const remoteGpu = isCloudflareQuickTunnelEndpoint(this.endpoint);
-    this.id = remoteGpu ? "kokoro-cloudflare" : "kokoro-local";
-    this.label = remoteGpu ? "Kokoro ONNX · temporary GPU" : "Kokoro ONNX · local";
+    this.label = isCloudflareQuickTunnelEndpoint(this.endpoint)
+      ? "Kokoro ONNX · temporary GPU" : "Kokoro ONNX · local";
   }
   async check(): Promise<TtsEngineStatus> {
     const response = await fetch(`${this.endpoint}/health`, { cache: "no-store" });
