@@ -13,6 +13,7 @@ import {StudioPanelHeader} from "./components/studio/StudioPanelHeader";
 import {extractDocxText,extractPdfText} from "./lib/documentImport";
 import {PROJECT_STORAGE_KEY,createProjectBackup,duplicateProject,mergeSceneWithPrevious,moveBlockAcrossScenes,moveItem,parseProjectBackup,readStoredProjects,splitSceneAfterBlock,type StudioProject} from "./lib/projectStore";
 import "./studio.css";
+import "./theme.css";
 type Project=StudioProject;
 type View="dashboard"|"script"|"audio"|"extractor"|"production";
 const KEY=PROJECT_STORAGE_KEY,stamp=()=>new Date().toISOString();
