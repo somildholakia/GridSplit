@@ -31,7 +31,7 @@ function blockForSegment(project: StudioProject, segment: StudioAudioSegment) {
 
 export default function AudioStudio({ project, onUpdate }: Props) {
   const [endpointDraft, setEndpointDraft] = useState(project.ttsEndpoint ?? DEFAULT_TTS_ENDPOINT);
-  const [engineMessage, setEngineMessage] = useState("Local engine not checked yet.");
+  const [engineMessage, setEngineMessage] = useState("Engine not checked yet.");
   const [engineReady, setEngineReady] = useState(false);
   const [voices, setVoices] = useState<TtsVoice[]>(DEFAULT_VOICES);
   const [newCharacter, setNewCharacter] = useState("");
