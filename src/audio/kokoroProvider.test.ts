@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { normalizeLocalEndpoint } from "./kokoroProvider";
+import { describe, expect, it, vi } from "vitest";
+import { KokoroLocalProvider, normalizeLocalEndpoint } from "./kokoroProvider";
 
 describe("Kokoro TTS endpoint allowlist", () => {
   it("accepts loopback endpoints and removes trailing paths", () => {
@@ -13,6 +13,28 @@ describe("Kokoro TTS endpoint allowlist", () => {
       .toBe("https://dentists-holes-nikon-tourist.trycloudflare.com");
     expect(normalizeLocalEndpoint("https://example.trycloudflare.com/tts/"))
       .toBe("https://example.trycloudflare.com/tts");
+  });
+
+  it("labels an explicit Quick Tunnel as a temporary GPU provider", () => {
+    expect(new KokoroLocalProvider("https://demo.trycloudflare.com").id).toBe("kokoro-cloudflare");
+    expect(new KokoroLocalProvider("http://127.0.0.1:8765").id).toBe("kokoro-local");
+  });
+
+  it("normalizes string voice IDs returned by the Colab Kokoro API", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ voices: ["af_heart", "bf_emma", "hm_psi"] }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )));
+    try {
+      const voices = await new KokoroLocalProvider("https://demo.trycloudflare.com").listVoices();
+      expect(voices).toEqual([
+        { id: "af_heart", name: "Heart", language: "en-us", languageName: "American English" },
+        { id: "bf_emma", name: "Emma", language: "en-gb", languageName: "British English" },
+        { id: "hm_psi", name: "Psi", language: "hi", languageName: "Hindi" },
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("rejects arbitrary remote hosts, LAN addresses, insecure tunnels, and credentials", () => {
