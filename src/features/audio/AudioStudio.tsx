@@ -4,7 +4,7 @@ import type { StudioProject } from "../../lib/projectStore";
 import { ensureSpeakerCharacters, reconcileAudioSegments, updateAudioSegment } from "../../lib/audioWorkflow";
 import { deleteGeneratedAudio, readGeneratedAudio, saveGeneratedAudio } from "../../audio/audioStore";
 import { DEFAULT_TTS_ENDPOINT, type StudioAudioSegment, type StudioCharacter, type TtsVoice } from "../../audio/types";
-import { KokoroLocalProvider } from "../../audio/kokoroProvider";
+import { isCloudflareQuickTunnelEndpoint, KokoroLocalProvider } from "../../audio/kokoroProvider";
 import "./audio-studio.css";
 
 type Props = { project: StudioProject; onUpdate: (patch: Partial<StudioProject>) => void };
@@ -44,7 +44,7 @@ export default function AudioStudio({ project, onUpdate }: Props) {
   const provider = useMemo(() => {
     try { return new KokoroLocalProvider(endpointDraft); } catch { return null; }
   }, [endpointDraft]);
-  const remoteGpu = provider?.id === "kokoro-cloudflare";
+  const remoteGpu = Boolean(provider && isCloudflareQuickTunnelEndpoint(endpointDraft));
   const characters = project.characters ?? [];
   const segments = project.audioSegments ?? [];
 
