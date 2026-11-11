@@ -4,6 +4,7 @@ import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore"
 import { readGeneratedAudio } from "../../audio/audioStore";
 import ProductionTools from "./ProductionTools";
 import { measureWavBlob } from "../../lib/mediaTimeline";
+import { buildRulerTicks, formatTimelineTime, IMAGE_PAGE_SIZE, MAX_IMAGE_FILE_BYTES, MAX_PROJECT_IMAGES, timelinePixelsPerSecond as getTimelinePixelsPerSecond } from "../../domain/capacity";
 import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
 import "./production-workspace.css";
 
@@ -55,7 +56,7 @@ async function dimensions(file:File):Promise<{width:number;height:number}>{
   try{const bitmap=await createImageBitmap(file);const result={width:bitmap.width,height:bitmap.height};bitmap.close();return result;}catch{return {width:0,height:0};}
 }
 function patchProject(onUpdate:Props["onUpdate"],patch:Partial<ProductionProject>){onUpdate({...patch} as Partial<StudioProject>);}
-function seconds(value:number){return Math.floor(value/60)+":"+((value%60).toFixed(1)).padStart(4,"0");}
+function seconds(value:number){return formatTimelineTime(value);}
 
 export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:Props){
   const data=project as ProductionProject;
@@ -71,16 +72,22 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const folderRef=useRef<HTMLInputElement>(null);
   useEffect(()=>{folderRef.current?.setAttribute("webkitdirectory","");folderRef.current?.setAttribute("directory","");},[]);
   const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline"|"tools">("sequence");
+  const [imagePage,setImagePage]=useState(0);
   const issues=useMemo(()=>analyseSequence(assets),[assets]);
   const timelineDuration=timelineDurationSeconds(clips);
-  const timelineWidth=Math.max(600,Math.ceil(timelineDuration*TIMELINE_PIXELS_PER_SECOND));
+  const timelineScale=getTimelinePixelsPerSecond(timelineDuration);
+  const timelineWidth=Math.max(600,Math.ceil(timelineDuration*timelineScale));
   const currentImageClip=imageClipAtTime(clips,playheadSeconds);
   const currentImage=currentImageClip?assets.find(asset=>asset.id===currentImageClip.assetId):undefined;
-  const rulerTicks=Array.from({length:Math.floor(timelineDuration/5)+1},(_,index)=>index*5);
-  if(timelineDuration>0&&rulerTicks[rulerTicks.length-1]!==timelineDuration)rulerTicks.push(timelineDuration);
+  const rulerTicks=buildRulerTicks(timelineDuration);
+  const pageCount=Math.max(1,Math.ceil(assets.length/IMAGE_PAGE_SIZE));
+  const pageIndex=Math.min(imagePage,pageCount-1);
+  const pageAssets=useMemo(()=>assets.slice(pageIndex*IMAGE_PAGE_SIZE,(pageIndex+1)*IMAGE_PAGE_SIZE),[assets,pageIndex]);
+  const thumbnailAssets=useMemo(()=>{const byId=new Map(pageAssets.map(asset=>[asset.id,asset]));if(currentImage)byId.set(currentImage.id,currentImage);return [...byId.values()];},[pageAssets,currentImage?.id]);
+  const pageControls=assets.length>IMAGE_PAGE_SIZE?<div className="production-pagination"><span>Showing {pageIndex*IMAGE_PAGE_SIZE+1}–{Math.min(assets.length,(pageIndex+1)*IMAGE_PAGE_SIZE)} of {assets.length.toLocaleString()} images</span><div><button type="button" disabled={pageIndex===0} onClick={()=>setImagePage(value=>Math.max(0,value-1))}>Previous</button><span>Page {pageIndex+1} / {pageCount}</span><button type="button" disabled={pageIndex>=pageCount-1} onClick={()=>setImagePage(value=>Math.min(pageCount-1,value+1))}>Next</button></div></div>:null;
   useEffect(()=>{
     let alive=true;const urls:Record<string,string>={};let missing=0;
-    void Promise.all(assets.map(async asset=>{
+    void Promise.all(thumbnailAssets.map(async asset=>{
       try{
         const blob=await readImage(asset.id);
         if(blob)urls[asset.id]=URL.createObjectURL(blob);else missing+=1;
@@ -92,7 +99,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
       }else Object.values(urls).forEach(URL.revokeObjectURL);
     });
     return()=>{alive=false;Object.values(urls).forEach(URL.revokeObjectURL);};
-  },[assets.map(a=>a.id).join("|")]);
+  },[thumbnailAssets.map(a=>a.id).join("|")]);
   useEffect(()=>{
     let alive=true;const urls:Record<string,string>={};
     void Promise.all((project.audioSegments??[]).filter(s=>s.status==="ready").map(async s=>{const blob=await readGeneratedAudio(project.id,s.id);if(blob)urls[s.id]=URL.createObjectURL(blob);}))
@@ -105,18 +112,28 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     if(!files?.length)return;setBusy(true);setMessage("Reading images and storing originals locally…");
     const savedIds:string[]=[];
     try{
-      const valid=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=100*1024*1024);
-      const accepted=valid.slice(0,Math.max(0,500-assets.length));
+      const valid=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=MAX_IMAGE_FILE_BYTES);
+      const accepted=valid.slice(0,Math.max(0,MAX_PROJECT_IMAGES-assets.length));
       const rejected=files.length-accepted.length;
       const additions:SequenceAsset[]=[];
       const ordered=sortSequence(accepted.map(f=>({name:f.name,relativePath:(f as File&{webkitRelativePath?:string}).webkitRelativePath||f.name,file:f})));
-      for(const item of ordered){
-        const file=item.file,id=crypto.randomUUID(),hash=await fingerprint(file);
-        const size=await dimensions(file);await saveImage(id,file);savedIds.push(id);
-        additions.push({id,name:file.name,relativePath:item.relativePath,mimeType:file.type,bytes:file.size,sequenceNumber:extractSequenceNumber(file.name),order:assets.length+additions.length,width:size.width,height:size.height,fingerprint:hash});
+      const incomingBytes=ordered.reduce((total,item)=>total+item.file.size,0);
+      const storage=await navigator.storage?.estimate();
+      if(storage?.quota&&storage.usage!==undefined&&storage.usage+incomingBytes>storage.quota*0.92)
+        throw new Error("This browser is close to its local storage quota. Free up device/browser storage or import a smaller batch, then retry.");
+      for(let index=0;index<ordered.length;index+=12){
+        const batch=ordered.slice(index,index+12);
+        for(const item of batch){
+          const file=item.file,id=crypto.randomUUID(),hash=await fingerprint(file);
+          const size=await dimensions(file);await saveImage(id,file);savedIds.push(id);
+          additions.push({id,name:file.name,relativePath:item.relativePath,mimeType:file.type,bytes:file.size,sequenceNumber:extractSequenceNumber(file.name),order:assets.length+additions.length,width:size.width,height:size.height,fingerprint:hash});
+        }
+        setMessage("Importing images locally… "+additions.length+" / "+ordered.length+" in this batch.");
+        await new Promise<void>(resolve=>window.setTimeout(resolve,0));
       }
       updateAssets([...assets,...additions].map((a,index)=>({...a,order:index})));
-      setMessage("Added "+additions.length+" image(s)."+(rejected?" Rejected "+rejected+" file(s): unsupported, empty, oversized, or beyond the 500-image project limit.":""));
+      if(additions.length)setImagePage(Math.floor((assets.length+additions.length-1)/IMAGE_PAGE_SIZE));
+      setMessage("Added "+additions.length.toLocaleString()+" image(s)."+(rejected?" Rejected "+rejected.toLocaleString()+" file(s): unsupported, empty, oversized, or beyond the "+MAX_PROJECT_IMAGES.toLocaleString()+"-image project limit.":""));
     }catch(error){
       await Promise.all(savedIds.map(id=>deleteImage(id).catch(()=>undefined)));
       setMessage(error instanceof Error?error.message:"Could not import these images.");
@@ -254,17 +271,18 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     </nav>
     {message&&<p className="production-message" role="status">{message}</p>}
     {activeTab==="sequence"&&<div className="production-section">
-      <div className="production-actions"><label className="production-button"><ImagePlus size={15}/> Add images<input type="file" accept="image/*" multiple onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/></label><button type="button" className="production-button" onClick={()=>folderRef.current?.click()}><ImagePlus size={15}/> Add folder</button><input ref={folderRef} type="file" accept="image/*" multiple hidden onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/><button className="production-button danger" disabled={!assets.length} onClick={()=>void clearAssets()}><Trash2 size={14}/> Clear all</button><span>{assets.length} images · thumbnails and originals stored locally</span></div>
+      <div className="production-actions"><label className="production-button"><ImagePlus size={15}/> Add images<input type="file" accept="image/*" multiple onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/></label><button type="button" className="production-button" onClick={()=>folderRef.current?.click()}><ImagePlus size={15}/> Add folder</button><input ref={folderRef} type="file" accept="image/*" multiple hidden onChange={e=>{void addFiles(e.target.files);e.currentTarget.value="";}}/><button className="production-button danger" disabled={!assets.length} onClick={()=>void clearAssets()}><Trash2 size={14}/> Clear all</button><span>{assets.length.toLocaleString()} / {MAX_PROJECT_IMAGES.toLocaleString()} images · originals stored locally</span></div>
+       {pageControls}
       {issues.length>0&&<div className="production-issues"><b><AlertTriangle size={15}/> {issues.length} sequence issue(s) to review</b><ul>{issues.map((issue,i)=><li key={i}>{issue.message}</li>)}</ul></div>}
-      {!assets.length?<div className="production-empty">Add your numbered storyboard images to start sequence management.</div>:<div className="production-assets">{assets.map((asset,index)=><article className={"production-asset"+(issues.some(issue=>issue.assetIds.includes(asset.id))?" has-issue":"")} key={asset.id}>
+      {!assets.length?<div className="production-empty">Add your numbered storyboard images to start sequence management.</div>:<div className="production-assets">{pageAssets.map((asset,index)=><article className={"production-asset"+(issues.some(issue=>issue.assetIds.includes(asset.id))?" has-issue":"")} key={asset.id}>
         {thumbs[asset.id]?<img src={thumbs[asset.id]} alt={asset.name}/>:<div className="production-thumb-placeholder">Preview</div>}
         <div className="production-asset-info"><b>{asset.name}</b><small>{asset.width&&asset.height?asset.width+" × "+asset.height+" · ":""}{(asset.bytes/1024).toFixed(0)} KB</small>{issues.filter(issue=>issue.assetIds.includes(asset.id)).map((issue,i)=><small className="production-asset-issue" key={i}>{issue.kind==="gap"?"Sequence gap · review":issue.kind==="duplicate"?"Duplicate · review":"Unnumbered · review"}</small>)}<label>Frame number<input aria-label={"Frame number for "+asset.name} value={asset.sequenceNumber??""} placeholder="Unnumbered" onChange={e=>setFrameNumber(asset.id,e.target.value)}/></label></div>
-        <div className="production-asset-controls"><button title="Move earlier" disabled={index===0} onClick={()=>moveAsset(index,-1)}><ArrowUp size={14}/></button><button title="Move later" disabled={index===assets.length-1} onClick={()=>moveAsset(index,1)}><ArrowDown size={14}/></button><button title="Remove image" onClick={()=>void removeAsset(asset.id)}><Trash2 size={14}/></button></div>
-      </article>)}</div>}
+        <div className="production-asset-controls"><button title="Move earlier" disabled={pageIndex*IMAGE_PAGE_SIZE+index===0} onClick={()=>moveAsset(pageIndex*IMAGE_PAGE_SIZE+index,-1)}><ArrowUp size={14}/></button><button title="Move later" disabled={pageIndex*IMAGE_PAGE_SIZE+index===assets.length-1} onClick={()=>moveAsset(pageIndex*IMAGE_PAGE_SIZE+index,1)}><ArrowDown size={14}/></button><button title="Remove image" onClick={()=>void removeAsset(asset.id)}><Trash2 size={14}/></button></div>
+      </article>)}</div>}{pageControls}
       <p className="production-footnote">Repeated frame numbers and matching content fingerprints are flagged for review, not silently deleted. Correct frame numbers and visual order independently.</p>
     </div>}
     {activeTab==="mapping"&&<div className="production-section"><p className="production-help">Select any number of images for each scene. The same image may be reused in multiple scenes, and each scene may contain multiple images.</p>
-      {!assets.length||!project.scenes.length?<div className="production-empty">Add images and create scenes before mapping.</div>:project.scenes.map(scene=><article className="production-scene-map" key={scene.id}><header><b>{scene.title}</b><span>{mappedFor(scene.id).length} image(s)</span></header><div className="production-map-grid">{assets.map(asset=><label key={asset.id} className={mappedFor(scene.id).includes(asset.id)?"selected":""}>{thumbs[asset.id]?<img src={thumbs[asset.id]} alt=""/>:<span className="production-thumb-placeholder"/>}<input type="checkbox" checked={mappedFor(scene.id).includes(asset.id)} onChange={()=>toggleMapping(scene.id,asset.id)}/><span>{asset.name}</span></label>)}</div></article>)}
+      {!assets.length||!project.scenes.length?<div className="production-empty">Add images and create scenes before mapping.</div>:project.scenes.map(scene=><article className="production-scene-map" key={scene.id}><header><b>{scene.title}</b><span>{mappedFor(scene.id).length} image(s)</span></header><div className="production-map-grid">{pageAssets.map(asset=><label key={asset.id} className={mappedFor(scene.id).includes(asset.id)?"selected":""}>{thumbs[asset.id]?<img src={thumbs[asset.id]} alt=""/>:<span className="production-thumb-placeholder"/>}<input type="checkbox" checked={mappedFor(scene.id).includes(asset.id)} onChange={()=>toggleMapping(scene.id,asset.id)}/><span>{asset.name}</span></label>)}</div>{pageControls}</article>)}
     </div>}
     {activeTab==="timeline"&&<div className="production-section">
       <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Rebuild from measured audio"}</button><span>{clips.length} clips · {seconds(timelineDuration)} total</span></div>
@@ -276,9 +294,9 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
         </div>
         <div className="production-current-frame">{currentImage&&thumbs[currentImage.id]?<img src={thumbs[currentImage.id]} alt={"Current frame: "+currentImage.name}/>:<div className="production-current-placeholder">No image at this playhead position</div>}<div><b>{currentImage?.name??"Preview monitor"}</b><small>{currentImageClip?project.scenes.find(scene=>scene.id===currentImageClip.sceneId)?.title??"Scene":"Move the playhead to preview a frame"}</small></div></div>
         <div className="production-timeline-scroll"><div className="production-timeline-board" style={{width:timelineWidth+132}}>
-          <div className="production-visual-ruler"><b>TIME</b><div className="production-visual-lane" style={{width:timelineWidth}}>{rulerTicks.map((tick,index)=><span key={index} style={{left:tick*TIMELINE_PIXELS_PER_SECOND}}>{seconds(tick)}</span>)}</div></div>
-          {(["images","audio"] as const).map(track=><div className="production-visual-track" key={track}><b>{track==="images"?"IMAGE TRACK":"AUDIO TRACK"}</b><div className="production-visual-lane" style={{width:timelineWidth}}>{clips.filter(clip=>clip.track===track).map(clip=><button key={clip.id} className={"production-visual-clip "+track} style={{left:clip.startSeconds*TIMELINE_PIXELS_PER_SECOND,width:Math.max(30,clip.durationSeconds*TIMELINE_PIXELS_PER_SECOND)}} title={track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Image clip"):"Scene audio · "+(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene")} onClick={()=>seekTimeline(clip.startSeconds)}>{track==="images"&&clip.assetId&&thumbs[clip.assetId]?<img src={thumbs[clip.assetId]} alt=""/>:null}<span>{track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene audio")}</span></button>)}</div></div>)}
-          <div className="production-visual-playhead" style={{left:132+playheadSeconds*TIMELINE_PIXELS_PER_SECOND}}/>
+          <div className="production-visual-ruler"><b>TIME</b><div className="production-visual-lane" style={{width:timelineWidth,backgroundSize:`${Math.max(8,timelineScale)}px 100%`}}>{rulerTicks.map((tick,index)=><span key={index} style={{left:tick*timelineScale}}>{seconds(tick)}</span>)}</div></div>
+          {(["images","audio"] as const).map(track=><div className="production-visual-track" key={track}><b>{track==="images"?"IMAGE TRACK":"AUDIO TRACK"}</b><div className="production-visual-lane" style={{width:timelineWidth,backgroundSize:`${Math.max(8,timelineScale)}px 100%`}}>{clips.filter(clip=>clip.track===track).map(clip=><button key={clip.id} className={"production-visual-clip "+track} style={{left:clip.startSeconds*timelineScale,width:Math.max(30,clip.durationSeconds*timelineScale)}} title={track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Image clip"):"Scene audio · "+(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene")} onClick={()=>seekTimeline(clip.startSeconds)}>{track==="images"&&clip.assetId&&thumbs[clip.assetId]?<img src={thumbs[clip.assetId]} alt=""/>:null}<span>{track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene audio")}</span></button>)}</div></div>)}
+          <div className="production-visual-playhead" style={{left:132+playheadSeconds*timelineScale}}/>
         </div></div>
         <div className="production-clip-editors"><b>Clip properties</b>{(["images","audio"] as const).map(track=><section className="production-track" key={track}><h3>{track==="images"?"IMAGE CLIPS":"AUDIO CLIPS"}</h3>{clips.filter(clip=>clip.track===track).sort((a,b)=>a.order-b.order).map(clip=><div className="production-clip" key={clip.id}><b>{track==="images"?"IMG":"WAV"}</b><label>Start <input aria-label="Clip start seconds" type="number" min="0" step="0.1" value={Number(clip.startSeconds.toFixed(2))} onChange={event=>editClipStart(clip.id,Number(event.target.value))}/> s</label><label>Duration <input aria-label="Clip duration seconds" type="number" min="0.1" step="0.1" value={Number(clip.durationSeconds.toFixed(2))} onChange={event=>editClip(clip.id,Number(event.target.value))}/> s</label><span>{project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Unknown scene"}{clip.assetId?" · "+(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):""}</span><div><button title="Nudge clip earlier by half a second" onClick={()=>nudgeClip(clip.id,-0.5)}><ArrowUp size={13}/></button><button title="Nudge clip later by half a second" onClick={()=>nudgeClip(clip.id,0.5)}><ArrowDown size={13}/></button></div></div>)}</section>)}</div>
         <div className="production-audio-preview"><b>Individual local audio segments</b>{(project.audioSegments??[]).filter(segment=>segment.status==="ready"&&audioUrls[segment.id]).map(segment=><label key={segment.id}>{project.scenes.find(scene=>scene.id===segment.sceneId)?.title??"Scene"}<audio controls preload="none" src={audioUrls[segment.id]}/></label>)}</div>
