@@ -7,21 +7,25 @@
 ## Data flow and privacy boundary
 
 - The frontend is a static Vite application. Scripts, project metadata, original storyboard images, generated WAVs and imported music/SFX are stored in browser-local localStorage and IndexedDB.
-- The optional TTS and FFmpeg services are separate sidecars. Both are intended for same-device loopback use; neither is a hosted processing dependency.
+- The optional local TTS and FFmpeg services are separate sidecars intended for same-device loopback use.
+- Audio Studio also accepts an explicitly entered HTTPS Cloudflare Quick Tunnel subdomain for a temporary user-started remote TTS runtime. This is opt-in and is not a GridSplit-hosted service; in this mode, selected narration/dialogue text leaves the browser and is sent to that runtime for synthesis.
 - The TTS model and voice files are installed by the user and are not committed or downloaded by GridSplit.
 - FFmpeg/ffprobe are installed by the user. The repository does not ship binaries or codecs.
 - JSON backups preserve project metadata. Media-inclusive portable ZIP export/restore is the media portability path.
 
 ## Local TTS sidecar
 
-- Uvicorn is documented to bind to `127.0.0.1`; the app's provider accepts loopback endpoints only.
+- Uvicorn is documented to bind to `127.0.0.1`; the local sidecar remains loopback-only.
+- The browser endpoint allowlist accepts loopback URLs by default and permits only HTTPS subdomains of `trycloudflare.com` as the explicit temporary GPU exception. Arbitrary internet hosts, LAN addresses and HTTP tunnels remain rejected.
 - The sidecar validates the request Host against `localhost`, `127.0.0.1` and `::1`, including optional ports; unexpected or malformed values receive HTTP 403.
 - Browser origins are explicitly allowlisted; wildcard CORS is not used.
 - Synthesis requests have bounded text length and validated voice/language/speed fields.
 - Model and voice files are user-installed; the sidecar does not automatically fall back to a remote provider.
 - Two Python unit tests cover accepted loopback Host values and rejected remote/ambiguous forms.
 
-**Limit:** Host/CORS checks are not authentication. A local malicious process with access to the user's loopback interface may still call the sidecar. Do not expose it to a LAN or public network.
+**Temporary remote GPU exception:** Cloudflare Quick Tunnels are public, temporary URLs and the Colab API described by the setup workflow is unauthenticated. Anyone who obtains the active URL may be able to submit synthesis requests. Use only for an intentional short session, avoid sensitive script text, and stop the tunnel and Colab runtime after use. The browser allowlist is a compatibility boundary, not authentication.
+
+**Local-sidecar limit:** Host/CORS checks are not authentication. A local malicious process with access to the user's loopback interface may still call the sidecar. Do not expose the local sidecar to a LAN or public network.
 
 ## Local FFmpeg renderer
 
