@@ -67,7 +67,7 @@ export class KokoroLocalProvider implements LocalTtsProvider {
           : prefix === "hf" || prefix === "hm" ? "hi" : "en-us";
         const languageName = language === "en-gb" ? "British English"
           : language === "hi" ? "Hindi" : "American English";
-        const name = id.split("_").slice(1).join(" ").replace(/\\b\\w/g, (letter) => letter.toUpperCase()) || id;
+        const name = id.split("_").slice(1).join(" ").replace(/\b\w/g, (letter) => letter.toUpperCase()) || id;
         return [{ id, name, language, languageName }];
       }
       if (typeof voice !== "object" || voice === null) return [];
