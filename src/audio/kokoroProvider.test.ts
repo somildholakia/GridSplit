@@ -16,7 +16,7 @@ describe("Kokoro TTS endpoint allowlist", () => {
   });
 
   it("labels an explicit Quick Tunnel as a temporary GPU provider", () => {
-    expect(new KokoroLocalProvider("https://demo.trycloudflare.com").id).toBe("kokoro-cloudflare");
+    expect(new KokoroLocalProvider("https://demo.trycloudflare.com").label).toBe("Kokoro ONNX · temporary GPU");
     expect(new KokoroLocalProvider("http://127.0.0.1:8765").id).toBe("kokoro-local");
   });
 
