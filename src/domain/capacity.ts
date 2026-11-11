@@ -15,7 +15,11 @@ export function timelinePixelsPerSecond(durationSeconds: number): number {
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
     return DEFAULT_TIMELINE_PIXELS_PER_SECOND;
   }
-  return Math.min(DEFAULT_TIMELINE_PIXELS_PER_SECOND, MAX_TIMELINE_WIDTH / durationSeconds);
+  const rawScale = Math.min(DEFAULT_TIMELINE_PIXELS_PER_SECOND, MAX_TIMELINE_WIDTH / durationSeconds);
+  // Round down to avoid a floating-point product exceeding MAX_TIMELINE_WIDTH.
+  return rawScale < DEFAULT_TIMELINE_PIXELS_PER_SECOND
+    ? Math.floor(rawScale * 1_000_000) / 1_000_000
+    : rawScale;
 }
 
 export function rulerIntervalSeconds(durationSeconds: number, maxTicks = 240): number {
