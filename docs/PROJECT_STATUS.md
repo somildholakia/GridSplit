@@ -15,6 +15,17 @@ Current application code on `main` is `47570357900a123571a4959d47caafaa10ef348d`
 
 **Base Studio validation:** GitHub Actions run #199 passed on pre-merge commit `0ba72cc6cf2b8fc3b00d446612f44ab0ec0f9491`, including 9 Python tests, 91 Vitest tests across 18 files, ESLint, TypeScript typecheck, Vite production build, static artifact upload and production npm audit (0 vulnerabilities at the high-severity threshold). [Open run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750). **Latest local-TTS dependency PR validation:** run #217 passed `uv lock --check`, `pip-audit --strict` (no known vulnerabilities found), 9 Python tests, 91 Vitest tests across 18 files, ESLint, typecheck, production build and artifact upload. [Open run #217](https://github.com/somildholakia/GridSplit/actions/runs/42865601179).
 
+## Browser-only / high-capacity branch in progress
+
+Branch: [`feat/browser-only-1200-images-hour-plus`](https://github.com/somildholakia/GridSplit/tree/feat/browser-only-1200-images-hour-plus). This work is not merged into `main` and is not deployed.
+
+- The project image ceiling is 2,400; sequence and mapping views paginate at 60 assets; imports are batched and check the browser-reported storage quota before writing.
+- Timeline ruler density and pixel scale adapt to long durations; time labels include hours. Helper tests cover capacity, bounded ruler ticks, one-hour/two-hour scaling and time formatting.
+- The requested complete phone-browser workflow is **not yet complete**: `AudioStudio` still points at a local Kokoro TTS sidecar and Production Tools still points at the Python + FFmpeg/ffprobe renderer. The branch must not be described as a fully browser-only release.
+- [`docs/BROWSER_ONLY_MIGRATION.md`](BROWSER_ONLY_MIGRATION.md) records the remaining browser TTS, browser video rendering, storage recovery, install-UX removal and target-device acceptance gates.
+
+The image-count setting is a logical ceiling, not a guarantee that any device can store 2,400 full-resolution originals or render a two-hour 1080p file. Browser quota, memory, codecs and thermal limits must be detected and reported. No target-device import/render acceptance or CI run is claimed for this branch yet.
+
 ## Milestone state
 
 - **M01–M05:** Complete on `main` — repository audit, product requirements, architecture/ADRs, source restructuring, and CI baseline.
