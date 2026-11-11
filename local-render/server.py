@@ -20,7 +20,8 @@ from pathlib import Path, PurePosixPath
 
 MAX_ARCHIVE = 1024 * 1024 * 1024
 MAX_EXPANDED = 2 * 1024 * 1024 * 1024
-MAX_ENTRIES = 1610
+MAX_MEDIA_FILES = 5_000
+MAX_ENTRIES = MAX_MEDIA_FILES + 2  # manifest.json and project.json
 MAX_ACTIVE_JOBS = 2
 MAX_FINISHED_JOBS = 8
 JOB_RETENTION_SECONDS = 6 * 60 * 60
@@ -102,7 +103,7 @@ def extract_verified_archive(archive: Path, destination: Path) -> tuple[dict, di
         if not isinstance(project, dict) or project.get("id") != manifest.get("projectId"):
             raise ValueError("Project metadata does not match the archive manifest.")
         records = manifest.get("files")
-        if not isinstance(records, list) or len(records) > 1600:
+        if not isinstance(records, list) or len(records) > MAX_MEDIA_FILES:
             raise ValueError("Invalid media manifest.")
         seen: set[str] = set()
         for record in records:

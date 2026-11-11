@@ -14,6 +14,7 @@ import {
   type VideoClipEdit,
 } from "../../domain/production";
 import { readGeneratedAudio } from "../../audio/audioStore";
+import { formatTimelineTime } from "../../domain/capacity";
 import { readProjectMedia, saveProjectMedia, deleteProjectMedia } from "../../lib/projectMediaStore";
 import { downloadPortableProject, exportPortableProject, importPortableProject } from "../../lib/portableProject";
 import { downloadRenderedVideo, getRenderReadiness, renderProjectLocally, type LocalRenderJob } from "../../lib/localRenderer";
@@ -39,8 +40,7 @@ const TRACK_LABELS = {
 } as const;
 
 function formatTime(value: number): string {
-  const minutes = Math.floor(value / 60);
-  return minutes + ":" + (value % 60).toFixed(1).padStart(4, "0");
+  return formatTimelineTime(value);
 }
 
 function defaultEdit(clipId: string): VideoClipEdit {
