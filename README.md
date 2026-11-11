@@ -2,7 +2,7 @@
 
 GridSplit Studio is a local-first workspace for preparing scripts and storyboard contact sheets for video production. The existing GridSplit image splitter remains available inside the studio and can still turn detected image grids into individually named crops.
 
-**No account or hosted media-processing service is required.** Script extraction, scene preparation, image analysis, cropping, and ZIP creation run in the browser. Speech generation is optional and uses a separately installed local TTS sidecar; it does not send scripts to a cloud provider.
+**No account or hosted media-processing service is required for the default workflow.** Script extraction, scene preparation, image analysis, cropping, and ZIP creation run in the browser. Speech generation is optional and defaults to a separately installed local TTS sidecar. Advanced users may explicitly configure an HTTPS Cloudflare Quick Tunnel to a temporary GPU runtime; only then is selected narration/dialogue text sent to that remote runtime.
 
 ## Current capabilities
 
@@ -23,7 +23,9 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 ### Audio Studio (M12–M16 implementation)
 - Manage stable narrator and dialogue character identities per project.
 - Assign each character a voice, language, and speech speed.
-- Connect to the optional Kokoro ONNX sidecar on loopback (`127.0.0.1`).
+- Connect to the optional Kokoro ONNX sidecar on loopback (`127.0.0.1`) or explicitly enter an HTTPS Cloudflare Quick Tunnel for a temporary user-started GPU runtime.
+- Keep loopback as the default; arbitrary remote hosts and insecure HTTP tunnels are rejected, and there is no automatic remote fallback.
+- In temporary GPU mode, selected narration/dialogue text is sent over HTTPS to the configured runtime; generated WAVs are still stored locally in browser IndexedDB.
 - Generate, cancel, retry, and regenerate narration/dialogue blocks independently.
 - Persist WAV audio locally in IndexedDB; review with the browser audio player and download individual WAV files.
 - The Kokoro model and matching voice file are user-installed and are not bundled or downloaded by GridSplit. Real model-backed synthesis/playback smoke testing remains an explicit acceptance step.
@@ -99,7 +101,7 @@ GridSplit first finds horizontal image bands, then analyses each band independen
 
 ## Privacy and storage
 
-Images, scripts and imported media are processed locally. Studio project metadata is saved in the current browser's localStorage; image, generated-audio and music/SFX blobs are kept in IndexedDB. These stores are not synced between browsers or devices. JSON backup is metadata-only. Production Studio can export a media-inclusive .gridsplit.zip with editable project data, original images, generated WAVs, imported audio, measured synchronization metadata and SRT/VTT subtitles; restore recreates a new local project after checksum validation.
+Images, scripts and imported media are processed locally by default. Studio project metadata is saved in the current browser's localStorage; image, generated-audio and music/SFX blobs are kept in IndexedDB. If a user explicitly selects a temporary remote GPU TTS endpoint, the selected narration/dialogue text is sent over HTTPS to that endpoint for synthesis; generated audio remains in the browser's IndexedDB. These stores are not synced between browsers or devices. JSON backup is metadata-only. Production Studio can export a media-inclusive .gridsplit.zip with editable project data, original images, generated WAVs, imported audio, measured synchronization metadata and SRT/VTT subtitles; restore recreates a new local project after checksum validation.
 
 ## Scope and roadmap
 
@@ -111,9 +113,9 @@ GridSplit is MIT licensed. The locally bundled PDF.js dependency is Apache-2.0; 
 
 ## Local audio generation (M12–M16)
 
-GridSplit includes a character/voice workspace and an optional Kokoro ONNX local TTS provider. Follow [local-tts/README.md](local-tts/README.md) to set up the sidecar, then open **Audio studio** in an active project. Model and voice files are installed by the user and are not included in this repository. The browser calls only a loopback service; WAV blobs are stored in local IndexedDB.
+GridSplit includes a character/voice workspace and an optional Kokoro ONNX TTS provider. Follow [local-tts/README.md](local-tts/README.md) to set up the default loopback sidecar, then open **Audio studio** in an active project. Model and voice files are installed by the user and are not included in this repository. For a temporary Colab GPU session, enter the HTTPS Quick Tunnel URL in Audio Studio after starting a CORS-enabled API and tunnel; keep the runtime active only while generating. The selected script text is sent to Colab in this mode, while WAV blobs remain in local IndexedDB.
 
-See [docs/M12-M16.md](docs/M12-M16.md) for milestones and limitations. To use the public Vercel frontend with local TTS, allow the exact origin `https://gridsplit-kappa.vercel.app` using `GRIDSPLIT_ALLOWED_ORIGINS` before starting the loopback sidecar; see [the setup guide](local-tts/README.md).
+See [docs/M12-M16.md](docs/M12-M16.md) for milestones and limitations. For local TTS from the public Vercel frontend, allow the exact frontend origin using `GRIDSPLIT_ALLOWED_ORIGINS` before starting the loopback sidecar; see [the setup guide](local-tts/README.md).
 
 ## Local rendering and portable projects (M26–M31)
 
