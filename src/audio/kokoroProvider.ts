@@ -34,7 +34,7 @@ async function errorMessage(response: Response): Promise<string> {
       if (typeof parsed.error === "string") return parsed.error;
     } catch { return body.slice(0, 240); }
   }
-  return `Local TTS request failed (${response.status}).`;
+  return `TTS request failed (${response.status}).`;
 }
 /** Kokoro adapter for loopback sidecars and explicitly selected HTTPS Cloudflare Quick Tunnels. */
 export class KokoroLocalProvider implements LocalTtsProvider {
