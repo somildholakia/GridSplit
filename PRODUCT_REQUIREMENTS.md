@@ -10,7 +10,7 @@ This document converts the master prompt into testable requirements. It defines 
 
 ## 1. Product vision and scope
 
-GridSplit Studio is a free, local-first production studio that takes a written script plus numbered images or a storyboard/contact sheet and produces editable narrated video.
+GridSplit Studio is a free, browser-only, local-first production studio that takes a written script plus numbered images or a storyboard/contact sheet and produces editable narrated video. Users must be able to use the public website from a current mobile or desktop browser without installing a phone app, CLI, Python runtime, FFmpeg binary, TTS sidecar, native helper, or desktop editor. Project media is processed on the user's device; optional model files may be downloaded by the browser after an explicit user action and cached locally.
 
 The product combines:
 1. Script, chapter, scene, and dialogue preparation.
@@ -18,14 +18,15 @@ The product combines:
 3. Accurate media metadata and synchronization.
 4. Contact-sheet extraction and image-sequence management.
 5. Editable multitrack video timeline.
-6. Local rendering and a portable project export.
+6. Browser-based rendering and a portable project export.
 
-The computer running GridSplit Studio performs the processing. A hosted static frontend is allowed only as a distribution surface; it must not make remote processing or an online account necessary.
+The browser running GridSplit Studio performs the processing using browser APIs, workers, WebAssembly, and supported media codecs. A hosted static frontend distributes application code only; it must not make remote processing or an online account necessary. No local sidecar or command-line setup is part of the user's workflow.
 
 ### Out of scope
 
 - Paid or metered APIs as required dependencies.
 - Cloud-only rendering or mandatory remote model inference.
+- User-required native app installs, Python/Node/FFmpeg command-line setup, loopback TTS/render sidecars, or third-party desktop editors.
 - Mandatory user accounts, subscription gates, or usage quotas.
 - Server-side upload of scripts, images, generated audio, or project archives.
 - Undocumented model/voice redistribution or unsupported controls presented as working features.
@@ -123,6 +124,7 @@ A creator or editor who has a script and a set of storyboard images and wants to
 - **GSS-IMG-006 (P0):** Export individual crops with deterministic, configurable filenames and a manifest.
 - **GSS-IMG-007 (P0):** Never silently discard an unmatched or excluded image; show its status and preserve source assets.
 - **GSS-IMG-008 (P0):** Keep source images local and do not transmit them to an application server.
+- **GSS-IMG-009 (P0):** Support at least 2,400 source images per project, bounded batch imports, browser-storage quota checks, recoverable interruption, and paginated image/mapping galleries. The 2,400 value is a logical product ceiling; actual import size must respect the device's reported storage and memory budget.
 
 ### 4.6 Image-to-scene mapping and synchronization
 
@@ -152,10 +154,10 @@ A creator or editor who has a script and a set of storyboard images and wants to
 - **GSS-SUB-004 (P1):** Support subtitle preview and manual correction before export.
 - **GSS-SUB-005 (P0):** Preserve subtitle timing consistency with the canonical project timebase.
 
-### 4.9 Local rendering and export
+### 4.9 Browser rendering and export
 
-- **GSS-RENDER-001 (P0):** Render locally without a paid rendering API or cloud rendering service.
-- **GSS-RENDER-002 (P0):** Support MP4 with H.264 video and AAC audio where the selected, license-compliant local build supports these codecs.
+- **GSS-RENDER-001 (P0):** Render on-device in the browser without paid APIs, cloud rendering, user-installed command-line tools, native apps, or local sidecars.
+- **GSS-RENDER-002 (P0):** Support MP4 with H.264 video and AAC audio when the browser exposes compatible encoders or a bundled, license-compliant WebAssembly encoder is available; capability-check before starting and provide an explicit supported fallback when not available.
 - **GSS-RENDER-003 (P0):** Support 720p and 1080p; 24, 25, and 30 FPS; configurable aspect ratio.
 - **GSS-RENDER-004 (P0):** Composite images, transitions/effects, narration/dialogue, music, SFX, and subtitles from canonical timeline data.
 - **GSS-RENDER-005 (P0):** Normalize final audio with user reviewable settings and avoid clipping.
@@ -164,6 +166,7 @@ A creator or editor who has a script and a set of storyboard images and wants to
 - **GSS-RENDER-008 (P0):** Validate output duration, dimensions, frame rate, codecs, and file readability before declaring render success.
 - **GSS-RENDER-009 (P0):** Export a ZIP containing final media, source images, audio segments, metadata, subtitles, and README.
 - **GSS-RENDER-010 (P0):** Preserve project metadata sufficient to reopen and continue editing.
+- **GSS-RENDER-011 (P0):** Support timelines of at least two hours, including hour-aware rulers, time displays, export metadata, and long-duration synchronization without fixed one-hour caps. Rendering must use chunked/segmented processing and device capability checks rather than assuming a one-hour export is feasible on every phone.
 
 ## 5. Canonical data and timing requirements
 
@@ -199,7 +202,7 @@ Floating-point seconds may be displayed in the UI, but source timing must be tra
 - **GSS-PLAT-001 (P0):** The web build works as a static site for browser-supported local tasks.
 - **GSS-PLAT-002 (P0):** Core application code is shared between web and optional desktop builds.
 - **GSS-PLAT-003 (P0):** Browser feature detection is required for directory handles, WebAssembly threading, audio decoding, and storage quotas; unsupported features need clear fallbacks.
-- **GSS-PLAT-004 (P1):** Evaluate a Tauri desktop host for native subprocesses, filesystem access, and large renders if browser limitations block reliable functionality.
+- **GSS-PLAT-004 (P0):** The normal user workflow must not require a native desktop host or a separately installed phone application; browser capability differences must be disclosed and handled with supported browser paths.
 - **GSS-PLAT-005 (P0):** Long operations run off the main UI thread where feasible and report cancellation/progress status truthfully.
 - **GSS-PLAT-006 (P0):** Respect storage quotas and provide clear warnings before operations likely to exceed available memory or disk.
 - **GSS-PLAT-007 (P0):** A project that exceeds available resources must fail safely without corrupting existing project data.
@@ -215,7 +218,7 @@ Floating-point seconds may be displayed in the UI, but source timing must be tra
 
 ## 9. Acceptance criteria and release gates
 
-The product is not considered complete until all P0 requirements pass and the following are demonstrated on a clean local installation:
+The product is not considered complete until all P0 requirements pass and the following are demonstrated in a clean mobile and desktop browser profile, using only the website and browser-managed downloads:
 
 1. Create and save a project; close and restore it.
 2. Import a long script and verify the original text remains unchanged.
@@ -227,16 +230,21 @@ The product is not considered complete until all P0 requirements pass and the fo
 8. Map multiple images to one scene and one image across multiple scenes; display all warnings for unmatched assets.
 9. Synchronize visuals against real segment durations and a chosen FPS.
 10. Edit image/audio clips and preview the result.
-11. Render a readable MP4 locally with required codecs/resolution/FPS supported by the chosen build.
-12. Export and reopen a ZIP project, confirming assets, timeline, subtitles, and edit decisions remain intact.
-13. Verify no project media was transmitted to an application server.
-14. Verify the licenses/notices for every distributed binary, model, voice, and codec.
+11. Render a readable MP4 in the browser, without a local sidecar, Python, FFmpeg executable, or native app installation; record any codec fallback.
+12. Import, map, edit, preview, and export a project with at least 1,200 images, and exercise the 2,400-image product ceiling subject to available storage.
+13. Edit and synchronize a two-hour timeline, and confirm hour-aware displays, metadata and export timing.
+14. Export and reopen a ZIP project, confirming assets, timeline, subtitles, and edit decisions remain intact.
+15. Verify no project media was transmitted to an application server.
+16. Verify the licenses/notices for every distributed binary, model, voice, and codec.
 
 ### Milestone-level acceptance
 
 Milestone acceptance and evidence are maintained in `docs/CHECKPOINTS.md`. The master product requirements are not a replacement for milestone tests.
 
 ## 10. Requirement change control
+
+- The public website is the complete user interface; do not require the user to install anything on a phone or computer to access core functionality.
+- Model/codec assets may be downloaded and cached by the browser after clear disclosure; browser capability and device resource limits must be visible before long operations.
 
 - Add new requirements with a stable ID, priority, owner decision, and acceptance criteria.
 - If an implementation cannot satisfy a requirement, document the constraint and propose a local/offline alternative; do not silently relax it.
