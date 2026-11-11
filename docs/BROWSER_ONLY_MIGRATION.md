@@ -24,7 +24,7 @@ Branch: `feat/browser-only-1200-images-hour-plus`
 - Keep timeline geometry, time labels, ruler density, clip controls, and seek ranges usable beyond one hour.
 - Keep all timeline time arithmetic based on real audio sample durations and the project timebase; do not impose a hidden 60-minute cap.
 
-**Acceptance:** import and navigate 1,200 images, then verify the 2,400 logical ceiling; map images across several scenes; verify paging and global order; inspect 1-hour and 2-hour timelines; verify storage exhaustion fails safely. Device storage may limit how many full-resolution originals can fit even though the product ceiling is 2,400.
+**Acceptance:** import and navigate 1,200 images, then verify the 2,400 logical ceiling; map images across several scenes; verify paging and global order; inspect 1-hour and 2-hour timelines; verify storage exhaustion fails safely. The existing optional ZIP renderer now accepts up to 5,000 media entries, but its separate archive limits remain 1 GiB compressed and 2 GiB expanded. Device storage and those byte limits may constrain the number of full-resolution originals that can be exported even though the product ceiling is 2,400.
 
 ### B02 — Browser TTS
 
