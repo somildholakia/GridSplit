@@ -2,7 +2,11 @@
 
 GridSplit Studio is a local-first workspace for preparing scripts and storyboard contact sheets for video production. The existing GridSplit image splitter remains available inside the studio and can still turn detected image grids into individually named crops.
 
-**No account or hosted media-processing service is required.** Script extraction, scene preparation, image analysis, cropping, and ZIP creation run in the browser. Speech generation is optional and uses a separately installed local TTS sidecar; it does not send scripts to a cloud provider.
+**Important current limitation:** the full website-only workflow is not complete yet. The existing `main`/deployed build still uses an optional local Kokoro TTS sidecar for speech generation and a Python + FFmpeg/ffprobe sidecar for MP4 export. Those steps currently require installing software on the computer running the browser; they are not suitable for the requested phone-only workflow.
+
+The active browser-only migration is tracked on [`feat/browser-only-1200-images-hour-plus`](https://github.com/somildholakia/GridSplit/tree/feat/browser-only-1200-images-hour-plus). That branch raises the project image ceiling to 2,400, pages image and mapping galleries, batches imports, and scales timeline UI beyond one hour. It does **not** yet replace TTS or MP4 rendering with browser-only engines, and it has not been merged or deployed. See [the browser-only migration plan](docs/BROWSER_ONLY_MIGRATION.md).
+
+Script extraction, scene preparation, image analysis, cropping, and ZIP creation already run in the browser. The target is to move speech and video processing into browser workers and browser media APIs without uploading user media or requiring a phone app, Python, FFmpeg, or local sidecars.
 
 ## Current capabilities
 
