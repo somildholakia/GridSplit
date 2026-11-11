@@ -55,6 +55,43 @@ class ArchiveValidationTests(unittest.TestCase):
             restored = root / "out/media/images/image-1.png"
             self.assertEqual(restored.read_bytes(), b"local-image-bytes")
 
+    def test_accepts_a_project_with_2400_image_assets(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "large-project.zip"
+            payload = b"image-bytes"
+            digest = hashlib.sha256(payload).hexdigest()
+            records = []
+            assets = []
+            with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+                for index in range(2400):
+                    asset_id = f"image-{index:04d}"
+                    relative_path = f"media/images/{asset_id}.png"
+                    bundle.writestr(relative_path, payload)
+                    records.append({
+                        "path": relative_path,
+                        "kind": "image",
+                        "assetId": asset_id,
+                        "mimeType": "image/png",
+                        "sizeBytes": len(payload),
+                        "sha256": digest,
+                    })
+                    assets.append({"id": asset_id})
+                manifest = {
+                    "format": "gridsplit-studio-project",
+                    "version": 1,
+                    "projectId": "large-project",
+                    "files": records,
+                }
+                project = {"id": "large-project", "imageAssets": assets}
+                bundle.writestr("manifest.json", json.dumps(manifest))
+                bundle.writestr("project.json", json.dumps(project))
+
+            restored_manifest, restored_project = server.extract_verified_archive(archive, root / "restored")
+            self.assertEqual(len(restored_manifest["files"]), 2400)
+            self.assertEqual(len(restored_project["imageAssets"]), 2400)
+            self.assertEqual((root / "restored/media/images/image-2399.png").read_bytes(), payload)
+
     def test_rejects_bad_media_checksum(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
