@@ -1,12 +1,27 @@
 import type { LocalTtsProvider, TtsAudioResult, TtsEngineStatus, TtsSynthesisRequest, TtsVoice } from "./types";
 import { readWavMetadata } from "./wav";
+export function isCloudflareQuickTunnelEndpoint(input: string): boolean {
+  try {
+    const url = new URL(input.trim());
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "https:" && host.endsWith(".trycloudflare.com")
+      && host.length > ".trycloudflare.com".length && !url.username && !url.password;
+  } catch { return false; }
+}
+
 export function normalizeLocalEndpoint(input: string): string {
   let url: URL;
-  try { url = new URL(input.trim()); } catch { throw new Error("Enter a valid local engine address, such as http://127.0.0.1:8765."); }
+  try {
+    url = new URL(input.trim());
+  } catch {
+    throw new Error("Enter a loopback URL such as http://127.0.0.1:8765 or an HTTPS Cloudflare Quick Tunnel URL.");
+  }
   const host = url.hostname.toLowerCase();
   const loopback = host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
-  if (!loopback || !["http:", "https:"].includes(url.protocol) || url.username || url.password) {
-    throw new Error("For privacy, GridSplit only connects to a local TTS service on this device.");
+  const quickTunnel = url.protocol === "https:" && host.endsWith(".trycloudflare.com")
+    && host.length > ".trycloudflare.com".length;
+  if ((!loopback && !quickTunnel) || !["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+    throw new Error("For privacy, GridSplit accepts loopback TTS services or explicitly entered HTTPS Cloudflare Quick Tunnels only.");
   }
   url.pathname = url.pathname.replace(/\/+$/, ""); url.search = ""; url.hash = "";
   return url.toString().replace(/\/$/, "");
@@ -21,11 +36,17 @@ async function errorMessage(response: Response): Promise<string> {
   }
   return `Local TTS request failed (${response.status}).`;
 }
-/** Local adapter for the optional loopback-only Kokoro ONNX sidecar. */
+/** Kokoro adapter for loopback sidecars and explicitly selected HTTPS Cloudflare Quick Tunnels. */
 export class KokoroLocalProvider implements LocalTtsProvider {
-  readonly id = "kokoro-local"; readonly label = "Kokoro ONNX · local";
+  readonly id: string;
+  readonly label: string;
   private readonly endpoint: string;
-  constructor(endpoint: string) { this.endpoint = normalizeLocalEndpoint(endpoint); }
+  constructor(endpoint: string) {
+    this.endpoint = normalizeLocalEndpoint(endpoint);
+    const remoteGpu = isCloudflareQuickTunnelEndpoint(this.endpoint);
+    this.id = remoteGpu ? "kokoro-cloudflare" : "kokoro-local";
+    this.label = remoteGpu ? "Kokoro ONNX · temporary GPU" : "Kokoro ONNX · local";
+  }
   async check(): Promise<TtsEngineStatus> {
     const response = await fetch(`${this.endpoint}/health`, { cache: "no-store" });
     if (!response.ok) throw new Error(await errorMessage(response));
