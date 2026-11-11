@@ -11,7 +11,6 @@ import "./production-workspace.css";
 type ProductionProject = StudioProject & { imageAssets?: SequenceAsset[]; imageMappings?: SceneImageMapping[]; timelineClips?: TimelineClip[] };
 type Props = { project: StudioProject; onUpdate: (patch: Partial<StudioProject>) => void; onRestoreProject?: (project: StudioProject) => void };
 const DB = "gridsplit-studio-images", STORE = "image-blobs", VERSION = 1;
-const TIMELINE_PIXELS_PER_SECOND = 64;
 function openImageDb(): Promise<IDBDatabase> {
   return new Promise((resolve,reject) => {
     const request=indexedDB.open(DB,VERSION);
