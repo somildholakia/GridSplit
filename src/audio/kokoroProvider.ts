@@ -1,12 +1,27 @@
 import type { LocalTtsProvider, TtsAudioResult, TtsEngineStatus, TtsSynthesisRequest, TtsVoice } from "./types";
 import { readWavMetadata } from "./wav";
+export function isCloudflareQuickTunnelEndpoint(input: string): boolean {
+  try {
+    const url = new URL(input.trim());
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "https:" && host.endsWith(".trycloudflare.com")
+      && host.length > ".trycloudflare.com".length && !url.username && !url.password;
+  } catch { return false; }
+}
+
 export function normalizeLocalEndpoint(input: string): string {
   let url: URL;
-  try { url = new URL(input.trim()); } catch { throw new Error("Enter a valid local engine address, such as http://127.0.0.1:8765."); }
+  try {
+    url = new URL(input.trim());
+  } catch {
+    throw new Error("Enter a loopback URL such as http://127.0.0.1:8765 or an HTTPS Cloudflare Quick Tunnel URL.");
+  }
   const host = url.hostname.toLowerCase();
   const loopback = host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
-  if (!loopback || !["http:", "https:"].includes(url.protocol) || url.username || url.password) {
-    throw new Error("For privacy, GridSplit only connects to a local TTS service on this device.");
+  const quickTunnel = url.protocol === "https:" && host.endsWith(".trycloudflare.com")
+    && host.length > ".trycloudflare.com".length;
+  if ((!loopback && !quickTunnel) || !["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+    throw new Error("For privacy, GridSplit accepts loopback TTS services or explicitly entered HTTPS Cloudflare Quick Tunnels only.");
   }
   url.pathname = url.pathname.replace(/\/+$/, ""); url.search = ""; url.hash = "";
   return url.toString().replace(/\/$/, "");
@@ -19,13 +34,18 @@ async function errorMessage(response: Response): Promise<string> {
       if (typeof parsed.error === "string") return parsed.error;
     } catch { return body.slice(0, 240); }
   }
-  return `Local TTS request failed (${response.status}).`;
+  return `TTS request failed (${response.status}).`;
 }
-/** Local adapter for the optional loopback-only Kokoro ONNX sidecar. */
+/** Kokoro adapter for loopback sidecars and explicitly selected HTTPS Cloudflare Quick Tunnels. */
 export class KokoroLocalProvider implements LocalTtsProvider {
-  readonly id = "kokoro-local"; readonly label = "Kokoro ONNX · local";
+  readonly id = "kokoro-local";
+  readonly label: string;
   private readonly endpoint: string;
-  constructor(endpoint: string) { this.endpoint = normalizeLocalEndpoint(endpoint); }
+  constructor(endpoint: string) {
+    this.endpoint = normalizeLocalEndpoint(endpoint);
+    this.label = isCloudflareQuickTunnelEndpoint(this.endpoint)
+      ? "Kokoro ONNX · temporary GPU" : "Kokoro ONNX · local";
+  }
   async check(): Promise<TtsEngineStatus> {
     const response = await fetch(`${this.endpoint}/health`, { cache: "no-store" });
     if (!response.ok) throw new Error(await errorMessage(response));
@@ -38,10 +58,23 @@ export class KokoroLocalProvider implements LocalTtsProvider {
     const response = await fetch(`${this.endpoint}/voices`, { cache: "no-store" });
     if (!response.ok) throw new Error(await errorMessage(response));
     const value = await response.json() as { voices?: unknown };
-    if (!Array.isArray(value.voices)) throw new Error("The local engine returned an invalid voice catalog.");
-    return value.voices.filter((voice): voice is TtsVoice => typeof voice === "object" && voice !== null
-      && typeof (voice as TtsVoice).id === "string" && typeof (voice as TtsVoice).name === "string"
-      && typeof (voice as TtsVoice).language === "string" && typeof (voice as TtsVoice).languageName === "string");
+    if (!Array.isArray(value.voices)) throw new Error("The TTS engine returned an invalid voice catalog.");
+    return value.voices.flatMap((voice): TtsVoice[] => {
+      if (typeof voice === "string" && voice.trim()) {
+        const id = voice.trim();
+        const prefix = id.split("_", 1)[0];
+        const language = prefix === "bf" || prefix === "bm" ? "en-gb"
+          : prefix === "hf" || prefix === "hm" ? "hi" : "en-us";
+        const languageName = language === "en-gb" ? "British English"
+          : language === "hi" ? "Hindi" : "American English";
+        const name = id.split("_").slice(1).join(" ").replace(/\b\w/g, (letter) => letter.toUpperCase()) || id;
+        return [{ id, name, language, languageName }];
+      }
+      if (typeof voice !== "object" || voice === null) return [];
+      const item = voice as TtsVoice;
+      return typeof item.id === "string" && typeof item.name === "string"
+        && typeof item.language === "string" && typeof item.languageName === "string" ? [item] : [];
+    });
   }
   async synthesize(request: TtsSynthesisRequest): Promise<TtsAudioResult> {
     const text = request.text.trim();
