@@ -133,3 +133,19 @@
 .motion-particle-defaults>b,.motion-particle-override>b{color:#c9ef75;font-size:9px;letter-spacing:.8px;overflow-wrap:anywhere}
 .motion-particle-override{border-color:#bca0ff38;background:#171326}
 .motion-particle-override .motion-secondary-button{justify-self:start}
+
+.motion-depth-estimator{display:grid;gap:12px;padding:13px;border:1px solid #c9ef7533;border-radius:10px;background:linear-gradient(145deg,#1a241b,#111b2a)}
+.motion-depth-estimator> b{font-size:9px;letter-spacing:1px;color:#c9ef75}
+.motion-depth-estimator>p{margin:0;color:#9aa8bb;font-size:11px;line-height:1.55}
+.motion-depth-focus-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.motion-depth-focus-grid label{display:grid;gap:7px;color:#aab6c8;font-size:10px}
+.motion-depth-focus-grid label b{color:#eaf2fa}
+.motion-depth-focus-grid input{width:100%;accent-color:#c9ef75}
+.motion-depth-map-preview{display:grid;grid-template-columns:74px minmax(0,1fr);gap:10px;align-items:center}
+.motion-depth-map-preview img{width:74px;height:54px;object-fit:cover;border:1px solid #ffffff24;border-radius:6px;background:#0a1018}
+.motion-depth-map-preview>div{display:grid;gap:4px;min-width:0}
+.motion-depth-map-preview>div b{font-size:10px;color:#c9ef75}
+.motion-depth-map-preview>div span{font-size:9px;color:#93a0b4;line-height:1.45}
+.motion-depth-map-preview>button{grid-column:1/-1;justify-self:start}
+.motion-parallax-divider{height:1px;background:#ffffff14;margin:3px 0}
+@media(max-width:560px){.motion-depth-focus-grid{grid-template-columns:1fr}}
