@@ -257,6 +257,8 @@ export default function MotionStudio() {
   const [checkingRenderer, setCheckingRenderer] = useState(false);
   const [effect, setEffect] = useState<ImageEffectKind>("ken-burns");
   const [selectedImageId, setSelectedImageId] = useState("");
+  const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
+  const [dropTargetImageId, setDropTargetImageId] = useState<string | null>(null);
   const [selectedKeyframeIndex, setSelectedKeyframeIndex] = useState(0);
   const [keyframePosition, setKeyframePosition] = useState(0.5);
   const [particlePreset, setParticlePreset] = useState<ParticlePreset>("none");
@@ -686,6 +688,23 @@ export default function MotionStudio() {
     setImages((current) => current.filter((item) => item.asset.id !== id).map((item, order) => ({ ...item, asset: { ...item.asset, order, sequenceNumber: order + 1 } })));
   };
 
+  const reorderImage = (fromId: string, toId: string) => {
+    if (!fromId || !toId || fromId === toId) return;
+    setImages((current) => {
+      const from = current.findIndex((item) => item.asset.id === fromId);
+      const to = current.findIndex((item) => item.asset.id === toId);
+      if (from < 0 || to < 0) return current;
+      const next = [...current];
+      const [moving] = next.splice(from, 1);
+      next.splice(to, 0, moving);
+      return next.map((item, order) => ({
+        ...item,
+        asset: { ...item.asset, order, sequenceNumber: order + 1 },
+      }));
+    });
+    setNotice("Image order updated. Every image still receives an equal share of the complete soundtrack.");
+  };
+
   const moveImage = (index: number, delta: -1 | 1) => {
     setImages((current) => {
       const next = [...current];
@@ -995,6 +1014,47 @@ export default function MotionStudio() {
               <div><b>{images.length}</b><span>images loaded</span></div>
               <div><b>{audioDuration > 0 && images.length ? formatTime(secondsPerImage) : "—"}</b><span>equal hold per image</span></div>
               <div><b>{audioDuration > 0 ? formatTime(audioDuration) : "—"}</b><span>complete video length</span></div>
+            </div>
+            {images.length > 0 && audioDuration > 0 && <div className="motion-visual-timeline">
+              <div className="motion-visual-timeline-heading">
+                <b>SEQUENCE TIMELINE</b>
+                <span>Drag clips to reorder · equal duration per image</span>
+              </div>
+              <div className="motion-visual-timeline-track">
+                {images.map((item, index) => <button
+                  key={item.asset.id}
+                  type="button"
+                  draggable={!rendering}
+                  title={"Drag to reorder image " + (index + 1)}
+                  className={"motion-timeline-clip" + (index === currentIndex ? " active" : "") + (draggedImageId === item.asset.id ? " dragging" : "") + (dropTargetImageId === item.asset.id ? " drop-target" : "")}
+                  onClick={() => selectImageForEditing(item.asset.id)}
+                  onDragStart={(event) => {
+                    setDraggedImageId(item.asset.id);
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", item.asset.id);
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    if (draggedImageId && draggedImageId !== item.asset.id) setDropTargetImageId(item.asset.id);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const fromId = draggedImageId || event.dataTransfer.getData("text/plain");
+                    reorderImage(fromId, item.asset.id);
+                    setDraggedImageId(null);
+                    setDropTargetImageId(null);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedImageId(null);
+                    setDropTargetImageId(null);
+                  }}>
+                  <span className="motion-timeline-index">{String(index + 1).padStart(2, "0")}</span>
+                  <img src={item.objectUrl} alt="" />
+                  <b>{item.asset.name}</b>
+                  <small>{formatTime(secondsPerImage)}</small>
+                </button>)}
+              </div>
+              <p>All clips are auto-fitted to the soundtrack. Reordering changes sequence, not the total video duration.</p>
             </div>
             {images.length ? <div className="motion-image-list">
               <div className="motion-list-header"><b>IMAGE ORDER</b><button type="button" disabled={rendering} onClick={clearImages}><Trash2 size={13} /> Clear all</button></div>
