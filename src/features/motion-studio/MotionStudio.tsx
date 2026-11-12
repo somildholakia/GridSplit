@@ -15,7 +15,7 @@ import {
 import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
-import { buildEvenImageTimeline } from "./motionTiming";
+import { buildEvenImageTimeline, moveSequenceItem } from "./motionTiming";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
 import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
 import { buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
@@ -694,9 +694,7 @@ export default function MotionStudio() {
       const from = current.findIndex((item) => item.asset.id === fromId);
       const to = current.findIndex((item) => item.asset.id === toId);
       if (from < 0 || to < 0) return current;
-      const next = [...current];
-      const [moving] = next.splice(from, 1);
-      next.splice(to, 0, moving);
+      const next = moveSequenceItem(current, from, to);
       return next.map((item, order) => ({
         ...item,
         asset: { ...item.asset, order, sequenceNumber: order + 1 },
