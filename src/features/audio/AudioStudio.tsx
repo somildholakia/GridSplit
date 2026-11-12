@@ -4,7 +4,7 @@ import type { StudioProject } from "../../lib/projectStore";
 import { ensureSpeakerCharacters, reconcileAudioSegments, updateAudioSegment } from "../../lib/audioWorkflow";
 import { deleteGeneratedAudio, readGeneratedAudio, saveGeneratedAudio } from "../../audio/audioStore";
 import { saveProjectMedia } from "../../lib/projectMediaStore";
-import { createDefaultAudioMixTracks, normalizeAudioMixTracks, type MixAudioAsset } from "../../domain/production";
+import { normalizeAudioMixTracks, type MixAudioAsset } from "../../domain/production";
 import { DEFAULT_TTS_ENDPOINT, type StudioAudioSegment, type StudioCharacter, type TtsVoice } from "../../audio/types";
 import { isCloudflareQuickTunnelEndpoint, KokoroLocalProvider } from "../../audio/kokoroProvider";
 import "./audio-studio.css";
@@ -290,7 +290,7 @@ export default function AudioStudio({ project, onUpdate }: Props) {
         ? mixAssets.map((asset) => asset.id === id ? nextAsset : asset)
         : [...mixAssets, nextAsset];
       onUpdate({
-        audioMixTracks: project.audioMixTracks?.length ? tracks : createDefaultAudioMixTracks(() => crypto.randomUUID()),
+        audioMixTracks: tracks,
         mixAssets: nextAssets,
       } as Partial<StudioProject>);
       setNotice(`${kind === "music" ? "Music" : "Sound effect"} generated and added to the ${kind} mixer track.`);
