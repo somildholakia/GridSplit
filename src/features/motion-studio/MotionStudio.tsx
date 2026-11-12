@@ -1007,8 +1007,8 @@ export default function MotionStudio() {
                 <div className="motion-image-info">
                   <b title={item.asset.name}>{item.asset.name}</b>
                   <span>{item.asset.width} × {item.asset.height} · {(item.file.size / 1024 / 1024).toFixed(1)} MB</span>
-                  <small className={item.foreground ? "motion-depth-state ready" : "motion-depth-state"}>
-                    {item.foreground ? "Depth cutout attached" : "Flat image"}
+                  <small className={(item.depthMap || item.foreground) ? "motion-depth-state ready" : "motion-depth-state"}>
+                    {item.depthMap ? "Estimated depth map ready" : item.foreground ? "Transparent cutout attached" : "Flat image"}
                   </small>
                 </div>
                 <div className="motion-image-hold">{audioDuration > 0 ? formatTime(secondsPerImage) : "—"}</div>
@@ -1164,7 +1164,7 @@ export default function MotionStudio() {
 
           <section className="motion-panel motion-parallax-panel">
             <div className="motion-panel-heading">
-              <div><span>05 · DEPTH & PARALLAX</span><h2>Separate foreground from background</h2><p>Attach a transparent cutout to each image with its Layer control.</p></div>
+              <div><span>05 · DEPTH & PARALLAX</span><h2>Create image depth</h2><p>Estimate a depth map locally or attach a transparent foreground cutout.</p></div>
               <Layers3 size={20} />
             </div>
             {selectedImage ? <>
