@@ -45,10 +45,12 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 
 ### Production Studio (M22–M31 implementation)
 
-- Store up to 1,200 numbered storyboard images in a project, review sequence gaps/duplicates, correct frame numbers, and reorder images.
+The project image capacity is 10,000 assets. Timeline synchronization is automatic: when ready narration/dialogue WAVs, image ordering, or scene-to-image mappings change, GridSplit remeasures the saved WAV files and rebuilds the image/audio schedule. Imported music stays aligned to programme start, while scene-bound SFX follows its assigned scene automatically. Manual clip edits remain available and are preserved until a source-media or mapping change requires a resync.
+
+- Store up to 10,000 numbered storyboard images in a project, review sequence gaps/duplicates, correct frame numbers, and reorder images.
 - Map multiple images to scenes and reuse images across scenes.
-- Build an editable image/audio timeline from measured WAV durations, with playhead, seek, preview, and clip editing.
-- Mix narration, dialogue, music and SFX on four independent tracks with gain, mute/solo and fade controls. Import music/SFX locally.
+- Automatically build and keep an editable image/audio timeline synchronized from measured WAV durations whenever generated speech audio, image order, or scene mappings change; retain playhead, seek, preview, and manual clip editing.
+- Mix narration, dialogue, music and SFX on four independent tracks with gain, mute/solo and fade controls. Imported music automatically starts at programme time zero; imported SFX can be bound to a scene and automatically follows that scene's timeline start whenever speech timing or image/scene mapping changes. Manual SFX placement remains available.
 - Add per-image Ken Burns, pan/zoom motion and cut/fade/dissolve/wipe transitions.
 - Render H.264/AAC MP4 locally with the optional Python sidecar, using FFmpeg/ffprobe installed on the user's own computer.
 - Export media-inclusive `.gridsplit.zip` packages with project metadata, original images, generated WAVs, imported music/SFX, checksums, measured synchronization JSON, SRT/VTT subtitles and README.

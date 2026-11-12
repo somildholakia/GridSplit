@@ -21,6 +21,8 @@ export interface MixAudioAsset {
   bytes: number;
   kind: "music" | "sfx";
   trackId: string;
+  /** SFX follows the start of this scene; music remains timeline-wide. */
+  sceneId?: string;
   startSeconds: number;
   durationSeconds: number;
   order: number;

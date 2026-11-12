@@ -70,6 +70,8 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const playbackOriginRef=useRef<number|null>(null);
   const animationFrameRef=useRef<number|null>(null);
   const folderRef=useRef<HTMLInputElement>(null);
+  const onUpdateRef=useRef(onUpdate);
+  onUpdateRef.current=onUpdate;
   useEffect(()=>{folderRef.current?.setAttribute("webkitdirectory","");folderRef.current?.setAttribute("directory","");},[]);
   const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline"|"animation"|"tools">("sequence");
   const issues=useMemo(()=>analyseSequence(assets),[assets]);
@@ -107,7 +109,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     const savedIds:string[]=[];
     try{
       const valid=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=100*1024*1024);
-      const accepted=valid.slice(0,Math.max(0,1200-assets.length));
+      const accepted=valid.slice(0,Math.max(0,10000-assets.length));
       const rejected=files.length-accepted.length;
       const additions:SequenceAsset[]=[];
       const ordered=sortSequence(accepted.map(f=>({name:f.name,relativePath:(f as File&{webkitRelativePath?:string}).webkitRelativePath||f.name,file:f})));
@@ -117,7 +119,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
         additions.push({id,name:file.name,relativePath:item.relativePath,mimeType:file.type,bytes:file.size,sequenceNumber:extractSequenceNumber(file.name),order:assets.length+additions.length,width:size.width,height:size.height,fingerprint:hash});
       }
       updateAssets([...assets,...additions].map((a,index)=>({...a,order:index})));
-      setMessage("Added "+additions.length+" image(s)."+(rejected?" Rejected "+rejected+" file(s): unsupported, empty, oversized, or beyond the 1,200-image project limit.":""));
+      setMessage("Added "+additions.length+" image(s)."+(rejected?" Rejected "+rejected+" file(s): unsupported, empty, oversized, or beyond the 10,000-image project limit.":""));
     }catch(error){
       await Promise.all(savedIds.map(id=>deleteImage(id).catch(()=>undefined)));
       setMessage(error instanceof Error?error.message:"Could not import these images.");
@@ -172,6 +174,52 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
       setActiveTab("timeline");
     }catch(error){setMessage(error instanceof Error?error.message:"Could not build the schedule.");}finally{setBusy(false);}
   };
+  // Keep the image and speech tracks aligned automatically whenever source media,
+  // image order/mappings, or generated-audio readiness changes. Manual clip edits
+  // remain intact until one of those source inputs changes again.
+  const autoSyncKey = [
+    assets.map(asset=>asset.id+":"+asset.order).join(","),
+    mappings.map(mapping=>mapping.sceneId+":"+mapping.imageIds.join(",")).join("|"),
+    project.scenes.map(scene=>scene.id).join(","),
+    (project.audioSegments??[]).map(segment=>segment.id+":"+segment.status+":"+String(segment.durationSeconds??"")).join(","),
+  ].join("::");
+  const autoSyncRevisionRef=useRef(0);
+  // The serialized source key captures the media/mapping inputs intentionally.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(()=>{
+    const revision=++autoSyncRevisionRef.current;
+    let cancelled=false;
+    const hasInputs=project.scenes.some(scene=>
+      (mappings.find(mapping=>mapping.sceneId===scene.id)?.imageIds.length??0)>0
+      &&(project.audioSegments??[]).some(segment=>segment.sceneId===scene.id&&segment.status==="ready"));
+    if(!hasInputs)return;
+    const timeout=window.setTimeout(()=>{
+      void (async()=>{
+        try{
+          const inputs:{sceneId:string;durationSeconds:number;imageIds:string[]}[]=[];
+          for(const scene of project.scenes){
+            const ready=(project.audioSegments??[]).filter(segment=>segment.sceneId===scene.id&&segment.status==="ready");
+            let duration=0;
+            for(const segment of ready){
+              const blob=await readGeneratedAudio(project.id,segment.id);
+              if(!blob)continue;
+              try{duration+=(await measureWavBlob(blob)).durationSeconds;}catch{/* skip unreadable audio */}
+            }
+            const imageIds=mappings.find(mapping=>mapping.sceneId===scene.id)?.imageIds??[];
+            if(duration>0&&imageIds.length)inputs.push({sceneId:scene.id,durationSeconds:duration,imageIds});
+          }
+          if(cancelled||revision!==autoSyncRevisionRef.current)return;
+          const next=buildTimeline(inputs);
+          patchProject(onUpdateRef.current,{timelineClips:next});
+          setPlayheadSeconds(current=>Math.min(current,timelineDurationSeconds(next)));
+          setMessage("Auto-synced "+next.filter(clip=>clip.track==="images").length+" image clips with measured narration/dialogue audio.");
+        }catch(error){
+          if(!cancelled)setMessage(error instanceof Error?error.message:"Automatic media synchronization failed.");
+        }
+      })();
+    },300);
+    return()=>{cancelled=true;window.clearTimeout(timeout);};
+  },[autoSyncKey,project.id]);
   const editClip=(id:string,value:number)=>{
     if(!Number.isFinite(value)||value<=0)return;
     patchProject(onUpdate,{timelineClips:clips.map(c=>c.id===id?{...c,durationSeconds:value}:c)});
