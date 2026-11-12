@@ -226,3 +226,18 @@ export function imageClipAtTime(clips: TimelineClip[], timeSeconds: number): Tim
     .sort((left, right) => left.startSeconds - right.startSeconds || left.order - right.order);
   return matches[matches.length - 1];
 }
+
+/** Assign an ordered image sequence to scenes in balanced, contiguous batches. */
+export function distributeImagesAcrossScenes<T extends { id: string; order: number }>(
+  assets: T[],
+  sceneIds: string[],
+): SceneImageMapping[] {
+  if (!assets.length || !sceneIds.length) return [];
+  const ordered = [...assets].sort((left, right) => left.order - right.order);
+  const buckets = sceneIds.map(() => [] as string[]);
+  ordered.forEach((asset, index) => {
+    const sceneIndex = Math.min(sceneIds.length - 1, Math.floor(index * sceneIds.length / ordered.length));
+    buckets[sceneIndex].push(asset.id);
+  });
+  return sceneIds.map((sceneId, index) => ({ sceneId, imageIds: buckets[index] }));
+}
