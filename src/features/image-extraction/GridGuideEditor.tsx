@@ -108,6 +108,7 @@ export function GridGuideEditor({
   const [selectedRow, setSelectedRow] = useState(0);
   const [activeGuide, setActiveGuide] = useState<ActiveGuide | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewportSize, setViewportSize] = useState({ width: 1280, height: 900 });
 
   const rowCount = verticalGuidesByRow.length;
   const activeRowGuides = verticalGuidesByRow[selectedRow] ?? [];
@@ -140,7 +141,13 @@ export function GridGuideEditor({
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", updateViewport);
     };
+    const updateViewport = () => {
+      setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
   }, [isFullscreen]);
 
   const updateGuideAtPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -239,7 +246,11 @@ export function GridGuideEditor({
     setVerticalGuidesByRow((current) =>
       current.filter((_, index) => index !== targetIndex + 1),
     );
-    setSelectedRow((current) => Math.min(current, Math.max(0, rowCount - 2)));
+    setSelectedRow((current) => {
+      if (current > targetIndex + 1) return current - 1;
+      if (current === targetIndex + 1) return targetIndex;
+      return current;
+    });
     setActiveGuide(null);
   };
 
@@ -309,9 +320,12 @@ export function GridGuideEditor({
   const aspectRatio = image.naturalWidth / Math.max(1, image.naturalHeight);
   const stageWidth = Math.min(920, Math.max(150, Math.round(520 * aspectRatio)));
   const stageStyle = {
-    width: isFullscreen
-      ? `min(94vw, calc((100dvh - 360px) * ${aspectRatio}))`
-      : stageWidth + "px",
+    width: (isFullscreen
+      ? Math.min(
+          viewportSize.width * 0.94,
+          Math.max(120, (viewportSize.height - 360) * aspectRatio),
+        )
+      : stageWidth) + "px",
     maxWidth: "100%",
     aspectRatio: image.naturalWidth + " / " + image.naturalHeight,
   };
