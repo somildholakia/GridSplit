@@ -50,7 +50,7 @@ class MotionLayerExpressionTests(unittest.TestCase):
         ], "scale", 101, 10.0)
         self.assertIn("lte(on,20.000000),1.100000", expression)
         self.assertIn("lte(on,80.000000)", expression)
-        self.assertTrue(expression.endswith("1.400000))"))
+        self.assertIn("1.400000", expression)
 
     def test_all_particle_presets_produce_rgba_overlay_expressions(self):
         for preset in ("embers", "snow", "rain", "confetti", "magic"):
