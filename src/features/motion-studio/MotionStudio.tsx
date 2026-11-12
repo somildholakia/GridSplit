@@ -321,7 +321,7 @@ export default function MotionStudio() {
       if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     };
-  }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize]);
+  }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
 
   function drawAtTime(time: number): void {
     const canvas = canvasRef.current;
@@ -335,23 +335,60 @@ export default function MotionStudio() {
     const index = Math.min(images.length - 1, Math.floor(safeTime / secondsPerImage));
     const imageItem = images[index];
     if (!imageItem) return;
-    let image = imageCacheRef.current.get(imageItem.asset.id);
+    const baseKey = "base:" + imageItem.asset.id;
+    const depthKey = imageItem.foreground ? "depth:" + imageItem.foreground.asset.id : "";
+    imageCacheRef.current.forEach((cached, key) => {
+      if (key !== baseKey && key !== depthKey) {
+        cached.src = "";
+        imageCacheRef.current.delete(key);
+      }
+    });
+    let image = imageCacheRef.current.get(baseKey);
     if (!image) {
-      imageCacheRef.current.forEach((cached) => { cached.src = ""; });
-      imageCacheRef.current.clear();
       image = new Image();
       image.onload = () => {
         const audio = audioRef.current;
         drawAtTime(audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime);
       };
       image.onerror = () => setNotice("Could not decode " + imageItem.asset.name + " for the preview.");
-      imageCacheRef.current.set(imageItem.asset.id, image);
+      imageCacheRef.current.set(baseKey, image);
       image.src = imageItem.objectUrl;
       return;
     }
     if (!image.complete || !image.naturalWidth) return;
     const localProgress = Math.max(0, Math.min(1, (safeTime - index * secondsPerImage) / secondsPerImage));
-    drawMotionFrame(canvas, image, effect, localProgress, zoomStrength);
+    const keyframes = imageItem.keyframes.length
+      ? imageItem.keyframes
+      : createPresetKeyframes(effect, zoomStrength);
+    drawMotionFrame(canvas, image, effect, localProgress, zoomStrength, keyframes);
+
+    if (imageItem.foreground) {
+      let foreground = imageCacheRef.current.get(depthKey);
+      if (!foreground) {
+        foreground = new Image();
+        foreground.onload = () => {
+          const audio = audioRef.current;
+          drawAtTime(audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime);
+        };
+        foreground.onerror = () => setNotice("Could not decode the transparent foreground layer for " + imageItem.asset.name + ".");
+        imageCacheRef.current.set(depthKey, foreground);
+        foreground.src = imageItem.foreground.objectUrl;
+      } else if (foreground.complete && foreground.naturalWidth) {
+        const context = canvas.getContext("2d");
+        if (context) {
+          const scale = Math.min(canvas.width / foreground.naturalWidth, canvas.height / foreground.naturalHeight);
+          const drawWidth = foreground.naturalWidth * scale;
+          const drawHeight = foreground.naturalHeight * scale;
+          const strength = parallaxStrength / 100;
+          const offsetX = Math.sin(localProgress * Math.PI * 2) * canvas.width * 0.035 * strength;
+          const offsetY = Math.cos(localProgress * Math.PI * 2) * canvas.height * 0.02 * strength;
+          context.save();
+          context.drawImage(foreground, (canvas.width - drawWidth) / 2 + offsetX, (canvas.height - drawHeight) / 2 + offsetY, drawWidth, drawHeight);
+          context.restore();
+        }
+      }
+    }
+    drawParticlePreview(canvas, particlePreset, localProgress, particleIntensity);
   }
 
   useEffect(() => () => {
