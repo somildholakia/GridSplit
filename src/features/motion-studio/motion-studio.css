@@ -97,3 +97,34 @@
 @media(max-width:1000px){.motion-studio-layout{grid-template-columns:1fr}.motion-studio-side-column{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}}
 @media(max-width:680px){.motion-studio-header{align-items:flex-start}.motion-studio-header-mark{min-width:68px;padding:11px}.motion-studio-header-mark svg{width:23px}.motion-studio-principles{gap:6px}.motion-studio-principles span{font-size:8px;padding:7px 8px}.motion-panel{padding:12px}.motion-studio-side-column{grid-template-columns:1fr}.motion-image-row{grid-template-columns:22px 46px minmax(0,1fr) auto;gap:7px}.motion-image-row>img{width:46px;height:36px}.motion-image-hold{grid-column:3;grid-row:2;text-align:left}.motion-image-actions{grid-column:4;grid-row:1/3;flex-direction:column}.motion-image-info{grid-row:1/3}.motion-settings-grid{grid-template-columns:1fr}.motion-preview-screen{max-height:380px}.motion-preview-screen canvas{max-height:380px}}
 @media(max-width:430px){.motion-studio-header-mark{display:none}.motion-panel-heading{flex-direction:column}.motion-add-images{width:100%}.motion-audio-import{flex-wrap:wrap}.motion-audio-copy{min-width:calc(100% - 60px)}.motion-audio-button{width:100%}.motion-sequence-summary>div{padding:8px}.motion-sequence-summary b{font-size:13px}.motion-preview-footer{flex-direction:column}}
+
+.motion-image-row{cursor:pointer}
+.motion-image-row.editing{outline:1px solid #bca0ff66;border-color:#bca0ff66}
+.motion-depth-state{color:#7f8da2;font-size:8px}
+.motion-depth-state.ready{color:#c9ef75}
+.motion-image-actions{flex-wrap:wrap;justify-content:flex-end}
+.motion-image-actions button,.motion-depth-upload{display:grid;place-items:center;width:25px;height:25px;border:1px solid #ffffff14;border-radius:5px;background:#1a2638;color:#aab6c8;cursor:pointer}
+.motion-depth-upload{position:relative}
+.motion-depth-upload input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.motion-depth-upload:focus-within{outline:2px solid #bca0ff}
+.motion-keyframe-panel,.motion-particle-panel,.motion-parallax-panel{display:grid;gap:12px}
+.motion-keyframe-strip{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.motion-keyframe-strip button{display:inline-flex;align-items:center;gap:5px;padding:7px 9px;border:1px solid #ffffff18;border-radius:6px;background:#101a28;color:#9eacc0;font-size:9px;cursor:pointer}
+.motion-keyframe-strip button.active{border-color:#c9ef75;color:#dff3b9;background:#c9ef7512}
+.motion-keyframe-strip>span{margin-left:auto;color:#8190a5;font-size:8px}
+.motion-range-field{display:grid;grid-template-columns:1fr auto;align-items:center;gap:7px;color:#aab6c8;font-size:9px}
+.motion-range-field b{color:#d5e8b0;font-variant-numeric:tabular-nums}
+.motion-range-field input{grid-column:1/-1;width:100%;accent-color:#c9ef75}
+.motion-keyframe-actions{display:flex;gap:8px;flex-wrap:wrap}
+.motion-keyframe-actions .motion-secondary-button{flex:1}
+.motion-keyframe-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:12px;border:1px solid #ffffff14;border-radius:8px;background:#0e1723}
+.motion-keyframe-controls .motion-range-field:first-child{grid-column:1/-1}
+.motion-effect-legend{display:flex;flex-wrap:wrap;gap:7px}
+.motion-effect-legend span{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid #ffffff12;border-radius:6px;color:#98a6ba;font-size:8px}
+.motion-effect-legend svg{color:#c9ef75}
+.motion-depth-summary{display:grid;gap:5px;padding:11px;border:1px solid #c9ef7520;border-radius:7px;background:#c9ef7508}
+.motion-depth-summary b{color:#c9ef75;font-size:10px}
+.motion-depth-summary span,.motion-note,.motion-colab-caption{margin:0;color:#8593a8;font-size:9px;line-height:1.55}
+.motion-colab-button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;border:1px solid #7a5ec2;border-radius:8px;background:#2c2143;color:#e5d9ff;font-size:10px;font-weight:800;cursor:pointer}
+.motion-colab-caption{margin-top:-5px}
+@media(max-width:680px){.motion-keyframe-controls{grid-template-columns:1fr}.motion-keyframe-controls .motion-range-field:first-child{grid-column:auto}.motion-keyframe-actions{flex-direction:column}.motion-image-actions{max-width:34px}}
