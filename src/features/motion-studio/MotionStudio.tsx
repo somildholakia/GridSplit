@@ -265,6 +265,7 @@ export default function MotionStudio() {
   const [fps, setFps] = useState(30);
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [previewSelectedImage, setPreviewSelectedImage] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [job, setJob] = useState<LocalRenderJob | null>(null);
   const [notice, setNotice] = useState("");
@@ -321,18 +322,23 @@ export default function MotionStudio() {
       if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     };
-  }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
+  }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength, selectedImageId, previewSelectedImage]);
 
   function drawAtTime(time: number): void {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (!images.length || !secondsPerImage) {
+    if (!images.length) {
       const context = canvas.getContext("2d");
       context?.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
     const safeTime = Math.max(0, Math.min(time, Math.max(0, audioDuration - 0.001)));
-    const index = Math.min(images.length - 1, Math.floor(safeTime / secondsPerImage));
+    const timelineIndex = secondsPerImage > 0
+      ? Math.min(images.length - 1, Math.floor(safeTime / secondsPerImage))
+      : 0;
+    const selectedIndex = images.findIndex((item) => item.asset.id === selectedImageId);
+    const useSelectedPreview = previewSelectedImage && selectedIndex >= 0;
+    const index = useSelectedPreview ? selectedIndex : timelineIndex;
     const imageItem = images[index];
     if (!imageItem) return;
     const baseKey = "base:" + imageItem.asset.id;
@@ -356,7 +362,9 @@ export default function MotionStudio() {
       return;
     }
     if (!image.complete || !image.naturalWidth) return;
-    const localProgress = Math.max(0, Math.min(1, (safeTime - index * secondsPerImage) / secondsPerImage));
+    const localProgress = useSelectedPreview || !secondsPerImage
+      ? 0.5
+      : Math.max(0, Math.min(1, (safeTime - index * secondsPerImage) / secondsPerImage));
     const keyframes = imageItem.keyframes.length
       ? imageItem.keyframes
       : createPresetKeyframes(effect, zoomStrength);
@@ -496,6 +504,13 @@ export default function MotionStudio() {
     setImages((current) => current.map((item) => item.asset.id === imageId
       ? { ...item, foreground: undefined }
       : item));
+  };
+
+  const selectImageForEditing = (imageId: string) => {
+    audioRef.current?.pause();
+    setPreviewSelectedImage(true);
+    setSelectedImageId(imageId);
+    setSelectedKeyframeIndex(0);
   };
 
   const addKeyframe = () => {
@@ -802,8 +817,13 @@ export default function MotionStudio() {
     setImages([]);
   };
 
-  const previewTime = audioDuration > 0 ? formatTime(playhead) + " / " + formatTime(audioDuration) : "Import a soundtrack to set the full duration";
-  const previewImage = images[currentIndex];
+  const previewIndex = previewSelectedImage && selectedImage
+    ? images.findIndex((item) => item.asset.id === selectedImage.asset.id)
+    : currentIndex;
+  const previewTime = previewSelectedImage && selectedImage
+    ? "Editing image " + (previewIndex + 1) + " · midpoint preview"
+    : audioDuration > 0 ? formatTime(playhead) + " / " + formatTime(audioDuration) : "Import a soundtrack to set the full duration";
+  const previewImage = images[Math.max(0, previewIndex)];
 
   return (
     <section className="motion-studio">
@@ -858,8 +878,14 @@ export default function MotionStudio() {
                   setAudioError("");
                   setNotice("Soundtrack measured: " + formatTime(duration) + ". Image holds can now be distributed evenly.");
                 }}
-                onTimeUpdate={(event) => setPlayhead(event.currentTarget.currentTime)}
-                onPlay={() => setPlaying(true)}
+                onTimeUpdate={(event) => {
+                  setPreviewSelectedImage(false);
+                  setPlayhead(event.currentTarget.currentTime);
+                }}
+                onPlay={() => {
+                  setPreviewSelectedImage(false);
+                  setPlaying(true);
+                }}
                 onPause={() => setPlaying(false)}
                 onEnded={() => setPlaying(false)}
                 onError={() => setAudioError("The browser could not read this audio file. Try WAV or MP3.")} />
@@ -875,7 +901,7 @@ export default function MotionStudio() {
               {images.map((item, index) => <article
                 className={(index === currentIndex ? "motion-image-row active" : "motion-image-row") + (selectedImageId === item.asset.id ? " editing" : "")}
                 key={item.asset.id}
-                onClick={() => { setSelectedImageId(item.asset.id); setSelectedKeyframeIndex(0); }}>
+                onClick={() => selectImageForEditing(item.asset.id)}>
                 <span className="motion-image-number">{String(index + 1).padStart(2, "0")}</span>
                 <img src={item.objectUrl} alt="" />
                 <div className="motion-image-info">
@@ -929,7 +955,7 @@ export default function MotionStudio() {
               <KeyRound size={20} />
             </div>
             <label className="motion-field">Image being edited
-              <select value={selectedImage?.asset.id ?? ""} disabled={!images.length || rendering} onChange={(event) => { setSelectedImageId(event.target.value); setSelectedKeyframeIndex(0); }}>
+              <select value={selectedImage?.asset.id ?? ""} disabled={!images.length || rendering} onChange={(event) => selectImageForEditing(event.target.value)}>
                 {images.map((item, index) => <option key={item.asset.id} value={item.asset.id}>{index + 1}. {item.asset.name}</option>)}
               </select>
             </label>
