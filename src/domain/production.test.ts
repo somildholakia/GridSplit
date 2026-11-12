@@ -122,8 +122,11 @@ describe("motion layer contracts", () => {
   });
 
   it("accepts explicit software and NVIDIA render encoder preferences", () => {
-    expect(isRenderProfile({ ...profile, encoder: "software" })).toBe(true);
-    expect(isRenderProfile({ ...profile, encoder: "nvidia" })).toBe(true);
-    expect(isRenderProfile({ ...profile, encoder: "unknown" })).toBe(false);
+    const baseProfile: RenderProfile = {
+      width: 1920, height: 1080, fps: 30, aspectRatio: "16:9", quality: "balanced",
+    };
+    expect(isRenderProfile({ ...baseProfile, encoder: "software" })).toBe(true);
+    expect(isRenderProfile({ ...baseProfile, encoder: "nvidia" })).toBe(true);
+    expect(isRenderProfile({ ...baseProfile, encoder: "unknown" })).toBe(false);
   });
 });
