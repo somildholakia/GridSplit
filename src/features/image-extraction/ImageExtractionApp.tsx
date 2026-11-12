@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent } from "react";
+import type { ClipboardEvent as ReactClipboardEvent, DragEvent } from "react";
 import {
   ArrowDownToLine,
   Check,
+  ClipboardPaste,
   CircleHelp,
   FileImage,
   FolderArchive,
@@ -23,6 +24,7 @@ import { applyReviewed196SampleCorrection, is196SampleCandidateLayout } from "..
 import { drawCropToFrame, type FrameFitMode } from "../../lib/frameRenderer";
 import { GridGuideEditor } from "./GridGuideEditor";
 import { buildCellsFromGuides } from "../../lib/manualGrid";
+import { parseGridCoordinatePayload } from "../../lib/gridCoordinateImport";
 
 type Cell = ExportCell & {
   id: string;
@@ -205,6 +207,18 @@ function App() {
   const [rowsInput, setRowsInput] = useState("13");
   const [gutter, setGutter] = useState(2);
   const [showGridGuides, setShowGridGuides] = useState(false);
+  const [showCoordinatePaste, setShowCoordinatePaste] = useState(false);
+  const [coordinateText, setCoordinateText] = useState("");
+  const [coordinateError, setCoordinateError] = useState("");
+
+  useEffect(() => {
+    if (!showCoordinatePaste) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowCoordinatePaste(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showCoordinatePaste]);
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
   const [fitMode, setFitMode] = useState<FrameFitMode>("blur");
   const [backgroundColor, setBackgroundColor] = useState("#080b12");
@@ -380,6 +394,37 @@ function App() {
       horizontalCuts.length + " full-width horizontal guides. " + nextCells.length +
       " independently positioned regions are ready for review.",
     );
+  };
+
+  const applyCoordinateText = (rawText: string) => {
+    if (!loaded) return;
+    try {
+      const parsed = parseGridCoordinatePayload(
+        rawText,
+        loaded.image.naturalWidth,
+        loaded.image.naturalHeight,
+      );
+      applyGuidedGrid(parsed.verticalCutsByRow, parsed.horizontalCuts);
+      setCoordinateError("");
+      setCoordinateText("");
+      setShowCoordinatePaste(false);
+    } catch (coordinateImportError) {
+      setCoordinateError(
+        coordinateImportError instanceof Error
+          ? coordinateImportError.message
+          : "Could not read these coordinates. Copy the complete JSON block and try again.",
+      );
+    }
+  };
+
+  const handleCoordinatePaste = (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = event.clipboardData.getData("text/plain") || event.clipboardData.getData("text");
+    if (!pastedText.trim()) return;
+    event.preventDefault();
+    setCoordinateText(pastedText);
+    setCoordinateError("");
+    // One paste applies the full grid immediately; no per-line entry is needed.
+    applyCoordinateText(pastedText);
   };
 
   const updateCellGeometry = (
@@ -685,10 +730,23 @@ function App() {
 
               <div className="review-hint"><CircleHelp size={15} /> Click a tile to include or exclude it. Use manual guides for uneven rows and columns, then fine-tune any crop before export.</div>
               <div className="manual-guide-toolbar">
-                <div><b>Need exact boundaries?</b><span>Place and drag your own split lines over the original collage.</span></div>
-                <button type="button" className="button button-secondary" onClick={() => setShowGridGuides((visible) => !visible)}>
-                  <Grid2X2 size={15} /> {showGridGuides ? "Hide grid guide editor" : "Open grid guide editor"}
-                </button>
+                <div><b>Need exact boundaries?</b><span>Paste one complete coordinate block or place and drag split lines manually.</span></div>
+                <div className="manual-guide-toolbar-actions">
+                  <button
+                    type="button"
+                    className="button button-primary"
+                    onClick={() => {
+                      setCoordinateText("");
+                      setCoordinateError("");
+                      setShowCoordinatePaste(true);
+                    }}
+                  >
+                    <ClipboardPaste size={15} /> Paste coordinates
+                  </button>
+                  <button type="button" className="button button-secondary" onClick={() => setShowGridGuides((visible) => !visible)}>
+                    <Grid2X2 size={15} /> {showGridGuides ? "Hide grid guide editor" : "Open grid guide editor"}
+                  </button>
+                </div>
               </div>
               <GridGuideEditor
                 key={loaded.url}
@@ -698,6 +756,72 @@ function App() {
                 open={showGridGuides}
                 onApply={applyGuidedGrid}
               />
+              {showCoordinatePaste && loaded && (
+                <div
+                  className="grid-coordinate-modal-backdrop"
+                  role="presentation"
+                  onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) setShowCoordinatePaste(false);
+                  }}
+                >
+                  <section
+                    className="grid-coordinate-modal"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="grid-coordinate-modal-title"
+                  >
+                    <div className="grid-coordinate-modal-heading">
+                      <div>
+                        <div className="grid-coordinate-modal-kicker"><ClipboardPaste size={14} /> BULK GRID IMPORT</div>
+                        <h2 id="grid-coordinate-modal-title">Paste all coordinates</h2>
+                        <p>Copy the complete JSON block and paste it here once. GridSplit will assign every horizontal and row-specific vertical line automatically.</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="grid-coordinate-modal-close"
+                        aria-label="Close coordinate window"
+                        onClick={() => setShowCoordinatePaste(false)}
+                      ><X size={18} /></button>
+                    </div>
+                    <div className="grid-coordinate-image-size">
+                      Original image size <b>{loaded.image.naturalWidth.toLocaleString()} × {loaded.image.naturalHeight.toLocaleString()} px</b>
+                    </div>
+                    <textarea
+                      className="grid-coordinate-modal-input"
+                      value={coordinateText}
+                      onChange={(event) => {
+                        setCoordinateText(event.target.value);
+                        setCoordinateError("");
+                      }}
+                      onPaste={handleCoordinatePaste}
+                      autoFocus
+                      rows={13}
+                      spellCheck={false}
+                      aria-label="Paste complete grid coordinate JSON"
+                      placeholder={'{\n  "width": 1536,\n  "height": 864,\n  "horizontalCuts": [93, 185],\n  "verticalCutsByRow": [\n    [227, 363],\n    [145, 276],\n    []\n  ]\n}'}
+                    />
+                    <div className="grid-coordinate-modal-help">Coordinates must be pixel positions from the top-left corner. Pasting a valid block applies it immediately.</div>
+                    {coordinateError && <div className="grid-coordinate-modal-error" role="alert">{coordinateError}</div>}
+                    <div className="grid-coordinate-modal-actions">
+                      <button
+                        type="button"
+                        className="button button-secondary"
+                        onClick={() => {
+                          setCoordinateText("");
+                          setCoordinateError("");
+                        }}
+                      >Clear</button>
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        disabled={!coordinateText.trim()}
+                        onClick={() => applyCoordinateText(coordinateText)}
+                      ><ClipboardPaste size={15} /> Apply coordinates</button>
+                    </div>
+                  </section>
+                </div>
+              )}
+
               {activeCell && (
                 <div className="crop-editor-panel">
                   <div className="crop-editor-heading">
