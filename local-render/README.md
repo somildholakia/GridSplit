@@ -46,7 +46,7 @@ Keep the browser endpoint at `http://127.0.0.1:8766`. The production site does n
 
 ## Render behavior
 
-The renderer creates H.264 video (libx264) and AAC audio, applies the selected output dimensions/frame rate, uses timeline image order, fills image timeline gaps with black, applies supported per-image zoom/pan effects and xfade transitions, and mixes available narration/dialogue/music/SFX tracks with gain, mute/solo and fade settings. It then probes the MP4 and checks codecs, dimensions, and timeline duration before the browser downloads it.
+The renderer creates H.264 video (libx264) and AAC audio, applies the selected output dimensions/frame rate, uses timeline image order, fills image timeline gaps with black, applies supported per-image zoom/pan effects and xfade transitions, and mixes available narration/dialogue/music/SFX tracks with gain, mute/solo and fade settings. Optional grayscale depth maps generated in the browser can drive a low-amplitude FFmpeg `displace` pass on each image clip. These maps are composition-based estimates (focus-point falloff, vertical perspective prior and local contrast), not neural monocular depth or accurate 3D reconstruction. All source images and depth maps stay in the project archive and render on the local machine. It then probes the MP4 and checks codecs, dimensions, and timeline duration before the browser downloads it.
 
 A renderer job can be cancelled from the Studio UI. FFmpeg and ffprobe must support the selected media formats; unsupported input files produce a readable job error. The output is not claimed complete until ffprobe validation succeeds.
 
