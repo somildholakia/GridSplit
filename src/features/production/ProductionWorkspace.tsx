@@ -70,6 +70,8 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const playbackOriginRef=useRef<number|null>(null);
   const animationFrameRef=useRef<number|null>(null);
   const folderRef=useRef<HTMLInputElement>(null);
+  const onUpdateRef=useRef(onUpdate);
+  onUpdateRef.current=onUpdate;
   useEffect(()=>{folderRef.current?.setAttribute("webkitdirectory","");folderRef.current?.setAttribute("directory","");},[]);
   const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline"|"animation"|"tools">("sequence");
   const issues=useMemo(()=>analyseSequence(assets),[assets]);
@@ -182,11 +184,13 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     (project.audioSegments??[]).map(segment=>segment.id+":"+segment.status+":"+String(segment.durationSeconds??"")).join(","),
   ].join("::");
   const autoSyncRevisionRef=useRef(0);
+  // The serialized source key captures the media/mapping inputs intentionally.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{
     const revision=++autoSyncRevisionRef.current;
     let cancelled=false;
     const hasInputs=project.scenes.some(scene=>
-      mappedFor(scene.id).length>0
+      (mappings.find(mapping=>mapping.sceneId===scene.id)?.imageIds.length??0)>0
       &&(project.audioSegments??[]).some(segment=>segment.sceneId===scene.id&&segment.status==="ready"));
     if(!hasInputs)return;
     const timeout=window.setTimeout(()=>{
@@ -201,12 +205,12 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
               if(!blob)continue;
               try{duration+=(await measureWavBlob(blob)).durationSeconds;}catch{/* skip unreadable audio */}
             }
-            const imageIds=mappedFor(scene.id);
+            const imageIds=mappings.find(mapping=>mapping.sceneId===scene.id)?.imageIds??[];
             if(duration>0&&imageIds.length)inputs.push({sceneId:scene.id,durationSeconds:duration,imageIds});
           }
           if(cancelled||revision!==autoSyncRevisionRef.current)return;
           const next=buildTimeline(inputs);
-          patchProject(onUpdate,{timelineClips:next});
+          patchProject(onUpdateRef.current,{timelineClips:next});
           setPlayheadSeconds(current=>Math.min(current,timelineDurationSeconds(next)));
           setMessage("Auto-synced "+next.filter(clip=>clip.track==="images").length+" image clips with measured narration/dialogue audio.");
         }catch(error){
