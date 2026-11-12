@@ -688,7 +688,6 @@ export default function MotionStudio() {
       keyframes: images[index].keyframes.length
         ? images[index].keyframes
         : createPresetKeyframes(effect, zoomStrength),
-      ...resolveParticleSettings(images[index].particlePreset, images[index].particleIntensity, particlePreset, particleIntensity),
       particlePreset: resolveParticleSettings(images[index].particlePreset, images[index].particleIntensity, particlePreset, particleIntensity).preset,
       particleIntensity: resolveParticleSettings(images[index].particlePreset, images[index].particleIntensity, particlePreset, particleIntensity).intensity,
       ...(images[index].foreground
