@@ -21,6 +21,21 @@ class SafePathTests(unittest.TestCase):
                     server.safe_path(value)
 
 
+class DepthWarpTests(unittest.TestCase):
+    def test_builds_low_resolution_depth_displacement_maps(self):
+        filters, output = server.depth_warp_filters(3, "[vbase0]", 1920, 1080, 4.0, 30, 45, 0)
+        self.assertEqual(output, "[vdepthwarp0]")
+        self.assertEqual(len(filters), 4)
+        self.assertIn("scale=480:270", filters[0])
+        self.assertIn("geq=lum=", filters[1])
+        self.assertIn("displace=edge=smear", filters[3])
+
+    def test_zero_strength_skips_depth_warp(self):
+        filters, output = server.depth_warp_filters(3, "[vbase0]", 1920, 1080, 4.0, 30, 0, 0)
+        self.assertEqual(filters, [])
+        self.assertEqual(output, "[vbase0]")
+
+
 class ArchiveValidationTests(unittest.TestCase):
     def create_archive(self, root: Path, payload: bytes, digest: str | None = None) -> Path:
         path = root / "project.zip"
