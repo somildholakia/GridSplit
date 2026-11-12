@@ -175,6 +175,13 @@ export default function MotionStudio() {
   const [rendererMessage, setRendererMessage] = useState("Local renderer not checked yet.");
   const [checkingRenderer, setCheckingRenderer] = useState(false);
   const [effect, setEffect] = useState<ImageEffectKind>("ken-burns");
+  const [selectedImageId, setSelectedImageId] = useState("");
+  const [selectedKeyframeIndex, setSelectedKeyframeIndex] = useState(0);
+  const [keyframePosition, setKeyframePosition] = useState(0.5);
+  const [particlePreset, setParticlePreset] = useState<ParticlePreset>("none");
+  const [particleIntensity, setParticleIntensity] = useState(55);
+  const [parallaxStrength, setParallaxStrength] = useState(45);
+  const [colabExporting, setColabExporting] = useState(false);
   const [transition, setTransition] = useState<TransitionKind>("dissolve");
   const [transitionDuration, setTransitionDuration] = useState(0.6);
   const [zoomStrength, setZoomStrength] = useState(1.16);
@@ -204,6 +211,19 @@ export default function MotionStudio() {
     : 0;
   const canRender = images.length > 0 && Boolean(audioFile) && audioDuration > 0
     && Number.isFinite(audioDuration) && audioDuration <= 24 * 60 * 60;
+  const selectedImage = images.find((item) => item.asset.id === selectedImageId) ?? images[currentIndex];
+  const editableKeyframes = selectedImage?.keyframes.length
+    ? selectedImage.keyframes
+    : selectedImage ? createPresetKeyframes(effect, zoomStrength) : [];
+  const selectedKeyframe = editableKeyframes[Math.min(selectedKeyframeIndex, Math.max(0, editableKeyframes.length - 1))];
+
+
+  useEffect(() => {
+    if (images.length && !images.some((item) => item.asset.id === selectedImageId)) {
+      setSelectedImageId(images[0].asset.id);
+      setSelectedKeyframeIndex(0);
+    }
+  }, [images, selectedImageId]);
 
   useEffect(() => {
     imageCacheRef.current.forEach((image) => { image.src = ""; });
