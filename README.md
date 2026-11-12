@@ -137,4 +137,4 @@ Install FFmpeg and ffprobe yourself, then from the repository root run:
 
     python local-render/server.py --allow-origin http://localhost:5173
 
-Use the exact browser origin for your frontend. For the public website, run the sidecar with `--allow-origin https://gridsplit-kappa.vercel.app`; it still binds to 127.0.0.1 and media remains on your computer. See [local-render/README.md](local-render/README.md) and [docs/M26-M31.md](docs/M26-M31.md) for setup, archive contents and limits. GridSplit does not bundle FFmpeg or download codecs. The exact installed build must provide H.264 (libx264) and AAC encoding for the default MP4 export profile.
+Use the exact browser origin for your frontend. For the public website, run the sidecar with `--allow-origin https://gridsplit-studio.vercel.app`; it still binds to 127.0.0.1 and media remains on your computer. See [local-render/README.md](local-render/README.md) and [docs/M26-M31.md](docs/M26-M31.md) for setup, archive contents and limits. GridSplit does not bundle FFmpeg or download codecs. The exact installed build must provide H.264 (libx264) and AAC encoding for the default MP4 export profile.

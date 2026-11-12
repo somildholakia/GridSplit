@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-12 — M37 browser animation and batch audio
+
+- PR #22 merged browser-based still-image animation with six motion presets, 3–60 second image duration, selected/all-sequence export, MP4 where supported and WebM fallback.
+- Animation recorder chunks stream to OPFS where supported; browsers without OPFS use an in-memory fallback. Long recordings remain real-time.
+- Added sequential Audio Studio batch generation with progress/cancellation; ready audio is skipped and music/SFX are excluded from TTS.
+- Expanded parser cue recognition and raised the Production Studio project image cap to 1,200.
+- PR CI #43184510763 and post-merge main CI #43185852867 passed. Secondary production deployment `gridsplit-studio.vercel.app` is READY.
+- Real Kokoro generation/playback and M36 media export/restore/re-render remain open.
+
 ## 2026-11-10 — 196-image ZIP export regression
 
 - Added `src/lib/exportZip.test.ts` to validate exactly 196 uniquely numbered PNG archive entries, 197 manifest lines, representative crop coordinates, one draw/encode per selection, and safe filename-prefix sanitization.
