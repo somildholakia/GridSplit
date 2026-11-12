@@ -222,7 +222,7 @@ describe("even image distribution across the complete audio runtime", () => {
     images.slice(1).forEach((clip, index) => {
       expect(clip.startSeconds).toBeCloseTo(images[index].startSeconds + images[index].durationSeconds, 8);
     });
-    expect(images.at(-1)!.startSeconds + images.at(-1)!.durationSeconds).toBeCloseTo(600, 8);
+    expect(images[images.length - 1].startSeconds + images[images.length - 1].durationSeconds).toBeCloseTo(600, 8);
   });
 
   it("applies a shared hold duration globally and lets the final image fill the audio tail", () => {
@@ -234,7 +234,7 @@ describe("even image distribution across the complete audio runtime", () => {
     const updated = setAllImageClipDurationsAcrossTimeline(clips, 30)!;
     const images = updated.filter((clip) => clip.track === "images").sort((a, b) => a.order - b.order);
     expect(images.every((clip) => clip.durationSeconds === 30)).toBe(true);
-    expect(images.at(-1)!.startSeconds + images.at(-1)!.durationSeconds).toBe(600);
+    expect(images[images.length - 1].startSeconds + images[images.length - 1].durationSeconds).toBe(600);
   });
 
   it("rejects a global hold duration that leaves less than 0.01 seconds for the final image", () => {
