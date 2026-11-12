@@ -23,6 +23,9 @@ export interface MixAudioAsset {
   trackId: string;
   /** SFX follows the start of this scene; music remains timeline-wide. */
   sceneId?: string;
+  /** Source script block allows generated cues to be reconciled and regenerated. */
+  sourceBlockId?: string;
+  sourceSceneId?: string;
   startSeconds: number;
   durationSeconds: number;
   order: number;
@@ -123,6 +126,9 @@ export function isMixAudioAsset(value: unknown): value is MixAudioAsset {
     && isFiniteInRange(value.bytes, 1, Number.MAX_SAFE_INTEGER)
     && (value.kind === "music" || value.kind === "sfx")
     && typeof value.trackId === "string"
+    && (value.sceneId === undefined || typeof value.sceneId === "string")
+    && (value.sourceBlockId === undefined || typeof value.sourceBlockId === "string")
+    && (value.sourceSceneId === undefined || typeof value.sourceSceneId === "string")
     && isFiniteInRange(value.startSeconds, 0, 24 * 60 * 60)
     && isFiniteInRange(value.durationSeconds, 0.01, 24 * 60 * 60)
     && Number.isSafeInteger(value.order)
