@@ -527,6 +527,11 @@ export default function MotionStudio() {
   const updateSelectedKeyframe = (patch: Partial<MotionKeyframe>) => {
     if (!selectedImage || !selectedKeyframe) return;
     const updatedKeyframe = { ...selectedKeyframe, ...patch };
+    if (patch.time !== undefined && editableKeyframes.some((item, index) =>
+      index !== selectedKeyframeIndex && Math.abs(item.time - updatedKeyframe.time) < 0.005)) {
+      setNotice("Keyframes need distinct positions. Move this key away from the neighbouring key.");
+      return;
+    }
     const next = editableKeyframes.map((item, index) => index === selectedKeyframeIndex
       ? updatedKeyframe
       : item).sort((a, b) => a.time - b.time);
