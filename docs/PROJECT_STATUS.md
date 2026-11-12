@@ -13,6 +13,9 @@
 
 **Validation:** PR-branch CI run [#43184510763](https://github.com/somildholakia/GridSplit/actions/runs/43184510763) passed the dependency audits, Python sidecar checks, ESLint, Vitest, TypeScript typecheck, production build and static artifact upload. Post-merge main CI run [#43185852867](https://github.com/somildholakia/GridSplit/actions/runs/43185852867) also passed on merge commit `e30fba7e363eb786c972fb01be9b439f22ad10c1`.
 
+
+**Public UI smoke test:** [Live browser run](https://agent.tinyfish.ai/runs/e704c165-6469-4efd-9ad0-29ebaff30dad) completed on 2026-11-12. Dashboard, Script Studio, Audio Studio, Image Splitter, Production Studio, Image Animation and Mix & Export all loaded. The six animation presets, batch-generation control, four-track mixer, MP4 export settings and archive restore controls were visible. The run created only a temporary QA project, uploaded no files and did not start TTS or rendering; therefore it is UI/navigation evidence, not media acceptance.
+
 **Production deployment:** the secondary Vercel account's `gridsplit-studio` project is `READY` at [https://gridsplit-studio.vercel.app](https://gridsplit-studio.vercel.app), deployment `dpl_5VXNM3wSoDumaV5RtjNMpsmE6y8Q`, serving merge commit `e30fba7e`. The public root returned HTTP 200, and the served JavaScript bundle contains the new batch-audio, image-animation, 1,200-image-cap and parser-cue code. The separate legacy `gridsplit-kappa.vercel.app` project is not asserted to have been updated by this deployment.
 
 **Remaining release gates:** M14–M16 still need a real Kokoro model/voice synthesis → playback → WAV-download test. M36 still needs a representative target-device/browser media workflow: actual image import and timeline review, local FFmpeg/ffprobe render, browser-generated portable archive export, restore and re-render. GitHub CI fixtures do not substitute for those device-specific steps.
