@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown, ArrowUp, AudioLines, CheckCircle2, Clapperboard, FileAudio,
   ImagePlus, Loader2, RefreshCw, ShieldCheck, Sparkles, Square,
-  Trash2, Upload, WandSparkles,
+  Trash2, Upload, WandSparkles, KeyRound, Layers3, Flame, CloudSnow, CloudRain, Sparkles as SparklesIcon,
 } from "lucide-react";
 import type { StudioProject, ProjectImageAsset, ProjectTimelineClip } from "../../lib/projectStore";
 import type {
   AspectRatio, AudioMixTrack, ImageEffectKind, MixAudioAsset,
-  RenderProfile, TransitionKind, VideoClipEdit,
+  MotionKeyframe, ParticlePreset, RenderProfile, TransitionKind, VideoClipEdit,
 } from "../../domain/production";
 import {
   downloadRenderedVideo, renderProjectLocally, type LocalRenderJob,
@@ -16,12 +16,18 @@ import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
 import { buildEvenImageTimeline } from "./motionTiming";
+import { createPresetKeyframes, insertMotionKeyframe, sampleMotionKeyframes } from "./motionLayers";
+import { buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
 import "./motion-studio.css";
 
+type MotionForeground = { asset: ProjectImageAsset; file: File; objectUrl: string };
 type MotionImage = {
   asset: ProjectImageAsset;
   file: File;
   objectUrl: string;
+  foreground?: MotionForeground;
+  keyframes: MotionKeyframe[];
+  customKeyframes: boolean;
 };
 
 type OutputSize = "720p" | "1080p";
@@ -92,6 +98,7 @@ function drawMotionFrame(
   effect: ImageEffectKind,
   progress: number,
   zoomStrength: number,
+  keyframes?: MotionKeyframe[],
 ): void {
   const context = canvas.getContext("2d");
   if (!context || !image.complete || !image.naturalWidth || !image.naturalHeight) return;
@@ -112,12 +119,21 @@ function drawMotionFrame(
     zoom = 1.08 + strength * 0.06;
     offsetX = (progress - 0.5) * width * 0.11;
   }
+  let rotation = 0;
+  if (keyframes?.length) {
+    const transform = sampleMotionKeyframes(keyframes, progress);
+    zoom = transform.scale;
+    offsetX = (0.5 - transform.panX) * width * 0.14;
+    offsetY = (0.5 - transform.panY) * height * 0.14;
+    rotation = transform.rotation * Math.PI / 180;
+  }
   const drawWidth = image.naturalWidth * cover * zoom;
   const drawHeight = image.naturalHeight * cover * zoom;
   context.fillStyle = "#070a10";
   context.fillRect(0, 0, width, height);
   context.save();
   context.translate(width / 2 + offsetX, height / 2 + offsetY);
+  context.rotate(rotation);
   context.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
   context.restore();
 }
