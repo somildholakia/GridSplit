@@ -58,7 +58,7 @@ function classifyParagraph(raw: string): Classification {
 function isExplicitBlockStart(line: string): boolean {
   const value = line.trim().replace(/^\*{1,2}(.*?)\*{1,2}\s*/, "$1 ");
   if (/^\[(?:NARRATOR|NARRATION|VOICE\s*OVER|VOICEOVER|VO|CHARACTER|CHAR|DIALOGUE|BACKGROUND\s+MUSIC|MUSIC|BGM|SCORE|SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND|FOOTSTEPS|THUNDER|WIND|RAIN|DOOR|ENGINE|EXPLOSION|GUNSHOT|BIRDS|CROWD)\b/i.test(value)) return true;
-  if (/^(?:NARRATOR|NARRATION|VOICE\s*OVER|VOICEOVER|VO|BACKGROUND\s+MUSIC|MUSIC|BGM|SCORE|SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])/i.test(value)) return true;
+  if (/^(?:NARRATOR|NARRATION|VOICE\s*OVER|VOICEOVER|VO|CHARACTER|CHAR|DIALOGUE|BACKGROUND\s+MUSIC|MUSIC|BGM|SCORE|SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])/i.test(value)) return true;
   const speaker = value.match(/^([A-Z][A-Z0-9 _.'-]{1,28})(?:\s*\([^)]{1,40}\))?\s*:\s*\S/);
   return Boolean(speaker && !/^(?:NOTE|WARNING|IMPORTANT|TITLE|LOCATION|TIME|DATE)$/i.test(speaker[1].trim()));
 }
