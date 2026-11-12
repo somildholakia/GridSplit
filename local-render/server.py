@@ -230,6 +230,30 @@ def particle_overlay_expressions(preset: str, intensity: float, width: int, heig
     return plate_width, plate_height, red, green, blue, alpha
 
 
+def depth_warp_filters(depth_input: int, current_label: str, width: int, height: int,
+                      duration: float, fps: float, strength: float, index: int) -> tuple[list[str], str]:
+    """Build a subtle FFmpeg displace pass from a grayscale composition-depth map."""
+    amount = clamp(float(strength), 0, 100) / 100
+    if amount <= 0:
+        return [], current_label
+    plate_width = max(160, width // 4)
+    plate_height = max(90, height // 4)
+    # Mid-gray (128) means no displacement. Relative depth moves gently in
+    # opposite directions across the clip to create a low-amplitude 2.5D warp.
+    amplitude = amount * 0.72
+    safe_duration = max(0.05, float(duration))
+    filters = [
+        f"[{depth_input}:v]scale={plate_width}:{plate_height}:flags=bilinear,format=gray,"
+        f"fps={fps},trim=duration={safe_duration:.6f},setpts=PTS-STARTPTS,split=2[depthxsrc{index}][depthysrc{index}]",
+        f"[depthxsrc{index}]geq=lum='128+(lum(X,Y)-128)*{amplitude:.6f}*sin(2*PI*T/{safe_duration:.6f})',"
+        f"scale={width}:{height}:flags=bilinear,setpts=PTS-STARTPTS[depthx{index}]",
+        f"[depthysrc{index}]geq=lum='128+(lum(X,Y)-128)*{amplitude:.6f}*cos(2*PI*T/{safe_duration:.6f})',"
+        f"scale={width}:{height}:flags=bilinear,setpts=PTS-STARTPTS[depthy{index}]",
+        f"{current_label}[depthx{index}][depthy{index}]displace=edge=smear[vdepthwarp{index}]",
+    ]
+    return filters, f"[vdepthwarp{index}]"
+
+
 def encoder_available(ffmpeg: str, encoder: str) -> bool:
     try:
         encoders = subprocess.run([ffmpeg, "-hide_banner", "-encoders"], capture_output=True,
@@ -313,6 +337,14 @@ def render_command(project: dict, manifest: dict, root: Path) -> tuple[list[str]
             if not overlay_asset or not overlay_record or overlay_record.get("kind") != "image":
                 raise ValueError("A parallax foreground layer is missing from the project archive.")
             parallax_path = root / overlay_record["path"]
+        depth_map_path = None
+        depth_map_asset_id = edit.get("depthMapAssetId")
+        if depth_map_asset_id:
+            depth_asset = images.get(depth_map_asset_id)
+            depth_record = by_id.get(depth_map_asset_id)
+            if not depth_asset or not depth_record or depth_record.get("kind") != "image":
+                raise ValueError("A depth-map layer is missing from the project archive.")
+            depth_map_path = root / depth_record["path"]
         keyframes = edit.get("keyframes")
         if keyframes is not None:
             if not isinstance(keyframes, list) or not (2 <= len(keyframes) <= 32):
@@ -332,6 +364,7 @@ def render_command(project: dict, manifest: dict, root: Path) -> tuple[list[str]
             "duration": effective_duration,
             "edit": edit,
             "parallaxPath": parallax_path,
+            "depthMapPath": depth_map_path,
         })
         cursor = max(cursor, start + duration)
     video_duration = cursor
@@ -402,6 +435,22 @@ def render_command(project: dict, manifest: dict, root: Path) -> tuple[list[str]
                 f"{current_label}[vdepth{index}]overlay=x='{x_expr}':y='{y_expr}':eval=frame:shortest=1:format=auto[vpara{index}]"
             )
             current_label = f"[vpara{index}]"
+
+        if part.get("depthMapPath"):
+            depth_input = input_index
+            command += ["-loop", "1", "-framerate", str(fps), "-t", f"{duration:.6f}", "-i", str(part["depthMapPath"])]
+            input_index += 1
+            depth_filters, current_label = depth_warp_filters(
+                depth_input,
+                current_label,
+                width,
+                height,
+                duration,
+                fps,
+                clamp(float(edit.get("depthMotionAmount", 35)), 0, 100),
+                index,
+            )
+            filters.extend(depth_filters)
 
         particle = particle_overlay_expressions(
             str(edit.get("particlePreset", "none")),
