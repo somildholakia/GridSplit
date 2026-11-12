@@ -1,8 +1,9 @@
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Crosshair, Expand, Minus, Minimize2, Plus, RotateCcw, Scissors, X } from "lucide-react";
+import type { PointerEvent as ReactPointerEvent, KeyboardEvent as ReactKeyboardEvent, ClipboardEvent as ReactClipboardEvent } from "react";
+import { ClipboardPaste, Crosshair, Expand, Minus, Minimize2, Plus, RotateCcw, Scissors, Terminal, X } from "lucide-react";
 import "./grid-guide-editor.css";
+import { parseGridCoordinatePayload } from "../../lib/gridCoordinateImport";
 
 type Guide = {
   id: string;
@@ -109,6 +110,11 @@ export function GridGuideEditor({
   const [activeGuide, setActiveGuide] = useState<ActiveGuide | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 900 });
+  const [coordinateText, setCoordinateText] = useState("");
+  const [coordinateStatus, setCoordinateStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const activeRowGuides = verticalGuidesByRow[selectedRow] ?? [];
   const activeVerticalId =
@@ -312,6 +318,52 @@ export function GridGuideEditor({
     onApply(verticalCutsByRow, horizontalCuts);
   };
 
+  const importCoordinates = (rawText: string) => {
+    try {
+      const parsed = parseGridCoordinatePayload(
+        rawText,
+        image.naturalWidth,
+        image.naturalHeight,
+      );
+      const nextVerticalGuides = parsed.verticalCutsByRow.map((cuts) =>
+        cuts.map((coordinate) => ({
+          id: makeId("vertical"),
+          position: (coordinate / image.naturalWidth) * 100,
+        })),
+      );
+      const nextHorizontalGuides = parsed.horizontalCuts.map((coordinate) => ({
+        id: makeId("horizontal"),
+        position: (coordinate / image.naturalHeight) * 100,
+      }));
+
+      setVerticalGuidesByRow(nextVerticalGuides);
+      setHorizontalGuides(nextHorizontalGuides);
+      setSelectedRow(0);
+      setActiveGuide(null);
+      dragRef.current = null;
+      onApply(parsed.verticalCutsByRow, parsed.horizontalCuts);
+      const verticalCount = parsed.verticalCutsByRow.reduce((total, cuts) => total + cuts.length, 0);
+      const regionCount = parsed.verticalCutsByRow.reduce((total, cuts) => total + cuts.length + 1, 0);
+      setCoordinateStatus({
+        type: "success",
+        message: `Applied ${verticalCount + parsed.horizontalCuts.length} guides (${verticalCount} vertical, ${parsed.horizontalCuts.length} horizontal) across ${parsed.verticalCutsByRow.length} rows. ${regionCount} regions are ready in the splitter.`,
+      });
+    } catch (importError) {
+      setCoordinateStatus({
+        type: "error",
+        message: importError instanceof Error ? importError.message : "Could not import these coordinates.",
+      });
+    }
+  };
+
+  const handleCoordinatePaste = (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = event.clipboardData.getData("text/plain") || event.clipboardData.getData("text");
+    if (!pastedText.trim()) return;
+    event.preventDefault();
+    setCoordinateText(pastedText);
+    importCoordinates(pastedText);
+  };
+
   const horizontalBoundaries = [
     0,
     ...horizontalGuides.map((guide) => guide.position).sort((a, b) => a - b),
@@ -353,6 +405,54 @@ export function GridGuideEditor({
             {isFullscreen ? "Exit full screen" : "Full size"}
           </button>
         </div>
+      </div>
+
+      <div className="grid-guide-coordinate-terminal">
+        <div className="grid-guide-terminal-heading">
+          <div>
+            <div className="grid-guide-terminal-title"><Terminal size={14} /> BULK COORDINATE TERMINAL</div>
+            <p>Paste one complete coordinate block. A valid paste is assigned to the grid and splitter immediately.</p>
+          </div>
+          <span>{image.naturalWidth.toLocaleString()} × {image.naturalHeight.toLocaleString()} px</span>
+        </div>
+        <textarea
+          className="grid-guide-terminal-input"
+          value={coordinateText}
+          onChange={(event) => {
+            setCoordinateText(event.target.value);
+            setCoordinateStatus(null);
+          }}
+          onPaste={handleCoordinatePaste}
+          rows={5}
+          spellCheck={false}
+          aria-label="Paste all image grid coordinates as JSON"
+          placeholder={'{\n  "width": 1536,\n  "height": 864,\n  "horizontalCuts": [86, 173],\n  "verticalCutsByRow": [\n    [256, 512, 768],\n    [192, 576],\n    [256, 512, 768]\n  ]\n}'}
+        />
+        <div className="grid-guide-terminal-footer">
+          <span>Pixels from top-left · X cuts per row · Y cuts span full width · paste once</span>
+          <div>
+            <button
+              type="button"
+              className="grid-guide-terminal-clear"
+              onClick={() => {
+                setCoordinateText("");
+                setCoordinateStatus(null);
+              }}
+            >Clear</button>
+            <button
+              type="button"
+              className="grid-guide-terminal-apply"
+              onClick={() => importCoordinates(coordinateText)}
+              disabled={!coordinateText.trim()}
+            ><ClipboardPaste size={13} /> Apply all coordinates</button>
+          </div>
+        </div>
+        {coordinateStatus && (
+          <div
+            className={"grid-guide-terminal-status " + coordinateStatus.type}
+            role={coordinateStatus.type === "error" ? "alert" : "status"}
+          >{coordinateStatus.message}</div>
+        )}
       </div>
 
       <div className="grid-guide-stage-shell">
