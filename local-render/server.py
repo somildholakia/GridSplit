@@ -166,7 +166,10 @@ def keyframe_expression(keyframes: list[dict], field: str, frame_count: int,
         end = right["position"]
         delta = right["value"] - left["value"]
         segment = f"({left['value']:.6f}+({delta:.6f})*({variable}-{position:.6f})/{span:.6f})"
-        result = f"if(lte({variable},{end:.6f}),{segment},{result})"
+        result = (
+            f"if(lte({variable},{position:.6f}),{left['value']:.6f},"
+            f"if(lte({variable},{end:.6f}),{segment},{result}))"
+        )
     return ffmpeg_expression(result)
 
 
