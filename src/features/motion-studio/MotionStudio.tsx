@@ -108,7 +108,7 @@ function drawMotionFrame(
   const cover = Math.max(width / image.naturalWidth, height / image.naturalHeight);
   let zoom = effect === "none" ? 1 : 1.04 + strength * 0.08;
   let offsetX = 0;
-  const offsetY = 0;
+  let offsetY = 0;
   if (effect === "ken-burns" || effect === "zoom-in") zoom = 1.04 + strength * 0.08 + progress * (0.09 + strength * 0.08);
   if (effect === "zoom-out") zoom = 1.16 + strength * 0.12 - progress * (0.09 + strength * 0.08);
   if (effect === "pan-left") {
@@ -861,15 +861,29 @@ export default function MotionStudio() {
             </div>
             {images.length ? <div className="motion-image-list">
               <div className="motion-list-header"><b>IMAGE ORDER</b><button type="button" disabled={rendering} onClick={clearImages}><Trash2 size={13} /> Clear all</button></div>
-              {images.map((item, index) => <article className={index === currentIndex ? "motion-image-row active" : "motion-image-row"} key={item.asset.id}>
+              {images.map((item, index) => <article
+                className={(index === currentIndex ? "motion-image-row active" : "motion-image-row") + (selectedImageId === item.asset.id ? " editing" : "")}
+                key={item.asset.id}
+                onClick={() => { setSelectedImageId(item.asset.id); setSelectedKeyframeIndex(0); }}>
                 <span className="motion-image-number">{String(index + 1).padStart(2, "0")}</span>
                 <img src={item.objectUrl} alt="" />
-                <div className="motion-image-info"><b title={item.asset.name}>{item.asset.name}</b><span>{item.asset.width} × {item.asset.height} · {(item.file.size / 1024 / 1024).toFixed(1)} MB</span></div>
+                <div className="motion-image-info">
+                  <b title={item.asset.name}>{item.asset.name}</b>
+                  <span>{item.asset.width} × {item.asset.height} · {(item.file.size / 1024 / 1024).toFixed(1)} MB</span>
+                  <small className={item.foreground ? "motion-depth-state ready" : "motion-depth-state"}>
+                    {item.foreground ? "Depth cutout attached" : "Flat image"}
+                  </small>
+                </div>
                 <div className="motion-image-hold">{audioDuration > 0 ? formatTime(secondsPerImage) : "—"}</div>
                 <div className="motion-image-actions">
-                  <button type="button" title="Move earlier" aria-label="Move image earlier" disabled={rendering || index === 0} onClick={() => moveImage(index, -1)}><ArrowUp size={13} /></button>
-                  <button type="button" title="Move later" aria-label="Move image later" disabled={rendering || index === images.length - 1} onClick={() => moveImage(index, 1)}><ArrowDown size={13} /></button>
-                  <button type="button" title="Remove image" aria-label="Remove image" disabled={rendering} onClick={() => removeImage(item.asset.id)}><Trash2 size={13} /></button>
+                  <label className="motion-depth-upload" title="Attach a transparent foreground cutout">
+                    <Layers3 size={12} />
+                    <input type="file" accept="image/png,image/webp" disabled={rendering} onChange={(event) => { void addForegroundLayer(item.asset.id, event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} />
+                  </label>
+                  {item.foreground && <button type="button" title="Remove depth layer" aria-label="Remove depth layer" disabled={rendering} onClick={(event) => { event.stopPropagation(); removeForegroundLayer(item.asset.id); }}><Layers3 size={12} /></button>}
+                  <button type="button" title="Move earlier" aria-label="Move image earlier" disabled={rendering || index === 0} onClick={(event) => { event.stopPropagation(); moveImage(index, -1); }}><ArrowUp size={13} /></button>
+                  <button type="button" title="Move later" aria-label="Move image later" disabled={rendering || index === images.length - 1} onClick={(event) => { event.stopPropagation(); moveImage(index, 1); }}><ArrowDown size={13} /></button>
+                  <button type="button" title="Remove image" aria-label="Remove image" disabled={rendering} onClick={(event) => { event.stopPropagation(); removeImage(item.asset.id); }}><Trash2 size={13} /></button>
                 </div>
               </article>)}
             </div> : <label className="motion-dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void handleImageFiles(event.dataTransfer.files); }}>
@@ -897,6 +911,98 @@ export default function MotionStudio() {
               <div className="motion-preview-footer"><span>{previewImage ? "FRAME " + (currentIndex + 1) + " / " + images.length + " · " + previewImage.asset.name : "NO FRAME SELECTED"}</span><span>{previewTime}</span></div>
             </div>
           </section>
+
+          <section className="motion-panel motion-keyframe-panel">
+            <div className="motion-panel-heading">
+              <div><span>03 · KEYFRAME ANIMATION</span><h2>Animate transform layers</h2><p>Author position, scale and rotation across each image hold.</p></div>
+              <KeyRound size={20} />
+            </div>
+            <label className="motion-field">Image being edited
+              <select value={selectedImage?.asset.id ?? ""} disabled={!images.length || rendering} onChange={(event) => { setSelectedImageId(event.target.value); setSelectedKeyframeIndex(0); }}>
+                {images.map((item, index) => <option key={item.asset.id} value={item.asset.id}>{index + 1}. {item.asset.name}</option>)}
+              </select>
+            </label>
+            {selectedImage && <>
+              <div className="motion-keyframe-strip">
+                {editableKeyframes.map((keyframe, index) => <button
+                  key={keyframe.time}
+                  type="button"
+                  className={index === selectedKeyframeIndex ? "active" : ""}
+                  disabled={rendering}
+                  onClick={() => { setSelectedKeyframeIndex(index); setKeyframePosition(keyframe.time); }}>
+                  <KeyRound size={11} /> {Math.round(keyframe.time * 100)}%
+                </button>)}
+                <span>{editableKeyframes.length} keys</span>
+              </div>
+              <label className="motion-range-field">New keyframe position <b>{Math.round(keyframePosition * 100)}%</b>
+                <input type="range" min="0" max="1" step="0.01" value={keyframePosition} disabled={rendering} onChange={(event) => setKeyframePosition(Number(event.target.value))} />
+              </label>
+              <div className="motion-keyframe-actions">
+                <button type="button" className="motion-secondary-button" disabled={rendering || editableKeyframes.length >= 32} onClick={addKeyframe}><KeyRound size={13} /> Add / replace keyframe</button>
+                <button type="button" className="motion-secondary-button" disabled={rendering || editableKeyframes.length <= 2} onClick={removeSelectedKeyframe}><Trash2 size={13} /> Remove selected</button>
+              </div>
+              {selectedKeyframe && <div className="motion-keyframe-controls">
+                <label className="motion-range-field">Keyframe time <b>{Math.round(selectedKeyframe.time * 100)}%</b>
+                  <input type="range" min="0" max="1" step="0.01" value={selectedKeyframe.time} disabled={rendering} onChange={(event) => { const time = Number(event.target.value); setKeyframePosition(time); updateSelectedKeyframe({ time }); }} />
+                </label>
+                <label className="motion-range-field">Scale <b>{selectedKeyframe.scale.toFixed(2)}×</b>
+                  <input type="range" min="1" max="1.5" step="0.01" value={selectedKeyframe.scale} disabled={rendering} onChange={(event) => updateSelectedKeyframe({ scale: Number(event.target.value) })} />
+                </label>
+                <label className="motion-range-field">Horizontal position <b>{Math.round(selectedKeyframe.panX * 100)}%</b>
+                  <input type="range" min="0" max="1" step="0.01" value={selectedKeyframe.panX} disabled={rendering} onChange={(event) => updateSelectedKeyframe({ panX: Number(event.target.value) })} />
+                </label>
+                <label className="motion-range-field">Vertical position <b>{Math.round(selectedKeyframe.panY * 100)}%</b>
+                  <input type="range" min="0" max="1" step="0.01" value={selectedKeyframe.panY} disabled={rendering} onChange={(event) => updateSelectedKeyframe({ panY: Number(event.target.value) })} />
+                </label>
+                <label className="motion-range-field">Rotation <b>{selectedKeyframe.rotation.toFixed(1)}°</b>
+                  <input type="range" min="-25" max="25" step="0.5" value={selectedKeyframe.rotation} disabled={rendering} onChange={(event) => updateSelectedKeyframe({ rotation: Number(event.target.value) })} />
+                </label>
+              </div>}
+              <p className="motion-note">The preview interpolates between keyframes. Add your own key to override the preset for this image.</p>
+            </>}
+          </section>
+
+          <section className="motion-panel motion-particle-panel">
+            <div className="motion-panel-heading">
+              <div><span>04 · PARTICLE EFFECTS</span><h2>Layer procedural particles</h2><p>Effekseer-inspired overlays rendered locally as a separate pass.</p></div>
+              <Flame size={20} />
+            </div>
+            <label className="motion-field">Particle preset
+              <select value={particlePreset} disabled={rendering} onChange={(event) => setParticlePreset(event.target.value as ParticlePreset)}>
+                <option value="none">No particles</option>
+                <option value="embers">Fire embers</option>
+                <option value="snow">Snowfall</option>
+                <option value="rain">Rain streaks</option>
+                <option value="confetti">Confetti</option>
+                <option value="magic">Magic sparks</option>
+              </select>
+            </label>
+            <label className="motion-range-field">Effect density <b>{particleIntensity}%</b>
+              <input type="range" min="0" max="100" step="5" value={particleIntensity} disabled={rendering || particlePreset === "none"} onChange={(event) => setParticleIntensity(Number(event.target.value))} />
+            </label>
+            <div className="motion-effect-legend">
+              <span><Flame size={13} /> Fire embers</span>
+              <span><CloudSnow size={13} /> Snow</span>
+              <span><CloudRain size={13} /> Rain</span>
+              <span><SparklesIcon size={13} /> Magic</span>
+            </div>
+            <p className="motion-note">Procedural overlays only; they do not generate realistic smoke or fire footage. The chosen effect is applied to all image clips.</p>
+          </section>
+
+          <section className="motion-panel motion-parallax-panel">
+            <div className="motion-panel-heading">
+              <div><span>05 · DEPTH & PARALLAX</span><h2>Separate foreground from background</h2><p>Attach a transparent cutout to each image with its Layer control.</p></div>
+              <Layers3 size={20} />
+            </div>
+            <label className="motion-range-field">Parallax strength <b>{parallaxStrength}%</b>
+              <input type="range" min="0" max="100" step="5" value={parallaxStrength} disabled={rendering} onChange={(event) => setParallaxStrength(Number(event.target.value))} />
+            </label>
+            <div className="motion-depth-summary">
+              <b>{images.filter((item) => item.foreground).length} / {images.length} images have depth layers</b>
+              <span>Use a transparent PNG/WebP cutout aligned to its original image. Background and foreground layers move independently.</span>
+            </div>
+            <p className="motion-note">Depth is manually supplied. This workflow does not call a segmentation API or infer masks automatically.</p>
+          </section>
         </div>
 
         <aside className="motion-studio-side-column">
@@ -918,6 +1024,11 @@ export default function MotionStudio() {
               <p className={rendererReady ? "motion-renderer-status ready" : "motion-renderer-status"}>{rendererReady ? <CheckCircle2 size={13} /> : <span className="motion-status-dot" />}{rendererMessage}</p>
               {!rendererReady && <div className="motion-install-note"><b>Start the local engine</b><code>python local-render/server.py --allow-origin http://localhost:5173</code><small>For the deployed site, allow its exact HTTPS origin instead. Keep the sidecar running while rendering.</small></div>}
             </div>
+            <button type="button" className="motion-colab-button" disabled={!canRender || colabExporting || rendering} onClick={() => void exportForColab()}>
+              {colabExporting ? <Loader2 size={14} /> : <CloudSnow size={14} />}
+              {colabExporting ? "Preparing Colab package…" : "Export Colab / T4 package"}
+            </button>
+            <p className="motion-colab-caption">Creates a ZIP containing the project, renderer and Colab notebook. GPU acceleration is used only when Google provides a compatible T4/NVENC runtime.</p>
             {rendering ? <div className="motion-job-status">
               <div><Loader2 size={15} /><b>{job?.status === "running" ? "Rendering locally" : "Preparing render"}</b><span>{Math.round(job?.progress ?? 0)}%</span></div>
               <div className="motion-progress"><span style={{ width: (job?.progress ?? 0) + "%" }} /></div>
