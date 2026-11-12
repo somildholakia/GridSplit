@@ -165,7 +165,7 @@ describe("automatic schedule and timeline editing", () => {
     const clips = buildTimeline([
       { sceneId: "one", durationSeconds: 5, imageIds: ["a", "b", "c"] },
     ], () => "clip-" + (++id));
-    expect(setAllImageClipDurations(clips, 2)).toBeNull();
+    expect(setAllImageClipDurations(clips, 2.5)).toBeNull();
   });
 
   it("splits an image clip at the playhead and preserves the original end time", () => {
