@@ -174,7 +174,6 @@ export function isVideoClipEdit(value: unknown): value is VideoClipEdit {
     && (value.particleIntensity === undefined || isFiniteInRange(value.particleIntensity, 0, 100))
     && (value.parallaxAssetId === undefined || (typeof value.parallaxAssetId === "string" && value.parallaxAssetId.trim().length > 0))
     && (value.parallaxBackgroundAssetId === undefined || (typeof value.parallaxBackgroundAssetId === "string" && value.parallaxBackgroundAssetId.trim().length > 0))
-    && (value.parallaxAssetId === undefined) === (value.parallaxBackgroundAssetId === undefined)
     && (value.parallaxAmount === undefined || isFiniteInRange(value.parallaxAmount, 0, 100));
 }
 
