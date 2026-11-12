@@ -10,6 +10,10 @@ type Props = {
   onImportFiles: (files: FileList | null) => void;
 };
 type LoadedImage = { id: string; name: string; image: HTMLImageElement };
+type LocalWritableFile = { write(data: Blob): Promise<void>; close(): Promise<void>; abort?: () => Promise<void> };
+type LocalFileHandle = { createWritable(): Promise<LocalWritableFile>; getFile(): Promise<File> };
+type LocalDirectoryHandle = { getFileHandle(name: string, options: { create: boolean }): Promise<LocalFileHandle> };
+type StorageManagerWithOpfs = StorageManager & { getDirectory?: () => Promise<LocalDirectoryHandle> };
 
 const PRESETS: Array<{ value: MotionPreset; label: string }> = [
   { value: "ken-burns", label: "Ken Burns · slow zoom" },
@@ -174,6 +178,8 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
     setMessage("Preparing local image frames…");
     let stream: MediaStream | null = null;
     let recorder: MediaRecorder | null = null;
+    let writer: LocalWritableFile | null = null;
+    let fileHandle: LocalFileHandle | null = null;
     let stopped: Promise<Blob | null> | null = null;
     try {
       const context = canvas.getContext("2d");
@@ -181,24 +187,63 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
       // Keep at most the current and next decoded image in memory. This avoids
       // decoding hundreds of full-resolution images together for large projects.
       let current = await loadImage(selectedImages[0].id, selectedImages[0].name, imageUrls[selectedImages[0].id]);
-      stream = canvas.captureStream(30);
       const mimeType = supportedRecordingType();
-      recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 6_000_000 } : undefined);
+      const actualType = mimeType || "video/webm";
+      const extension = actualType.includes("mp4") ? "mp4" : "webm";
+      // Prefer the browser's Origin Private File System for chunked writes. This
+      // keeps hour-long videos off the JavaScript heap. Fall back to Blob chunks
+      // on browsers that do not expose OPFS.
+      try {
+        const storage = navigator.storage as StorageManagerWithOpfs;
+        const directory = await storage.getDirectory?.();
+        if (directory) {
+          fileHandle = await directory.getFileHandle(`gridsplit-image-animation-${Date.now()}.${extension}`, { create: true });
+          writer = await fileHandle.createWritable();
+        }
+      } catch {
+        writer = null;
+        fileHandle = null;
+      }
+
+      stream = canvas.captureStream(30);
+      recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 3_000_000 } : undefined);
       recorderRef.current = recorder;
       const chunks: BlobPart[] = [];
-      const actualType = mimeType || "video/webm";
+      let writeChain = Promise.resolve();
       stopped = new Promise<Blob | null>((resolve, reject) => {
-        recorder!.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+        recorder!.ondataavailable = (event) => {
+          if (!event.data.size) return;
+          if (writer) {
+            const target = writer;
+            writeChain = writeChain.then(() => target.write(event.data));
+            void writeChain.catch(() => undefined);
+          } else {
+            chunks.push(event.data);
+          }
+        };
         recorder!.onerror = () => reject(new Error("Browser video recording failed."));
         recorder!.onstop = () => {
-          stream?.getTracks().forEach((track) => track.stop());
-          if (cancelRef.current) resolve(null);
-          else resolve(new Blob(chunks, { type: recorder!.mimeType || actualType }));
+          void writeChain.then(async () => {
+            if (cancelRef.current) {
+              try { await writer?.abort?.(); } catch { /* best-effort cleanup */ }
+              resolve(null);
+            } else if (writer && fileHandle) {
+              await writer.close();
+              resolve(await fileHandle.getFile());
+            } else {
+              resolve(new Blob(chunks, { type: recorder!.mimeType || actualType }));
+            }
+          }).catch(async (error: unknown) => {
+            try { await writer?.abort?.(); } catch { /* best-effort cleanup */ }
+            reject(error);
+          }).finally(() => stream?.getTracks().forEach((track) => track.stop()));
         };
       });
 
       recorder.start(1000);
-      setMessage(`Rendering ${selectedImages.length} image(s) locally in this browser. The export runs in real time.`);
+      setMessage(writer
+        ? `Rendering ${selectedImages.length} image(s) locally and streaming video chunks to private browser storage. The export runs in real time.`
+        : `Rendering ${selectedImages.length} image(s) locally. This browser will buffer the export in memory; very long videos may need more available memory.`);
       const fadeSeconds = Math.min(0.65, duration / 4);
       let lastPercent = -1;
 
@@ -271,8 +316,9 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
         setMessage("Animation export cancelled. Your original images were not changed.");
       }
     } catch (error) {
+      cancelRef.current = true;
       if (recorder && recorder.state !== "inactive") recorder.stop();
-      else stream?.getTracks().forEach((track) => track.stop());
+      else { stream?.getTracks().forEach((track) => track.stop()); try { await writer?.abort?.(); } catch { /* best-effort cleanup */ } }
       setMessage(error instanceof Error ? error.message : "Could not render this animation.");
     } finally {
       recorderRef.current = null;
