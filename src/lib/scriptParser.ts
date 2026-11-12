@@ -24,20 +24,24 @@ function classifyParagraph(raw: string): Classification {
 
   const music = value.match(/^(?:BACKGROUND\s+MUSIC|MUSIC|BGM|SCORE)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])?\s*([\s\S]*)$/i);
   if (music && (bracket || /^(?:BACKGROUND\s+MUSIC|MUSIC|BGM|SCORE)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])/i.test(trimmed))) {
-    const description = bracket ? body : music[1].trim();
-    return { kind: "music", cue: label || "Music", text: description };
+    const bracketCue = label.match(/^((?:BACKGROUND\s+MUSIC|MUSIC|BGM|SCORE)(?:\s+(?:CUE|TRACK))?)\s*(?::|[-–—])\s*([\s\S]*)$/i);
+    const description = bracket ? (body || bracketCue?.[2]?.trim() || label) : music[1].trim();
+    const cue = bracket ? (bracketCue?.[1].trim() || label || "Music") : "Music";
+    return { kind: "music", cue, text: description };
   }
 
   const sfx = value.match(/^(?:SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])?\s*([\s\S]*)$/i);
   if (sfx && (bracket || /^(?:SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])/i.test(trimmed))) {
-    const description = bracket ? body : sfx[1].trim();
-    return { kind: "sfx", cue: label || "Sound effect", text: description };
+    const bracketCue = label.match(/^((?:SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?)\s*(?::|[-–—])\s*([\s\S]*)$/i);
+    const description = bracket ? (body || bracketCue?.[2]?.trim() || label) : sfx[1].trim();
+    const cue = bracket ? (bracketCue?.[1].trim() || label || "Sound effect") : "Sound effect";
+    return { kind: "sfx", cue, text: description };
   }
 
   if (bracket) {
-    if (/^(?:MUSIC|BGM|SCORE)\b/i.test(label)) return { kind: "music", cue: label, text: body };
+    if (/^(?:MUSIC|BGM|SCORE)\b/i.test(label)) return { kind: "music", cue: label, text: body || label };
     if (/^(?:SFX|FX|SOUND|FOLEY|AMBIENCE|FOOTSTEPS|THUNDER|WIND|RAIN|DOOR|ENGINE|EXPLOSION|GUNSHOT|BIRDS|CROWD)\b/i.test(label)) {
-      return { kind: "sfx", cue: label, text: body };
+      return { kind: "sfx", cue: label, text: body || label };
     }
     return { kind: "narration", text: trimmed };
   }
@@ -49,6 +53,14 @@ function classifyParagraph(raw: string): Classification {
   }
 
   return { kind: "narration", text: raw };
+}
+
+function isExplicitBlockStart(line: string): boolean {
+  const value = line.trim().replace(/^\*{1,2}(.*?)\*{1,2}\s*/, "$1 ");
+  if (/^\[(?:NARRATOR|NARRATION|VOICE\s*OVER|VOICEOVER|VO|CHARACTER|CHAR|DIALOGUE|BACKGROUND\s+MUSIC|MUSIC|BGM|SCORE|SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND|FOOTSTEPS|THUNDER|WIND|RAIN|DOOR|ENGINE|EXPLOSION|GUNSHOT|BIRDS|CROWD)\b/i.test(value)) return true;
+  if (/^(?:NARRATOR|NARRATION|VOICE\s*OVER|VOICEOVER|VO|CHARACTER|CHAR|DIALOGUE|BACKGROUND\s+MUSIC|MUSIC|BGM|SCORE|SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])/i.test(value)) return true;
+  const speaker = value.match(/^([A-Z][A-Z0-9 _.'-]{1,28})(?:\s*\([^)]{1,40}\))?\s*:\s*\S/);
+  return Boolean(speaker && !/^(?:NOTE|WARNING|IMPORTANT|TITLE|LOCATION|TIME|DATE)$/i.test(speaker[1].trim()));
 }
 
 export function parseScript(source: string): ParsedScene[] {
@@ -109,6 +121,7 @@ export function parseScript(source: string): ParsedScene[] {
       flush();
       continue;
     }
+    if (paragraph.length && isExplicitBlockStart(value)) flush();
     if (!paragraph.length) paragraphStartLine = lineNumber;
     paragraph.push(line);
   }

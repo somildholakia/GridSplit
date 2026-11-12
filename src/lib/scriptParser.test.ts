@@ -41,6 +41,47 @@ describe("parseScript", () => {
     expect(scenes[0].blocks.map(block => block.kind)).toEqual(["narration", "narration"]);
   });
 
+
+  it("splits consecutive marker lines without requiring blank lines", () => {
+    const scenes = parseScript([
+      "CHAPTER 1: Morning Routine",
+      "SCENE 1 - Kitchen",
+      "[NARRATOR] A quiet morning unfolds in a cozy kitchen.",
+      "[CHARACTER: ANNIE] Good morning everyone!",
+      "[BACKGROUND MUSIC: gentle piano]",
+      "[SFX: footsteps]",
+      "[Music fades in]",
+      "MAYA (whispering): We should leave.",
+    ].join("\n"));
+    expect(scenes).toHaveLength(1);
+    expect(scenes[0].blocks.map(block => block.kind)).toEqual([
+      "narration", "dialogue", "music", "sfx", "music", "dialogue",
+    ]);
+    expect(scenes[0].blocks.map(block => block.text)).toEqual([
+      "A quiet morning unfolds in a cozy kitchen.",
+      "Good morning everyone!",
+      "gentle piano",
+      "footsteps",
+      "Music fades in",
+      "We should leave.",
+    ]);
+    expect(scenes[0].blocks[1].speaker).toBe("ANNIE");
+    expect(scenes[0].blocks[2].cue).toBe("BACKGROUND MUSIC");
+    expect(scenes[0].blocks[3].cue).toBe("SFX");
+    expect(scenes[0].blocks[5].speaker).toBe("MAYA");
+  });
+
+  it("keeps continuation lines attached to the preceding marked block", () => {
+    const scenes = parseScript([
+      "[NARRATOR] The ship approaches.",
+      "Its engines are silent.",
+      "[SFX: low engine hum]",
+    ].join("\n"));
+    expect(scenes[0].blocks.map(block => block.kind)).toEqual(["narration", "sfx"]);
+    expect(scenes[0].blocks[0].text).toBe("The ship approaches.\nIts engines are silent.");
+    expect(scenes[0].blocks[1].text).toBe("low engine hum");
+  });
+
   it("keeps an opening before an explicit scene", () => {
     expect(parseScript("Opening.\n\nSCENE 1\n\nNext.")).toHaveLength(2);
   });
