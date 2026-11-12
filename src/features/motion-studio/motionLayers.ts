@@ -2,10 +2,6 @@ import type { ImageEffectKind, MotionKeyframe } from "../../domain/production";
 
 export function createPresetKeyframes(effect: ImageEffectKind, zoom: number): MotionKeyframe[] {
   const scale = Math.max(1, Math.min(1.5, zoom));
-  const centered: MotionKeyframe[] = [
-    { time: 0, scale: 1, panX: 0.5, panY: 0.5, rotation: 0 },
-    { time: 1, scale, panX: 0.5, panY: 0.5, rotation: 0 },
-  ];
   switch (effect) {
     case "zoom-out": return [
       { time: 0, scale, panX: 0.5, panY: 0.5, rotation: 0 },
