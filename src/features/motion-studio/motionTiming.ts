@@ -39,3 +39,16 @@ export function buildEvenImageTimeline(
     return clip;
   });
 }
+
+/** Move one sequence item to a target index without mutating the source array. */
+export function moveSequenceItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)
+      || fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length
+      || fromIndex === toIndex) {
+    return items;
+  }
+  const next = [...items];
+  const [moving] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moving);
+  return next;
+}
