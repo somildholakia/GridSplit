@@ -20,6 +20,9 @@ import { countCells, detectContactSheet, makeEvenBoundaries } from "../../lib/de
 import type { ContactSheetLayout } from "../../lib/detectGrid";
 import { createImageZip, type ExportCell } from "../../lib/exportZip";
 import { applyReviewed196SampleCorrection, is196SampleCandidateLayout } from "../../lib/sampleCorrections";
+import { drawCropToFrame, type FrameFitMode } from "../../lib/frameRenderer";
+import { GridGuideEditor } from "./GridGuideEditor";
+import { buildCellsFromGuides } from "../../lib/manualGrid";
 
 type Cell = ExportCell & {
   id: string;
@@ -99,6 +102,20 @@ function createUniformCells(width: number, height: number, columns: number, rows
   return cells;
 }
 
+function createCellsFromGuides(
+  width: number,
+  height: number,
+  verticalCuts: number[],
+  horizontalCuts: number[],
+): Cell[] {
+  return buildCellsFromGuides(width, height, verticalCuts, horizontalCuts).map((cell) => ({
+    ...cell,
+    id: makeCellId(cell.row, cell.column, cell.x, cell.y),
+    confidence: 0,
+    selected: true,
+  }));
+}
+
 function renumberCells(cells: Cell[]): Cell[] {
   const sorted = [...cells].sort((a, b) =>
     a.row - b.row || a.x - b.x || a.y - b.y,
@@ -148,10 +165,14 @@ function CropPreview({
   image,
   cell,
   gutter,
+  fitMode,
+  backgroundColor,
 }: {
   image: HTMLImageElement;
   cell: Cell;
   gutter: number;
+  fitMode: FrameFitMode;
+  backgroundColor: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -161,18 +182,19 @@ function CropPreview({
     if (!canvas || !context) return;
 
     const padding = Math.min(gutter, Math.floor(Math.min(cell.width, cell.height) / 8));
-    const sx = Math.max(0, cell.x + padding);
-    const sy = Math.max(0, cell.y + padding);
-    const sw = Math.max(1, cell.width - padding * 2);
-    const sh = Math.max(1, cell.height - padding * 2);
-    const scale = Math.min(1, 440 / sw, 250 / sh);
-    canvas.width = Math.max(1, Math.round(sw * scale));
-    canvas.height = Math.max(1, Math.round(sh * scale));
+    const crop = {
+      x: Math.max(0, cell.x + padding),
+      y: Math.max(0, cell.y + padding),
+      width: Math.max(1, cell.width - padding * 2),
+      height: Math.max(1, cell.height - padding * 2),
+    };
+    canvas.width = 440;
+    canvas.height = 248;
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  }, [image, cell, gutter]);
+    drawCropToFrame(context, image, crop, canvas.width, canvas.height, fitMode, backgroundColor);
+  }, [image, cell, gutter, fitMode, backgroundColor]);
 
-  return <canvas ref={canvasRef} className="crop-canvas" aria-label="Cropped image preview" />;
+  return <canvas ref={canvasRef} className="crop-canvas" aria-label="16 by 9 export preview" />;
 }
 
 function App() {
@@ -182,6 +204,10 @@ function App() {
   const [columnsInput, setColumnsInput] = useState("16");
   const [rowsInput, setRowsInput] = useState("13");
   const [gutter, setGutter] = useState(2);
+  const [showGridGuides, setShowGridGuides] = useState(false);
+  const [activeCellId, setActiveCellId] = useState<string | null>(null);
+  const [fitMode, setFitMode] = useState<FrameFitMode>("blur");
+  const [backgroundColor, setBackgroundColor] = useState("#080b12");
   const [prefix, setPrefix] = useState("frame-");
   const [startNumber, setStartNumber] = useState(1);
   const [digits, setDigits] = useState(3);
@@ -195,6 +221,7 @@ function App() {
   const [isSampleLayoutPristine, setIsSampleLayoutPristine] = useState(false);
 
   const selectedCells = useMemo(() => cells.filter((cell) => cell.selected), [cells]);
+  const activeCell = cells.find((cell) => cell.id === activeCellId) ?? null;
   const canApplyReviewed196Map = isReviewed196Sample && isSampleLayoutPristine && is196SampleCandidateLayout(cells);
 
   const releaseLoadedImage = useCallback(() => {
@@ -331,6 +358,52 @@ function App() {
     setNotice("Applied an evenly spaced " + requestedColumns + " × " + requestedRows + " grid. Switch back to boundary detection to restore row-specific crops.");
   };
 
+  const applyGuidedGrid = (verticalCuts: number[], horizontalCuts: number[]) => {
+    if (!loaded) return;
+    const nextCells = createCellsFromGuides(
+      loaded.image.naturalWidth,
+      loaded.image.naturalHeight,
+      verticalCuts,
+      horizontalCuts,
+    );
+    setCells(nextCells);
+    setActiveCellId(null);
+    setIsSampleLayoutPristine(false);
+    setColumnsInput(String(verticalCuts.length + 1));
+    setRowsInput(String(horizontalCuts.length + 1));
+    setDetectedRows(horizontalCuts.length + 1);
+    setConfidence({ x: 0, y: 0 });
+    setError("");
+    setNotice(
+      "Applied " + verticalCuts.length + " vertical and " + horizontalCuts.length +
+      " horizontal guides. " + nextCells.length + " independently positioned regions are ready for review.",
+    );
+  };
+
+  const updateCellGeometry = (
+    id: string,
+    field: "x" | "y" | "width" | "height",
+    rawValue: number,
+  ) => {
+    if (!loaded) return;
+    setIsSampleLayoutPristine(false);
+    setCells((current) => current.map((cell) => {
+      if (cell.id !== id) return cell;
+      const sourceWidth = loaded.image.naturalWidth;
+      const sourceHeight = loaded.image.naturalHeight;
+      const value = Number.isFinite(rawValue) ? Math.round(rawValue) : 0;
+      const x = field === "x" ? Math.max(0, Math.min(sourceWidth - 1, value)) : cell.x;
+      const y = field === "y" ? Math.max(0, Math.min(sourceHeight - 1, value)) : cell.y;
+      const width = field === "width"
+        ? Math.max(1, Math.min(sourceWidth - cell.x, value))
+        : Math.max(1, Math.min(sourceWidth - x, cell.width));
+      const height = field === "height"
+        ? Math.max(1, Math.min(sourceHeight - cell.y, value))
+        : Math.max(1, Math.min(sourceHeight - y, cell.height));
+      return { ...cell, x, y, width, height };
+    }));
+  };
+
   const redetect = () => {
     if (!loaded) return;
     try {
@@ -437,6 +510,8 @@ function App() {
         startNumber: Math.max(0, startNumber),
         digits,
         originalName: loaded.file.name,
+        fitMode,
+        backgroundColor,
       });
       const downloadUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
@@ -455,6 +530,8 @@ function App() {
   };
 
   const startOver = () => {
+    setShowGridGuides(false);
+    setActiveCellId(null);
     releaseLoadedImage();
     setCells([]);
     setIsReviewed196Sample(false);
@@ -551,8 +628,23 @@ function App() {
               <div className="setting-section">
                 <label className="setting-label" htmlFor="gutter">BORDER TRIM</label>
                 <div className="range-heading"><span>Trim around each tile</span><b>{gutter} px</b></div>
-                <input id="gutter" className="range-input" type="range" min="0" max="10" value={gutter} onChange={(event) => setGutter(Number(event.target.value))} />
+                <input id="gutter" className="range-input" type="range" min="0" max="60" value={gutter} onChange={(event) => setGutter(Number(event.target.value))} />
                 <p className="helper-copy">Removes the contact-sheet divider from the edge of each crop.</p>
+              </div>
+
+              <div className="setting-section">
+                <label className="setting-label">YOUTUBE FRAME EDITOR</label>
+                <label className="field-label">How each crop fills 16:9
+                  <select value={fitMode} onChange={(event) => setFitMode(event.target.value as FrameFitMode)}>
+                    <option value="blur">Soft blurred background · preserve full image</option>
+                    <option value="contain">Fit · preserve full image</option>
+                    <option value="cover">Fill · crop outer edges</option>
+                  </select>
+                </label>
+                <label className="field-label">Frame background
+                  <input type="color" value={backgroundColor} onChange={(event) => setBackgroundColor(event.target.value)} />
+                </label>
+                <p className="helper-copy">Every export is 1920 × 1080. Preview cards show the final widescreen composition before download.</p>
               </div>
 
               <div className="setting-section">
@@ -589,7 +681,35 @@ function App() {
               {notice && <div className="notice success-notice"><Check size={15} /> {notice}</div>}
               {error && <div className="notice error-notice"><X size={15} /> {error}</div>}
 
-              <div className="review-hint"><CircleHelp size={15} /> Click a tile to include or exclude it. Use Split to divide a wide tile or Merge → to join it with the next tile in the same row.</div>
+              <div className="review-hint"><CircleHelp size={15} /> Click a tile to include or exclude it. Use manual guides for uneven rows and columns, then fine-tune any crop before export.</div>
+              <div className="manual-guide-toolbar">
+                <div><b>Need exact boundaries?</b><span>Place and drag your own split lines over the original collage.</span></div>
+                <button type="button" className="button button-secondary" onClick={() => setShowGridGuides((visible) => !visible)}>
+                  <Grid2X2 size={15} /> {showGridGuides ? "Hide grid guide editor" : "Open grid guide editor"}
+                </button>
+              </div>
+              <GridGuideEditor
+                key={loaded.url}
+                image={loaded.image}
+                initialColumns={Math.max(1, Math.min(60, Number.parseInt(columnsInput, 10) || 4))}
+                initialRows={Math.max(1, Math.min(60, Number.parseInt(rowsInput, 10) || 4))}
+                open={showGridGuides}
+                onApply={applyGuidedGrid}
+              />
+              {activeCell && (
+                <div className="crop-editor-panel">
+                  <div className="crop-editor-heading">
+                    <div><b>Fine-tune crop · R{activeCell.row + 1} / C{activeCell.column + 1}</b><span>Adjust the exact source-image rectangle in pixels. The preview updates immediately.</span></div>
+                    <button type="button" onClick={() => setActiveCellId(null)}>Close</button>
+                  </div>
+                  <div className="crop-editor-fields">
+                    <label>X position <input type="number" min="0" max={loaded.image.naturalWidth - 1} value={activeCell.x} onChange={(event) => updateCellGeometry(activeCell.id, "x", Number(event.target.value))} /></label>
+                    <label>Y position <input type="number" min="0" max={loaded.image.naturalHeight - 1} value={activeCell.y} onChange={(event) => updateCellGeometry(activeCell.id, "y", Number(event.target.value))} /></label>
+                    <label>Crop width <input type="number" min="1" max={loaded.image.naturalWidth - activeCell.x} value={activeCell.width} onChange={(event) => updateCellGeometry(activeCell.id, "width", Number(event.target.value))} /></label>
+                    <label>Crop height <input type="number" min="1" max={loaded.image.naturalHeight - activeCell.y} value={activeCell.height} onChange={(event) => updateCellGeometry(activeCell.id, "height", Number(event.target.value))} /></label>
+                  </div>
+                </div>
+              )}
               {canApplyReviewed196Map && (
                 <div className="notice sample-correction-notice">
                   <span><b>Exact sample recognized.</b> Apply the reviewed pixel-based correction map to select the requested 196 storyboard crops. You can still review and change every tile before export.</span>
@@ -611,7 +731,7 @@ function App() {
                       aria-label={(cell.selected ? "Exclude " : "Include ") + "row " + (cell.row + 1) + ", column " + (cell.column + 1)}
                     >
                       <div className="image-card-preview">
-                        <CropPreview image={loaded.image} cell={cell} gutter={gutter} />
+                        <CropPreview image={loaded.image} cell={cell} gutter={gutter} fitMode={fitMode} backgroundColor={backgroundColor} />
                         <span className={"selection-indicator" + (cell.selected ? " is-selected" : "")}>{cell.selected ? <Check size={12} /> : <X size={12} />}</span>
                       </div>
                       <div className="image-card-meta">
@@ -625,6 +745,9 @@ function App() {
                       </button>
                       <button type="button" onClick={() => mergeWithNext(cell.id)} disabled={!canMergeWithNext(cell)} title="Merge with the next tile in this row">
                         <span aria-hidden="true">↔</span> Merge →
+                      </button>
+                      <button type="button" onClick={() => setActiveCellId((current) => current === cell.id ? null : cell.id)} title="Fine-tune crop bounds">
+                        <SlidersHorizontal size={12} /> {activeCellId === cell.id ? "Editing" : "Edit crop"}
                       </button>
                     </div>
                   </div>
