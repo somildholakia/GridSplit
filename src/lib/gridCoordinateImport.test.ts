@@ -39,17 +39,48 @@ describe("bulk grid coordinate import", () => {
     expect(parsed.horizontalCuts).toEqual([300]);
   });
 
-  it("rejects coordinates generated for a different image size", () => {
+  it("scales pixel coordinates when the uploaded image has the same aspect ratio", () => {
+    const parsed = parseGridCoordinatePayload(
+      JSON.stringify({
+        width: 1000,
+        height: 600,
+        horizontalCuts: [300],
+        verticalCutsByRow: [[250], [500]],
+      }),
+      2000,
+      1200,
+    );
+
+    expect(parsed.width).toBe(2000);
+    expect(parsed.height).toBe(1200);
+    expect(parsed.horizontalCuts).toEqual([600]);
+    expect(parsed.verticalCutsByRow).toEqual([[500], [1000]]);
+  });
+
+  it("rejects coordinates when the uploaded image has a different aspect ratio", () => {
     expect(() => parseGridCoordinatePayload(
       JSON.stringify({
-        width: 999,
-        height: IMAGE_HEIGHT,
+        width: 1000,
+        height: 600,
         horizontalCuts: [],
         verticalCutsByRow: [[]],
       }),
-      IMAGE_WIDTH,
-      IMAGE_HEIGHT,
-    )).toThrow(/Image size mismatch/);
+      1000,
+      700,
+    )).toThrow(/aspect ratio mismatch/i);
+  });
+
+  it("rejects scaled coordinates that collapse into duplicate lines", () => {
+    expect(() => parseGridCoordinatePayload(
+      JSON.stringify({
+        width: 1000,
+        height: 600,
+        horizontalCuts: [],
+        verticalCutsByRow: [[200, 201]],
+      }),
+      100,
+      60,
+    )).toThrow(/duplicate lines/i);
   });
 
   it("requires one vertical array for each horizontal row", () => {

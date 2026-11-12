@@ -43,9 +43,21 @@ function readCuts(value: unknown, label: string, limit: number, dimension: numbe
   return cuts.sort((left, right) => left - right);
 }
 
+function scaleCuts(cuts: number[], sourceSize: number, targetSize: number, label: string): number[] {
+  const scaled = cuts.map((coordinate) => Math.round((coordinate / sourceSize) * targetSize));
+  if (scaled.some((coordinate) => coordinate <= 0 || coordinate >= targetSize)) {
+    throw new Error(`Scaling ${label} to the uploaded image would put a line outside the image. Check the source coordinates.`);
+  }
+  if (new Set(scaled).size !== scaled.length) {
+    throw new Error(`Scaling ${label} to the uploaded image creates duplicate lines. Use more precise source coordinates.`);
+  }
+  return scaled.sort((left, right) => left - right);
+}
+
 /**
- * Parse and validate one complete bulk-grid payload. Coordinates are absolute
- * pixels measured from the original image's top-left corner.
+ * Parse one complete coordinate payload. If its source image has the same
+ * aspect ratio as the uploaded image (within 0.5%), pixel coordinates are
+ * proportionally scaled to the uploaded image dimensions.
  */
 export function parseGridCoordinatePayload(
   rawText: string,
@@ -74,30 +86,39 @@ export function parseGridCoordinatePayload(
     throw new Error("The coordinate block must be a JSON object.");
   }
 
-  const width = readDimension(parsed, "width");
-  const height = readDimension(parsed, "height");
-  if (width !== expectedWidth || height !== expectedHeight) {
+  const sourceWidth = readDimension(parsed, "width");
+  const sourceHeight = readDimension(parsed, "height");
+  const sourceAspect = sourceWidth / sourceHeight;
+  const targetAspect = expectedWidth / expectedHeight;
+  const aspectDifference = Math.abs(sourceAspect - targetAspect) / sourceAspect;
+
+  if (!Number.isFinite(targetAspect) || aspectDifference > 0.005) {
     throw new Error(
-      `Image size mismatch: this image is ${expectedWidth} × ${expectedHeight}px, but the pasted coordinates are for ${width} × ${height}px. Generate coordinates for the original image dimensions currently shown in the terminal.`,
+      `Image aspect ratio mismatch: coordinates are for ${sourceWidth} × ${sourceHeight}px, but this image is ${expectedWidth} × ${expectedHeight}px. Upload the same collage or generate a fresh coordinate block.`,
     );
   }
 
-  const horizontalCuts = readCuts(parsed.horizontalCuts, "horizontalCuts", 59, height);
+  const sourceHorizontalCuts = readCuts(parsed.horizontalCuts, "horizontalCuts", 59, sourceHeight);
   const verticalValue = parsed.verticalCutsByRow;
   if (!Array.isArray(verticalValue)) {
     throw new Error('"verticalCutsByRow" must be an array with one entry for every image row.');
   }
 
-  const expectedRows = horizontalCuts.length + 1;
+  const expectedRows = sourceHorizontalCuts.length + 1;
   if (verticalValue.length !== expectedRows) {
     throw new Error(
-      `Row count mismatch: ${horizontalCuts.length} horizontal cuts create ${expectedRows} rows, but verticalCutsByRow contains ${verticalValue.length}. Include one vertical coordinate array for every row, including rows with no cuts (use []).`,
+      `Row count mismatch: ${sourceHorizontalCuts.length} horizontal cuts create ${expectedRows} rows, but verticalCutsByRow contains ${verticalValue.length}. Include one vertical coordinate array for every row, including rows with no cuts (use []).`,
     );
   }
 
-  const verticalCutsByRow = verticalValue.map((cuts, row) =>
-    readCuts(cuts, `verticalCutsByRow row ${row + 1}`, 59, width),
+  const sourceVerticalCutsByRow = verticalValue.map((cuts, row) =>
+    readCuts(cuts, `verticalCutsByRow row ${row + 1}`, 59, sourceWidth),
   );
 
-  return { width, height, horizontalCuts, verticalCutsByRow };
+  const horizontalCuts = scaleCuts(sourceHorizontalCuts, sourceHeight, expectedHeight, "horizontal cuts");
+  const verticalCutsByRow = sourceVerticalCutsByRow.map((cuts, row) =>
+    scaleCuts(cuts, sourceWidth, expectedWidth, `vertical cuts in row ${row + 1}`),
+  );
+
+  return { width: expectedWidth, height: expectedHeight, horizontalCuts, verticalCutsByRow };
 }
