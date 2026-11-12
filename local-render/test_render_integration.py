@@ -41,6 +41,29 @@ def wav_tone(path: Path, seconds: float = 2.0, rate: int = 48000) -> None:
             output.writeframesraw(struct.pack("<h", sample))
 
 
+class MotionLayerExpressionTests(unittest.TestCase):
+    def test_keyframe_expression_holds_first_and_last_values_outside_key_range(self):
+        expression = server.keyframe_expression([
+            {"time": 0.2, "scale": 1.1},
+            {"time": 0.6, "scale": 1.3},
+            {"time": 0.8, "scale": 1.4},
+        ], "scale", 101, 10.0)
+        self.assertIn("lte(on,20.000000),1.100000", expression)
+        self.assertIn("lte(on,80.000000)", expression)
+        self.assertTrue(expression.endswith("1.400000))"))
+
+    def test_all_particle_presets_produce_rgba_overlay_expressions(self):
+        for preset in ("embers", "snow", "rain", "confetti", "magic"):
+            with self.subTest(preset=preset):
+                result = server.particle_overlay_expressions(preset, 50, 320, 320, 3.0, 24)
+                self.assertIsNotNone(result)
+                self.assertGreater(result[0], 0)
+                self.assertGreater(result[1], 0)
+                self.assertIn("min(235", result[5])
+        self.assertIsNone(server.particle_overlay_expressions("none", 50, 320, 320, 3.0, 24))
+        self.assertIsNone(server.particle_overlay_expressions("embers", 0, 320, 320, 3.0, 24))
+
+
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/ffprobe are not installed in this test environment")
 class LocalRenderSmokeTests(unittest.TestCase):
     def test_local_render_produces_probeable_h264_aac_mp4_with_transition_and_mix(self):
