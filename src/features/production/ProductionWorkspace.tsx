@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Pause, Play, RefreshCw, SlidersHorizontal, Sparkles, Square, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Maximize2, Pause, Play, RefreshCw, Scissors, SlidersHorizontal, Sparkles, Square, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import ProductionTools from "./ProductionTools";
 import ImageAnimationStudio from "./ImageAnimationStudio";
 import { measureWavBlob } from "../../lib/mediaTimeline";
-import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, distributeImagesAcrossScenes, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
+import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, distributeImagesAcrossScenes, resizeImageClipKeepingSceneDuration, setAllImageClipDurations, splitImageClipAtTime, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
 import "./production-workspace.css";
 
 type ProductionProject = StudioProject & { imageAssets?: SequenceAsset[]; imageMappings?: SceneImageMapping[]; timelineClips?: TimelineClip[] };
@@ -56,7 +56,8 @@ async function dimensions(file:File):Promise<{width:number;height:number}>{
   try{const bitmap=await createImageBitmap(file);const result={width:bitmap.width,height:bitmap.height};bitmap.close();return result;}catch{return {width:0,height:0};}
 }
 function patchProject(onUpdate:Props["onUpdate"],patch:Partial<ProductionProject>){onUpdate({...patch} as Partial<StudioProject>);}
-function seconds(value:number){return Math.floor(value/60)+":"+((value%60).toFixed(1)).padStart(4,"0");}
+function seconds(value:number){return Math.floor(value/60)+":"+((value%60).toFixed(2)).padStart(5,"0");}
+function rulerInterval(zoom:number){const target=160/Math.max(0.1,zoom);return [1,2,5,10,15,30,60,120,300,600,900,1800,3600].find(value=>value>=target)??3600;}
 
 export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:Props){
   const data=project as ProductionProject;
@@ -65,6 +66,10 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const [audioUrls,setAudioUrls]=useState<Record<string,string>>({});
   const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
   const [playheadSeconds,setPlayheadSeconds]=useState(0); const [isPlaying,setIsPlaying]=useState(false);
+  const [timelineZoom,setTimelineZoom]=useState(24);
+  const [bulkImageDuration,setBulkImageDuration]=useState("5.00");
+  const [selectedImageClipId,setSelectedImageClipId]=useState<string|null>(null);
+  const timelineScrollRef=useRef<HTMLDivElement>(null);
   const audioContextRef=useRef<AudioContext|null>(null);
   const scheduledSourcesRef=useRef<AudioBufferSourceNode[]>([]);
   const playbackOriginRef=useRef<number|null>(null);
@@ -76,11 +81,13 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline"|"animation"|"tools">("sequence");
   const issues=useMemo(()=>analyseSequence(assets),[assets]);
   const timelineDuration=timelineDurationSeconds(clips);
-  const timelineWidth=Math.max(600,Math.ceil(timelineDuration*TIMELINE_PIXELS_PER_SECOND));
+  const timelineWidth=Math.max(600,Math.ceil(timelineDuration*timelineZoom));
   const currentImageClip=imageClipAtTime(clips,playheadSeconds);
   const currentImage=currentImageClip?assets.find(asset=>asset.id===currentImageClip.assetId):undefined;
-  const rulerTicks=Array.from({length:Math.floor(timelineDuration/5)+1},(_,index)=>index*5);
+  const rulerStep=rulerInterval(timelineZoom);
+  const rulerTicks=Array.from({length:Math.floor(timelineDuration/rulerStep)+1},(_,index)=>index*rulerStep);
   if(timelineDuration>0&&rulerTicks[rulerTicks.length-1]!==timelineDuration)rulerTicks.push(timelineDuration);
+  const selectedImageClip=clips.find(clip=>clip.id===selectedImageClipId&&clip.track==="images");
   useEffect(()=>{
     let alive=true;const urls:Record<string,string>={};let missing=0;
     void Promise.all(assets.map(async asset=>{
@@ -232,6 +239,26 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     patchProject(onUpdate,{timelineClips:clips.map(c=>c.id===id?{...c,durationSeconds:value}:c)});
   };
   const editClipStart=(id:string,value:number)=>{if(!Number.isFinite(value)||value<0)return;patchProject(onUpdate,{timelineClips:clips.map(c=>c.id===id?{...c,startSeconds:value}:c)});};
+  const applyBulkImageDuration=()=>{
+    const value=Number(bulkImageDuration);
+    if(!Number.isFinite(value)||value<0.01){setMessage("Enter an image hold duration of at least 0.01 seconds.");return;}
+    const next=setAllImageClipDurations(clips,value);
+    if(!next){setMessage("That duration is too long for one or more scenes. Reduce it so every scene can still fit all its images inside the measured audio.");return;}
+    patchProject(onUpdate,{timelineClips:next});
+    setMessage("Applied "+value.toFixed(2)+"s to each image except the final image in each scene, which fills the remaining measured audio. The complete soundtrack remains covered.");
+  };
+  const fitTimeline=()=>{
+    const available=Math.max(260,(timelineScrollRef.current?.clientWidth??960)-150);
+    setTimelineZoom(Math.min(160,Math.max(0.1,available/Math.max(1,timelineDuration))));
+  };
+  const adjustTimelineZoom=(factor:number)=>setTimelineZoom(current=>Math.min(160,Math.max(0.1,current*factor)));
+  const splitSelectedImage=()=>{
+    if(!selectedImageClip){setMessage("Select an image clip before splitting it.");return;}
+    const next=splitImageClipAtTime(clips,selectedImageClip.id,playheadSeconds);
+    if(next===clips){setMessage("Move the playhead inside the selected image clip (not at either edge) to split it.");return;}
+    patchProject(onUpdate,{timelineClips:next});
+    setMessage("Image clip split at "+seconds(playheadSeconds)+". Both halves keep the same source image.");
+  };
   const nudgeClip=(id:string,delta:number)=>patchProject(onUpdate,{timelineClips:clips.map(clip=>clip.id===id?{...clip,startSeconds:Math.max(0,clip.startSeconds+delta)}:clip)});
   const stopScheduledAudio=()=>{scheduledSourcesRef.current.forEach(source=>{try{source.stop();}catch{/* source already ended */}});scheduledSourcesRef.current=[];};
   const pauseTimeline=()=>{
@@ -324,20 +351,37 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
       {!assets.length||!project.scenes.length?<div className="production-empty">Add images and create scenes before mapping.</div>:project.scenes.map(scene=><article className="production-scene-map" key={scene.id}><header><b>{scene.title}</b><span>{mappedFor(scene.id).length} image(s)</span></header><div className="production-map-grid">{assets.map(asset=><label key={asset.id} className={mappedFor(scene.id).includes(asset.id)?"selected":""}>{thumbs[asset.id]?<img src={thumbs[asset.id]} alt=""/>:<span className="production-thumb-placeholder"/>}<input type="checkbox" checked={mappedFor(scene.id).includes(asset.id)} onChange={()=>toggleMapping(scene.id,asset.id)}/><span>{asset.name}</span></label>)}</div></article>)}
     </div>}
     {activeTab==="timeline"&&<div className="production-section">
-      <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Rebuild from measured audio"}</button><span>{clips.length} clips · {seconds(timelineDuration)} total</span></div>
+      <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Re-sync images to full audio"}</button><span>{clips.length} clips · {seconds(timelineDuration)} total</span></div>
       {!clips.length?<div className="production-empty">Map images to scenes and generate WAV audio, then build the initial schedule.</div>:<>
         <div className="production-playback-controls">
           <button className="production-button primary" onClick={()=>void playTimeline()}>{isPlaying?<Pause size={14}/>:<Play size={14}/>} {isPlaying?"Pause":"Play timeline"}</button>
           <button className="production-button" onClick={()=>{if(isPlaying)pauseTimeline();setPlayheadSeconds(0);}}><Square size={13}/> Stop</button>
+          <button className="production-button" disabled={!selectedImageClip} onClick={splitSelectedImage} title="Split selected image at the playhead"><Scissors size={14}/> Split at playhead</button>
           <label className="production-seek"><span>{seconds(playheadSeconds)}</span><input aria-label="Timeline playhead" type="range" min="0" max={Math.max(0.1,timelineDuration)} step="0.01" value={Math.min(playheadSeconds,timelineDuration)} onChange={event=>seekTimeline(Number(event.target.value))}/><span>{seconds(timelineDuration)}</span></label>
         </div>
+        <div className="production-timeline-tools">
+          <div className="production-bulk-duration">
+            <b>IMAGE HOLD TIME</b>
+            <label><input aria-label="Bulk image duration in seconds" type="number" min="0.01" step="0.01" value={bulkImageDuration} onChange={event=>setBulkImageDuration(event.target.value)}/> seconds</label>
+            <button className="production-button" onClick={applyBulkImageDuration}>Apply to all images</button>
+            <small>Each scene's final image automatically fills the remaining audio time.</small>
+          </div>
+          <div className="production-zoom-tools">
+            <b>TIMELINE ZOOM</b>
+            <button className="production-button icon-only" title="Zoom out" aria-label="Zoom out timeline" onClick={()=>adjustTimelineZoom(0.7)}><ZoomOut size={14}/></button>
+            <input aria-label="Timeline zoom level" type="range" min="0.1" max="160" step="0.1" value={timelineZoom} onChange={event=>setTimelineZoom(Number(event.target.value))}/>
+            <button className="production-button icon-only" title="Zoom in" aria-label="Zoom in timeline" onClick={()=>adjustTimelineZoom(1.4)}><ZoomIn size={14}/></button>
+            <span>{timelineZoom<1?timelineZoom.toFixed(2):timelineZoom.toFixed(1)} px/s</span>
+            <button className="production-button" onClick={fitTimeline}><Maximize2 size={13}/> Fit</button>
+          </div>
+        </div>
         <div className="production-current-frame">{currentImage&&thumbs[currentImage.id]?<img src={thumbs[currentImage.id]} alt={"Current frame: "+currentImage.name}/>:<div className="production-current-placeholder">No image at this playhead position</div>}<div><b>{currentImage?.name??"Preview monitor"}</b><small>{currentImageClip?project.scenes.find(scene=>scene.id===currentImageClip.sceneId)?.title??"Scene":"Move the playhead to preview a frame"}</small></div></div>
-        <div className="production-timeline-scroll"><div className="production-timeline-board" style={{width:timelineWidth+132}}>
-          <div className="production-visual-ruler"><b>TIME</b><div className="production-visual-lane" style={{width:timelineWidth}}>{rulerTicks.map((tick,index)=><span key={index} style={{left:tick*TIMELINE_PIXELS_PER_SECOND}}>{seconds(tick)}</span>)}</div></div>
-          {(["images","audio"] as const).map(track=><div className="production-visual-track" key={track}><b>{track==="images"?"IMAGE TRACK":"AUDIO TRACK"}</b><div className="production-visual-lane" style={{width:timelineWidth}}>{clips.filter(clip=>clip.track===track).map(clip=><button key={clip.id} className={"production-visual-clip "+track} style={{left:clip.startSeconds*TIMELINE_PIXELS_PER_SECOND,width:Math.max(30,clip.durationSeconds*TIMELINE_PIXELS_PER_SECOND)}} title={track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Image clip"):"Scene audio · "+(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene")} onClick={()=>seekTimeline(clip.startSeconds)}>{track==="images"&&clip.assetId&&thumbs[clip.assetId]?<img src={thumbs[clip.assetId]} alt=""/>:null}<span>{track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene audio")}</span></button>)}</div></div>)}
+        <div ref={timelineScrollRef} className="production-timeline-scroll"><div className="production-timeline-board" style={{width:timelineWidth+132}}>
+          <div className="production-visual-ruler"><b>TIME</b><div className="production-visual-lane" style={{width:timelineWidth}}>{rulerTicks.map((tick,index)=><span key={index} style={{left:tick*timelineZoom}}>{seconds(tick)}</span>)}</div></div>
+          {(["images","audio"] as const).map(track=><div className="production-visual-track" key={track}><b>{track==="images"?"IMAGE TRACK":"AUDIO TRACK"}</b><div className="production-visual-lane" style={{width:timelineWidth}}>{clips.filter(clip=>clip.track===track).map(clip=><button key={clip.id} className={"production-visual-clip "+track+(track==="images"&&selectedImageClipId===clip.id?" selected":"")} style={{left:clip.startSeconds*timelineZoom,width:Math.max(6,clip.durationSeconds*timelineZoom)}} title={track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Image clip"):"Scene audio · "+(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene")} onClick={()=>{if(track==="images")setSelectedImageClipId(clip.id);seekTimeline(clip.startSeconds);}}>{track==="images"&&clip.assetId&&thumbs[clip.assetId]?<img src={thumbs[clip.assetId]} alt=""/>:null}<span>{track==="images"?(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):(project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Scene audio")}</span></button>)}</div></div>)}
           <div className="production-visual-playhead" style={{left:132+playheadSeconds*TIMELINE_PIXELS_PER_SECOND}}/>
         </div></div>
-        <div className="production-clip-editors"><b>Clip properties</b>{(["images","audio"] as const).map(track=><section className="production-track" key={track}><h3>{track==="images"?"IMAGE CLIPS":"AUDIO CLIPS"}</h3>{clips.filter(clip=>clip.track===track).sort((a,b)=>a.order-b.order).map(clip=><div className="production-clip" key={clip.id}><b>{track==="images"?"IMG":"WAV"}</b><label>Start <input aria-label="Clip start seconds" type="number" min="0" step="0.1" value={Number(clip.startSeconds.toFixed(2))} onChange={event=>editClipStart(clip.id,Number(event.target.value))}/> s</label><label>Duration <input aria-label="Clip duration seconds" type="number" min="0.1" step="0.1" value={Number(clip.durationSeconds.toFixed(2))} onChange={event=>editClip(clip.id,Number(event.target.value))}/> s</label><span>{project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Unknown scene"}{clip.assetId?" · "+(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):""}</span><div><button title="Nudge clip earlier by half a second" onClick={()=>nudgeClip(clip.id,-0.5)}><ArrowUp size={13}/></button><button title="Nudge clip later by half a second" onClick={()=>nudgeClip(clip.id,0.5)}><ArrowDown size={13}/></button></div></div>)}</section>)}</div>
+        <div className="production-clip-editors"><b>Clip properties</b>{(["images","audio"] as const).map(track=><section className="production-track" key={track}><h3>{track==="images"?"IMAGE CLIPS":"AUDIO CLIPS"}</h3>{clips.filter(clip=>clip.track===track).sort((a,b)=>a.order-b.order).map(clip=><div className="production-clip" key={clip.id}><b>{track==="images"?"IMG":"WAV"}</b><label>Start <input key={clip.id+"-start-"+clip.startSeconds.toFixed(2)} aria-label="Clip start seconds" type="number" min="0" step="0.01" defaultValue={clip.startSeconds.toFixed(2)} onBlur={event=>editClipStart(clip.id,Number(event.currentTarget.value))} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/> s</label><label>Duration <input key={clip.id+"-duration-"+clip.durationSeconds.toFixed(2)} aria-label="Clip duration seconds" type="number" min="0.01" step="0.01" defaultValue={clip.durationSeconds.toFixed(2)} onBlur={event=>editClip(clip.id,Number(event.currentTarget.value))} onKeyDown={event=>{if(event.key==="Enter")event.currentTarget.blur();}}/> s</label><span>{project.scenes.find(scene=>scene.id===clip.sceneId)?.title??"Unknown scene"}{clip.assetId?" · "+(assets.find(asset=>asset.id===clip.assetId)?.name??"Missing image"):""}</span><div><button title="Nudge clip earlier by half a second" onClick={()=>nudgeClip(clip.id,-0.5)}><ArrowUp size={13}/></button><button title="Nudge clip later by half a second" onClick={()=>nudgeClip(clip.id,0.5)}><ArrowDown size={13}/></button></div></div>)}</section>)}</div>
         <div className="production-audio-preview"><b>Individual local audio segments</b>{(project.audioSegments??[]).filter(segment=>segment.status==="ready"&&audioUrls[segment.id]).map(segment=><label key={segment.id}>{project.scenes.find(scene=>scene.id===segment.sceneId)?.title??"Scene"}<audio controls preload="none" src={audioUrls[segment.id]}/></label>)}</div>
       </>}
       <p className="production-footnote">Playback follows edited image positions and schedules local WAV segments against scene audio clips. Audio positions use measured WAV durations; edits stay in this browser.</p>
