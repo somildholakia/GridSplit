@@ -52,7 +52,7 @@ describe("parseScript", () => {
       "[SFX: footsteps]",
       "[Music fades in]",
       "MAYA (whispering): We should leave.",
-    ].join("\\n"));
+    ].join("\n"));
     expect(scenes).toHaveLength(1);
     expect(scenes[0].blocks.map(block => block.kind)).toEqual([
       "narration", "dialogue", "music", "sfx", "music", "dialogue",
@@ -76,9 +76,9 @@ describe("parseScript", () => {
       "[NARRATOR] The ship approaches.",
       "Its engines are silent.",
       "[SFX: low engine hum]",
-    ].join("\\n"));
+    ].join("\n"));
     expect(scenes[0].blocks.map(block => block.kind)).toEqual(["narration", "sfx"]);
-    expect(scenes[0].blocks[0].text).toBe("The ship approaches.\\nIts engines are silent.");
+    expect(scenes[0].blocks[0].text).toBe("The ship approaches.\nIts engines are silent.");
     expect(scenes[0].blocks[1].text).toBe("low engine hum");
   });
 
