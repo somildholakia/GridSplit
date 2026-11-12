@@ -110,7 +110,6 @@ export function GridGuideEditor({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 900 });
 
-  const rowCount = verticalGuidesByRow.length;
   const activeRowGuides = verticalGuidesByRow[selectedRow] ?? [];
   const activeVerticalId =
     activeGuide?.axis === "vertical" && activeGuide.row === selectedRow
