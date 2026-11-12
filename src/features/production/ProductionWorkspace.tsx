@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Pause, Play
 import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import ProductionTools from "./ProductionTools";
+import ImageAnimationStudio from "./ImageAnimationStudio";
 import { measureWavBlob } from "../../lib/mediaTimeline";
 import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
 import "./production-workspace.css";
@@ -70,7 +71,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const animationFrameRef=useRef<number|null>(null);
   const folderRef=useRef<HTMLInputElement>(null);
   useEffect(()=>{folderRef.current?.setAttribute("webkitdirectory","");folderRef.current?.setAttribute("directory","");},[]);
-  const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline"|"tools">("sequence");
+  const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline"|"animation"|"tools">("sequence");
   const issues=useMemo(()=>analyseSequence(assets),[assets]);
   const timelineDuration=timelineDurationSeconds(clips);
   const timelineWidth=Math.max(600,Math.ceil(timelineDuration*TIMELINE_PIXELS_PER_SECOND));
@@ -106,7 +107,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     const savedIds:string[]=[];
     try{
       const valid=[...files].filter(f=>f.type.startsWith("image/")&&f.size>0&&f.size<=100*1024*1024);
-      const accepted=valid.slice(0,Math.max(0,500-assets.length));
+      const accepted=valid.slice(0,Math.max(0,1200-assets.length));
       const rejected=files.length-accepted.length;
       const additions:SequenceAsset[]=[];
       const ordered=sortSequence(accepted.map(f=>({name:f.name,relativePath:(f as File&{webkitRelativePath?:string}).webkitRelativePath||f.name,file:f})));
@@ -116,7 +117,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
         additions.push({id,name:file.name,relativePath:item.relativePath,mimeType:file.type,bytes:file.size,sequenceNumber:extractSequenceNumber(file.name),order:assets.length+additions.length,width:size.width,height:size.height,fingerprint:hash});
       }
       updateAssets([...assets,...additions].map((a,index)=>({...a,order:index})));
-      setMessage("Added "+additions.length+" image(s)."+(rejected?" Rejected "+rejected+" file(s): unsupported, empty, oversized, or beyond the 500-image project limit.":""));
+      setMessage("Added "+additions.length+" image(s)."+(rejected?" Rejected "+rejected+" file(s): unsupported, empty, oversized, or beyond the 1,200-image project limit.":""));
     }catch(error){
       await Promise.all(savedIds.map(id=>deleteImage(id).catch(()=>undefined)));
       setMessage(error instanceof Error?error.message:"Could not import these images.");
@@ -250,7 +251,8 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
       <button className={activeTab==="sequence"?"active":""} onClick={()=>setActiveTab("sequence")}>1. Image sequence <span>{assets.length}</span></button>
       <button className={activeTab==="mapping"?"active":""} onClick={()=>setActiveTab("mapping")}>2. Scene mapping <span>{mappings.filter(m=>m.imageIds.length).length}</span></button>
       <button className={activeTab==="timeline"?"active":""} onClick={()=>setActiveTab("timeline")}>3. Timeline <span>{clips.length}</span></button>
-      <button className={activeTab==="tools"?"active":""} onClick={()=>setActiveTab("tools")}><SlidersHorizontal size={13}/> 4. Mix & export</button>
+      <button className={activeTab==="animation"?"active":""} onClick={()=>setActiveTab("animation")}>4. Image animation <span>{assets.length}</span></button>
+      <button className={activeTab==="tools"?"active":""} onClick={()=>setActiveTab("tools")}><SlidersHorizontal size={13}/> 5. Mix & export</button>
     </nav>
     {message&&<p className="production-message" role="status">{message}</p>}
     {activeTab==="sequence"&&<div className="production-section">
@@ -285,6 +287,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
       </>}
       <p className="production-footnote">Playback follows edited image positions and schedules local WAV segments against scene audio clips. Audio positions use measured WAV durations; edits stay in this browser.</p>
     </div>}
-    {activeTab==="tools"&&<ProductionTools project={project} onUpdate={onUpdate} onRestoreProject={onRestoreProject}/>}
+    {activeTab==="animation"&&<ImageAnimationStudio images={assets} imageUrls={thumbs} onImportFiles={(files)=>void addFiles(files)}/>}
+    {activeTab==="tools"&&<ProductionTools project={project} onUpdate={onUpdate} onRestoreProject={onRestoreProject}/>} 
   </section>;
 }

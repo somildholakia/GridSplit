@@ -29,3 +29,6 @@
 .production-asset.has-issue{border-color:#806a43}
 .production-asset-issue{font-size:9px;color:#f2c98f;line-height:1.3}
 @media(max-width:650px){.production-clip-editors .production-clip{grid-template-columns:28px 1fr 1fr 44px;gap:4px}.production-clip-editors .production-clip>span{grid-column:2/4;grid-row:2}.production-current-frame img,.production-current-placeholder{width:88px;height:60px}.production-playback-controls{align-items:stretch}.production-seek{flex-basis:100%}}
+
+
+/* Image animation workspace */
