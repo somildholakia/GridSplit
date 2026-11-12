@@ -30,12 +30,19 @@ def png_pixel(red: int, green: int, blue: int) -> bytes:
 class LocalRendererHttpWorkflowTests(unittest.TestCase):
     def test_archive_upload_job_poll_and_mp4_download(self):
         image = png_pixel(80, 120, 170)
+        depth_map = png_pixel(190, 190, 190)
         image_path = "media/images/image-1.png"
+        depth_path = "media/images/depth-map-1.png"
         project = {
             "id": "http-integration-project",
             "name": "HTTP integration fixture",
             "scenes": [{"id": "scene-1", "title": "Scene 1", "chapter": "Chapter 1", "blocks": []}],
-            "imageAssets": [{"id": "image-1"}],
+            "imageAssets": [{"id": "image-1"}, {"id": "depth-map-1"}],
+            "videoClipEdits": [{
+                "clipId": "clip-1", "effect": "none", "transitionIn": "cut",
+                "transitionOut": "cut", "transitionDurationSeconds": 0, "zoom": 1,
+                "depthMapAssetId": "depth-map-1", "depthMotionAmount": 40,
+            }],
             "timelineClips": [{
                 "id": "clip-1", "track": "images", "sceneId": "scene-1",
                 "assetId": "image-1", "startSeconds": 0, "durationSeconds": 1,
@@ -55,6 +62,13 @@ class LocalRendererHttpWorkflowTests(unittest.TestCase):
                 "mimeType": "image/png",
                 "sizeBytes": len(image),
                 "sha256": hashlib.sha256(image).hexdigest(),
+            }, {
+                "path": depth_path,
+                "kind": "image",
+                "assetId": "depth-map-1",
+                "mimeType": "image/png",
+                "sizeBytes": len(depth_map),
+                "sha256": hashlib.sha256(depth_map).hexdigest(),
             }],
         }
         with tempfile.NamedTemporaryFile(suffix=".zip") as archive_file:
@@ -62,6 +76,7 @@ class LocalRendererHttpWorkflowTests(unittest.TestCase):
                 bundle.writestr("project.json", json.dumps(project))
                 bundle.writestr("manifest.json", json.dumps(manifest))
                 bundle.writestr(image_path, image)
+                bundle.writestr(depth_path, depth_map)
             archive_file.flush()
             payload = Path(archive_file.name).read_bytes()
 
