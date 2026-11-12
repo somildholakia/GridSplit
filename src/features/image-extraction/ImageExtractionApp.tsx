@@ -22,6 +22,7 @@ import { createImageZip, type ExportCell } from "../../lib/exportZip";
 import { applyReviewed196SampleCorrection, is196SampleCandidateLayout } from "../../lib/sampleCorrections";
 import { drawCropToFrame, type FrameFitMode } from "../../lib/frameRenderer";
 import { GridGuideEditor } from "./GridGuideEditor";
+import { buildCellsFromGuides } from "../../lib/manualGrid";
 
 type Cell = ExportCell & {
   id: string;
@@ -107,30 +108,12 @@ function createCellsFromGuides(
   verticalCuts: number[],
   horizontalCuts: number[],
 ): Cell[] {
-  const xBoundaries = [...new Set([0, ...verticalCuts.filter((cut) => cut > 0 && cut < width), width])]
-    .sort((left, right) => left - right);
-  const yBoundaries = [...new Set([0, ...horizontalCuts.filter((cut) => cut > 0 && cut < height), height])]
-    .sort((top, bottom) => top - bottom);
-  const cells: Cell[] = [];
-
-  for (let row = 0; row < yBoundaries.length - 1; row += 1) {
-    for (let column = 0; column < xBoundaries.length - 1; column += 1) {
-      const x = xBoundaries[column];
-      const y = yBoundaries[row];
-      cells.push({
-        id: makeCellId(row, column, x, y),
-        row,
-        column,
-        x,
-        y,
-        width: xBoundaries[column + 1] - x,
-        height: yBoundaries[row + 1] - y,
-        confidence: 0,
-        selected: true,
-      });
-    }
-  }
-  return cells;
+  return buildCellsFromGuides(width, height, verticalCuts, horizontalCuts).map((cell) => ({
+    ...cell,
+    id: makeCellId(cell.row, cell.column, cell.x, cell.y),
+    confidence: 0,
+    selected: true,
+  }));
 }
 
 function renumberCells(cells: Cell[]): Cell[] {
