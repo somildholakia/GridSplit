@@ -66,3 +66,12 @@
 @media(max-width:560px){.audio-character{grid-template-columns:1fr 28px}.audio-character label{grid-column:1/-1}.audio-add-character{max-width:none}.audio-engine-config{align-items:stretch;flex-direction:column}.audio-engine-config label{max-width:none}.audio-engine-config button{width:100%}.audio-player-row{flex-wrap:wrap}.audio-player-row audio{flex-basis:100%}}
 
 .audio-remote-warning{margin:12px 0;padding:11px 13px;border:1px solid #8a6a35;border-radius:9px;background:rgba(138,106,53,.12);color:#f0d6a6;font-size:11px;line-height:1.55}
+
+
+.audio-batch-controls{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.audio-batch-progress{display:grid;gap:7px;margin:-4px 0 16px;padding:12px 14px;border:1px solid var(--line,#303040);border-radius:10px;background:rgba(255,255,255,.025)}
+.audio-batch-progress>div{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted,#aaa)}
+.audio-batch-progress>div b{color:var(--text,#eee);font-variant-numeric:tabular-nums}
+.audio-batch-progress progress{width:100%;height:7px;accent-color:#a995ef}
+.audio-batch-progress small{color:var(--muted,#9292a6);font-size:10px;line-height:1.4}
+@media(max-width:560px){.audio-batch-controls{width:100%;justify-content:space-between}.audio-batch-controls button{flex:1}}

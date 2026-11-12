@@ -38,6 +38,9 @@ export default function AudioStudio({ project, onUpdate }: Props) {
   const [notice, setNotice] = useState("");
   const [activeGeneration, setActiveGeneration] = useState<string | null>(null);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const batchCancelledRef = useRef(false);
   const controllerRef = useRef<AbortController | null>(null);
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
@@ -47,6 +50,8 @@ export default function AudioStudio({ project, onUpdate }: Props) {
   const remoteGpu = Boolean(provider && isCloudflareQuickTunnelEndpoint(endpointDraft));
   const characters = project.characters ?? [];
   const segments = project.audioSegments ?? [];
+  const segmentsRef = useRef(segments);
+  segmentsRef.current = segments;
 
   useEffect(() => setEndpointDraft(project.ttsEndpoint ?? DEFAULT_TTS_ENDPOINT), [project.ttsEndpoint]);
 
@@ -113,7 +118,9 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     }
   };
   const updateSegment = (id: string, patch: Partial<StudioAudioSegment>) => {
-    onUpdate({ audioSegments: updateAudioSegment(segments, id, patch) });
+    const next = updateAudioSegment(segmentsRef.current, id, patch);
+    segmentsRef.current = next;
+    onUpdateRef.current({ audioSegments: next });
   };
 
   const checkEngine = async () => {
@@ -128,12 +135,13 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     } catch (error) { setEngineMessage(error instanceof Error ? error.message : "Could not connect to the TTS engine."); }
   };
 
-  const generate = async (segment: StudioAudioSegment) => {
-    if (!provider) { setNotice("Enter a valid loopback or HTTPS Cloudflare Quick Tunnel address first."); return; }
+  const generate = async (segment: StudioAudioSegment): Promise<"success" | "failed" | "cancelled"> => {
+    if (!provider) { setNotice("Enter a valid loopback or HTTPS Cloudflare Quick Tunnel address first."); return "failed"; }
     const { block } = blockForSegment(project, segment);
-    if (!block?.text.trim()) { setNotice("This segment has no speech text."); return; }
+    if (!block?.text.trim()) { setNotice("This speech segment has no text."); return "failed"; }
     setActiveGeneration(segment.id);
-    const controller = new AbortController(); controllerRef.current = controller;
+    const controller = new AbortController();
+    controllerRef.current = controller;
     updateSegment(segment.id, { status: "generating", error: undefined });
     try {
       const result = await provider.synthesize({ text: block.text, voiceId: segment.voiceId,
@@ -141,16 +149,57 @@ export default function AudioStudio({ project, onUpdate }: Props) {
       await saveGeneratedAudio(project.id, segment.id, result.blob);
       updateSegment(segment.id, { status: "ready", sampleCount: result.sampleCount, sampleRate: result.sampleRate,
         channels: result.channels, durationSeconds: result.durationSeconds, error: undefined });
-      setNotice(`Generated ${formatDuration(result.durationSeconds)} of audio ${remoteGpu ? "using the temporary GPU endpoint." : "locally."}`);
+      return "success";
     } catch (error) {
       const cancelled = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
       updateSegment(segment.id, { status: cancelled ? "pending" : "failed",
         error: cancelled ? undefined : error instanceof Error ? error.message : "Audio generation failed." });
       if (!cancelled) setNotice(error instanceof Error ? error.message : "Audio generation failed.");
+      return cancelled ? "cancelled" : "failed";
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
       setActiveGeneration(null);
     }
+  };
+
+  const generateAllRemaining = async () => {
+    if (!provider || !engineReady) {
+      setNotice("Connect to the Kokoro engine before starting batch generation.");
+      return;
+    }
+    const queue = sortedSegments
+      .filter(({ segment, block }) => segment.status !== "ready" && segment.status !== "generating" && Boolean(block?.text.trim()))
+      .map(({ segment }) => segment);
+    if (!queue.length) {
+      setNotice("All narration and dialogue audio is already generated.");
+      return;
+    }
+
+    batchCancelledRef.current = false;
+    setBatchRunning(true);
+    setBatchProgress({ current: 0, total: queue.length });
+    let generated = 0;
+    let failed = 0;
+    let completed = 0;
+    for (const segment of queue) {
+      if (batchCancelledRef.current) break;
+      const result = await generate(segment);
+      if (result === "success") generated += 1;
+      if (result === "failed") failed += 1;
+      completed += 1;
+      setBatchProgress({ current: completed, total: queue.length });
+      if (result === "cancelled") break;
+    }
+    const cancelled = batchCancelledRef.current;
+    setBatchRunning(false);
+    setNotice(cancelled
+      ? `Batch stopped. Generated ${generated} of ${queue.length} queued segment(s); successful audio was kept.`
+      : `Batch complete. Generated ${generated} segment(s)${failed ? `; ${failed} failed — retry those individually or run the batch again.` : "."}`);
+  };
+
+  const cancelBatch = () => {
+    batchCancelledRef.current = true;
+    controllerRef.current?.abort();
   };
   const downloadAudio = (segment: StudioAudioSegment) => {
     const url = previewUrls[segment.id]; if (!url) return;
@@ -225,8 +274,13 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     </section>
 
     <section className="audio-panel">
-      <div className="audio-panel-title"><div><span className="audio-step">M15–M16</span><div><h2>Generated segments</h2><p>Generate, retry, play, and download one narration or dialogue block at a time.</p></div></div>
-        <span className="audio-count">{segments.filter((item) => item.status === "ready").length} / {segments.length} ready</span></div>
+      <div className="audio-panel-title"><div><span className="audio-step">M15–M16</span><div><h2>Generated segments</h2><p>Generate narration and dialogue one by one automatically, or review individual segments.</p></div></div>
+        <div className="audio-batch-controls"><span className="audio-count">{segments.filter((item) => item.status === "ready").length} / {segments.length} ready</span>
+          {batchRunning
+            ? <button className="audio-secondary-button" onClick={cancelBatch}><Square size={13}/> Stop batch</button>
+            : <button className="audio-primary-button" disabled={!engineReady || activeGeneration !== null || !sortedSegments.some(({ segment, block }) => segment.status !== "ready" && segment.status !== "generating" && Boolean(block?.text.trim()))} onClick={() => void generateAllRemaining()}><Sparkles size={13}/> Generate all remaining</button>}
+        </div></div>
+      {batchRunning && <div className="audio-batch-progress" role="status"><div><span>Generating audio sequentially</span><b>{batchProgress.current} / {batchProgress.total}</b></div><progress max={Math.max(1, batchProgress.total)} value={batchProgress.current}/><small>Existing completed audio is skipped. Failed segments do not stop the remaining queue.</small></div>}
       <div className="audio-segment-list">
         {sortedSegments.map(({ segment, scene, block }) => {
           const ready = segment.status === "ready", busy = activeGeneration === segment.id;
@@ -245,7 +299,7 @@ export default function AudioStudio({ project, onUpdate }: Props) {
             </div>}
             <div className="audio-segment-actions">
               {busy ? <button className="audio-secondary-button" onClick={() => controllerRef.current?.abort()}><Square size={13}/> Cancel</button>
-                : <button className={ready ? "audio-secondary-button" : "audio-primary-button"} disabled={!engineReady || activeGeneration !== null}
+                : <button className={ready ? "audio-secondary-button" : "audio-primary-button"} disabled={!engineReady || activeGeneration !== null || batchRunning}
                   onClick={() => void generate(segment)}>{ready ? <><RotateCcw size={13}/> Regenerate</> : segment.status === "failed"
                     ? <><RefreshCw size={13}/> Retry</> : <><Sparkles size={13}/> Generate audio</>}</button>}
               {ready && <span className="audio-generated-note"><CheckCircle2 size={13}/> Saved in this browser</span>}

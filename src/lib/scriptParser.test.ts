@@ -1,10 +1,60 @@
-import {describe,expect,it} from "vitest";
-import {parseScript} from "./scriptParser";
-describe("parseScript",()=>{
- it("preserves paragraph source and order",()=>{const s=parseScript("First.\n\nSecond.");expect(s).toHaveLength(1);expect(s[0].blocks.map(b=>b.text)).toEqual(["First.","Second."]);expect(s[0].sourceText).toBe("First.\n\nSecond.");});
- it("parses chapters, scenes and marker kinds",()=>{const s=parseScript("CHAPTER 1: Arrival\n\nSCENE 1 - Street\n\n[NARRATOR] Empty.\n\n[CHARACTER: MAYA] Hello\n\n[SFX: THUNDER]\n\n[MUSIC: TENSION]");expect(s).toHaveLength(1);expect(s[0].chapter).toBe("CHAPTER 1: Arrival");expect(s[0].blocks.map(b=>b.kind)).toEqual(["narration","dialogue","sfx","music"]);expect(s[0].blocks[1].speaker).toBe("MAYA");});
- it("keeps an opening before an explicit scene",()=>expect(parseScript("Opening.\n\nSCENE 1\n\nNext.")).toHaveLength(2));
- it("tracks exact source lines when paragraph text repeats",()=>{const s=parseScript("Repeated\n\nOther\n\nRepeated");expect(s[0].blocks.map(b=>b.sourceLine)).toEqual([1,3,5]);});
- it("starts a new scene when a chapter changes without an explicit scene heading",()=>{const s=parseScript("CHAPTER 1: First\n\nSCENE 1: Opening\n\nFirst chapter text.\n\nCHAPTER 2: Next\n\nSecond chapter text.");expect(s).toHaveLength(2);expect(s[0].chapter).toBe("CHAPTER 1: First");expect(s[1].chapter).toBe("CHAPTER 2: Next");expect(s[1].title).toBe("CHAPTER 2: Next");expect(s[1].blocks.map(b=>b.text)).toEqual(["Second chapter text."]);});
- it("returns empty for whitespace",()=>expect(parseScript(" \n ")).toEqual([]));
+import { describe, expect, it } from "vitest";
+import { parseScript } from "./scriptParser";
+
+describe("parseScript", () => {
+  it("preserves paragraph source and order", () => {
+    const scenes = parseScript("First.\n\nSecond.");
+    expect(scenes).toHaveLength(1);
+    expect(scenes[0].blocks.map(block => block.text)).toEqual(["First.", "Second."]);
+    expect(scenes[0].sourceText).toBe("First.\n\nSecond.");
+  });
+
+  it("parses chapters, scenes and bracketed markers", () => {
+    const scenes = parseScript("CHAPTER 1: Arrival\n\nSCENE 1 - Street\n\n[NARRATOR] Empty.\n\n[CHARACTER: MAYA] Hello\n\n[SFX: THUNDER]\n\n[MUSIC: TENSION]");
+    expect(scenes).toHaveLength(1);
+    expect(scenes[0].chapter).toBe("CHAPTER 1: Arrival");
+    expect(scenes[0].blocks.map(block => block.kind)).toEqual(["narration", "dialogue", "sfx", "music"]);
+    expect(scenes[0].blocks[1].speaker).toBe("MAYA");
+  });
+
+  it("recognises natural-language music and sound-effect prefixes", () => {
+    const scenes = parseScript("Narration: The ship approaches.\n\nBACKGROUND MUSIC: Low orchestral tension builds.\n\nSOUND EFFECT: Metal doors open.\n\nBGM - Music fades out.");
+    expect(scenes[0].blocks.map(block => block.kind)).toEqual(["narration", "music", "sfx", "music"]);
+    expect(scenes[0].blocks[1].text).toBe("Low orchestral tension builds.");
+    expect(scenes[0].blocks[2].text).toBe("Metal doors open.");
+  });
+
+  it("recognises screenplay speaker labels and bracketed stage directions", () => {
+    const scenes = parseScript("MAYA: We have to leave.\n\n[Footsteps echo in the corridor]\n\n[Music fades in]");
+    expect(scenes[0].blocks.map(block => block.kind)).toEqual(["dialogue", "sfx", "music"]);
+    expect(scenes[0].blocks[0].speaker).toBe("MAYA");
+    expect(scenes[0].blocks[1].cue).toBe("Footsteps echo in the corridor");
+  });
+
+  it("does not classify ordinary prose merely because it mentions music or sound", () => {
+    const scenes = parseScript("The music in the room reminded her of home.\n\nHe heard a strange sound outside.");
+    expect(scenes[0].blocks.map(block => block.kind)).toEqual(["narration", "narration"]);
+  });
+
+  it("keeps an opening before an explicit scene", () => {
+    expect(parseScript("Opening.\n\nSCENE 1\n\nNext.")).toHaveLength(2);
+  });
+
+  it("tracks exact source lines when paragraph text repeats", () => {
+    const scenes = parseScript("Repeated\n\nOther\n\nRepeated");
+    expect(scenes[0].blocks.map(block => block.sourceLine)).toEqual([1, 3, 5]);
+  });
+
+  it("starts a new scene when a chapter changes without an explicit scene heading", () => {
+    const scenes = parseScript("CHAPTER 1: First\n\nSCENE 1: Opening\n\nFirst chapter text.\n\nCHAPTER 2: Next\n\nSecond chapter text.");
+    expect(scenes).toHaveLength(2);
+    expect(scenes[0].chapter).toBe("CHAPTER 1: First");
+    expect(scenes[1].chapter).toBe("CHAPTER 2: Next");
+    expect(scenes[1].title).toBe("CHAPTER 2: Next");
+    expect(scenes[1].blocks.map(block => block.text)).toEqual(["Second chapter text."]);
+  });
+
+  it("returns empty for whitespace", () => {
+    expect(parseScript(" \n ")).toEqual([]);
+  });
 });
