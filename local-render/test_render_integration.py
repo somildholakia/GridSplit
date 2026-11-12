@@ -48,8 +48,8 @@ class MotionLayerExpressionTests(unittest.TestCase):
             {"time": 0.6, "scale": 1.3},
             {"time": 0.8, "scale": 1.4},
         ], "scale", 101, 10.0)
-        self.assertIn("lte(on,20.000000),1.100000", expression)
-        self.assertIn("lte(on,80.000000)", expression)
+        self.assertIn(r"lte(on\\,20.000000)\\,1.100000", expression)
+        self.assertIn(r"lte(on\\,80.000000)", expression)
         self.assertIn("1.400000", expression)
 
     def test_all_particle_presets_produce_rgba_overlay_expressions(self):
