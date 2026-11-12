@@ -22,18 +22,17 @@ describe("bulk grid coordinate import", () => {
   });
 
   it("accepts a complete JSON object copied inside a markdown code fence", () => {
-    const parsed = parseGridCoordinatePayload(
-      ```json
-{
-  "width": 1000,
-  "height": 600,
-  "horizontalCuts": [300],
-  "verticalCutsByRow": [[250], [500]]
-}
-```,
-      IMAGE_WIDTH,
-      IMAGE_HEIGHT,
-    );
+    const fencedJson = [
+      "\`\`\`json",
+      "{",
+      '  "width": 1000,',
+      '  "height": 600,',
+      '  "horizontalCuts": [300],',
+      '  "verticalCutsByRow": [[250], [500]]',
+      "}",
+      "\`\`\`",
+    ].join("\n");
+    const parsed = parseGridCoordinatePayload(fencedJson, IMAGE_WIDTH, IMAGE_HEIGHT);
 
     expect(parsed.verticalCutsByRow).toEqual([[250], [500]]);
     expect(parsed.horizontalCuts).toEqual([300]);
