@@ -38,14 +38,14 @@ The frontend may be served from Vercel while synthesis remains on your own compu
 Windows PowerShell:
 
 ```powershell
-$env:GRIDSPLIT_ALLOWED_ORIGINS = "https://gridsplit-kappa.vercel.app"
+$env:GRIDSPLIT_ALLOWED_ORIGINS = "https://gridsplit-studio.vercel.app"
 uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
 ```
 
 macOS/Linux:
 
 ```bash
-GRIDSPLIT_ALLOWED_ORIGINS=https://gridsplit-kappa.vercel.app uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
+GRIDSPLIT_ALLOWED_ORIGINS=https://gridsplit-studio.vercel.app uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
 ```
 
 For local development, the localhost origins are already allowed by the sidecar. Never use a wildcard origin or expose the TTS server to your LAN. In the public website, keep the Audio Studio endpoint at `http://127.0.0.1:8765`.
