@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ImagePlus, Download, Play, Square, Sparkles, Video } from "lucide-react";
+import { ImagePlus, Download, Square, Sparkles, Video } from "lucide-react";
 import type { SequenceAsset } from "./productionModel";
 import "./image-animation-studio.css";
 
@@ -91,7 +91,6 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
   const [preset, setPreset] = useState<MotionPreset>("ken-burns");
   const [duration, setDuration] = useState(3);
   const [intensity, setIntensity] = useState(45);
-  const [previewTime, setPreviewTime] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("");
@@ -173,58 +172,91 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
     setExporting(true);
     setProgress(0);
     setMessage("Preparing local image frames…");
+    let stream: MediaStream | null = null;
+    let recorder: MediaRecorder | null = null;
+    let stopped: Promise<Blob | null> | null = null;
     try {
-      const loaded = await Promise.all(selectedImages.map((item) => loadImage(item.id, item.name, imageUrls[item.id])));
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Canvas rendering is unavailable in this browser.");
-      const stream = canvas.captureStream(30);
+      // Keep at most the current and next decoded image in memory. This avoids
+      // decoding hundreds of full-resolution images together for large projects.
+      let current = await loadImage(selectedImages[0].id, selectedImages[0].name, imageUrls[selectedImages[0].id]);
+      stream = canvas.captureStream(30);
       const mimeType = supportedRecordingType();
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 6_000_000 } : undefined);
+      recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 6_000_000 } : undefined);
       recorderRef.current = recorder;
       const chunks: BlobPart[] = [];
       const actualType = mimeType || "video/webm";
-      const stopped = new Promise<Blob | null>((resolve, reject) => {
-        recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
-        recorder.onerror = () => reject(new Error("Browser video recording failed."));
-        recorder.onstop = () => {
-          stream.getTracks().forEach((track) => track.stop());
+      stopped = new Promise<Blob | null>((resolve, reject) => {
+        recorder!.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+        recorder!.onerror = () => reject(new Error("Browser video recording failed."));
+        recorder!.onstop = () => {
+          stream?.getTracks().forEach((track) => track.stop());
           if (cancelRef.current) resolve(null);
-          else resolve(new Blob(chunks, { type: recorder.mimeType || actualType }));
+          else resolve(new Blob(chunks, { type: recorder!.mimeType || actualType }));
         };
       });
 
       recorder.start(1000);
       setMessage(`Rendering ${selectedImages.length} image(s) locally in this browser. The export runs in real time.`);
       const fadeSeconds = Math.min(0.65, duration / 4);
-      const startTime = performance.now();
-      await new Promise<void>((resolve) => {
-        const tick = (timestamp: number) => {
-          if (cancelRef.current) {
-            if (recorder.state !== "inactive") recorder.stop();
-            resolve();
-            return;
-          }
-          const elapsed = Math.min(totalDuration, (timestamp - startTime) / 1000);
-          const imageIndex = Math.min(loaded.length - 1, Math.floor(elapsed / duration));
-          const local = Math.min(1, (elapsed - imageIndex * duration) / duration);
-          context.fillStyle = "#080b10";
-          context.fillRect(0, 0, canvas.width, canvas.height);
-          drawMotion(context, loaded[imageIndex].image, preset, local, intensity);
-          const fading = local > 1 - fadeSeconds / duration && imageIndex < loaded.length - 1;
-          if (fading) {
-            const alpha = (local - (1 - fadeSeconds / duration)) / (fadeSeconds / duration);
-            drawMotion(context, loaded[imageIndex + 1].image, preset, 0, intensity, Math.min(1, Math.max(0, alpha)));
-          }
-          setProgress(elapsed / totalDuration);
-          if (elapsed >= totalDuration) {
-            if (recorder.state !== "inactive") recorder.stop();
-            resolve();
-            return;
-          }
+      let lastPercent = -1;
+
+      for (let imageIndex = 0; imageIndex < selectedImages.length; imageIndex += 1) {
+        if (cancelRef.current) break;
+        let nextImage: LoadedImage | null = null;
+        let nextError: unknown = null;
+        const nextPromise = imageIndex + 1 < selectedImages.length
+          ? loadImage(selectedImages[imageIndex + 1].id, selectedImages[imageIndex + 1].name, imageUrls[selectedImages[imageIndex + 1].id])
+              .then((loaded) => { nextImage = loaded; return loaded; })
+              .catch((error: unknown) => { nextError = error; throw error; })
+          : null;
+        // Attach a rejection handler immediately; the awaited promise below
+        // still propagates the original failure after the current frame.
+        void nextPromise?.catch(() => undefined);
+
+        const segmentStart = performance.now();
+        await new Promise<void>((resolve) => {
+          const tick = (timestamp: number) => {
+            if (cancelRef.current) { resolve(); return; }
+            const elapsed = Math.min(duration, Math.max(0, (timestamp - segmentStart) / 1000));
+            const local = elapsed / duration;
+            context.fillStyle = "#080b10";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            drawMotion(context, current.image, preset, local, intensity);
+            const fading = local > 1 - fadeSeconds / duration && imageIndex < selectedImages.length - 1;
+            if (fading && nextImage) {
+              const alpha = (local - (1 - fadeSeconds / duration)) / (fadeSeconds / duration);
+              drawMotion(context, nextImage.image, preset, 0, intensity, Math.min(1, Math.max(0, alpha)));
+            }
+            const fraction = Math.min(1, (imageIndex * duration + elapsed) / totalDuration);
+            const percent = Math.floor(fraction * 100);
+            if (percent !== lastPercent) {
+              lastPercent = percent;
+              setProgress(fraction);
+            }
+            if (elapsed >= duration) { resolve(); return; }
+            requestAnimationFrame(tick);
+          };
           requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      });
+        });
+
+        current.image.src = "";
+        if (cancelRef.current) {
+          if (nextImage) nextImage.image.src = "";
+          break;
+        }
+        if (nextPromise) {
+          try {
+            current = await nextPromise;
+          } catch (error) {
+            throw nextError ?? error;
+          }
+        }
+      }
+
+      current.image.src = "";
+      if (recorder.state !== "inactive") recorder.stop();
       const blob = await stopped;
       if (blob && blob.size) {
         if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
@@ -239,6 +271,8 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
         setMessage("Animation export cancelled. Your original images were not changed.");
       }
     } catch (error) {
+      if (recorder && recorder.state !== "inactive") recorder.stop();
+      else stream?.getTracks().forEach((track) => track.stop());
       setMessage(error instanceof Error ? error.message : "Could not render this animation.");
     } finally {
       recorderRef.current = null;
