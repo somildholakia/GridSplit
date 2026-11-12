@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createImageZip, type ExportCell } from "./exportZip";
+import { createImageZip, type ExportCell, YOUTUBE_FRAME_HEIGHT, YOUTUBE_FRAME_WIDTH } from "./exportZip";
 
 function makeCells(count: number): ExportCell[] {
   return Array.from({ length: count }, (_, index) => {
@@ -19,10 +19,12 @@ function makeCells(count: number): ExportCell[] {
 
 function installCanvasMock() {
   const drawImage = vi.fn();
+  const fillRect = vi.fn();
+  const context = { drawImage, fillRect, fillStyle: "", imageSmoothingEnabled: false, imageSmoothingQuality: "low" };
   const canvas = {
     width: 0,
     height: 0,
-    getContext: vi.fn(() => ({ drawImage })),
+    getContext: vi.fn(() => context),
     toBlob: vi.fn((callback: BlobCallback) => {
       callback(new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }));
     }),
@@ -30,7 +32,7 @@ function installCanvasMock() {
   vi.stubGlobal("document", {
     createElement: vi.fn(() => canvas),
   });
-  return { drawImage, canvas };
+  return { drawImage, fillRect, canvas, context };
 }
 
 afterEach(() => {
@@ -39,8 +41,8 @@ afterEach(() => {
 });
 
 describe("contact-sheet image ZIP export", () => {
-  it("writes exactly 196 uniquely numbered PNG crops and one manifest row per crop", async () => {
-    const { drawImage, canvas } = installCanvasMock();
+  it("writes exactly 196 uniquely numbered 1920x1080 YouTube PNG frames and a manifest", async () => {
+    const { drawImage, fillRect, canvas, context } = installCanvasMock();
     const count = 196;
 
     const blob = await createImageZip({
@@ -64,10 +66,29 @@ describe("contact-sheet image ZIP export", () => {
     expect(imagePaths[0]).toBe("gridsplit-images/frame-001.png");
     expect(imagePaths.at(-1)).toBe("gridsplit-images/frame-196.png");
     expect(manifest?.trim().split("\n")).toHaveLength(count + 1);
-    expect(manifest).toContain('"frame-001.png",1,1,2,2,96,76');
-    expect(manifest).toContain('"frame-196.png",14,14,1302,1042,96,76');
+    expect(manifest).toContain('"frame-001.png",1,1,2,2,96,76,1920,1080');
+    expect(manifest).toContain('"frame-196.png",14,14,1302,1042,96,76,1920,1080');
     expect(drawImage).toHaveBeenCalledTimes(count);
+    expect(fillRect).toHaveBeenCalledTimes(count);
     expect(canvas.toBlob).toHaveBeenCalledTimes(count);
+    expect(canvas.width).toBe(YOUTUBE_FRAME_WIDTH);
+    expect(canvas.height).toBe(YOUTUBE_FRAME_HEIGHT);
+    expect(context.imageSmoothingEnabled).toBe(true);
+    expect(context.imageSmoothingQuality).toBe("high");
+  });
+
+  it("fits a wide crop without changing its aspect ratio", async () => {
+    const { drawImage } = installCanvasMock();
+    await createImageZip({
+      image: {} as HTMLImageElement,
+      cells: [{ row: 0, column: 0, x: 0, y: 0, width: 200, height: 50 }],
+      gutter: 0,
+      prefix: "wide-",
+      startNumber: 1,
+      digits: 2,
+      originalName: "contact.png",
+    });
+    expect(drawImage).toHaveBeenCalledWith({}, 0, 0, 200, 50, 0, 300, 1920, 480);
   });
 
   it("sanitizes filename prefixes before writing archive entries", async () => {
