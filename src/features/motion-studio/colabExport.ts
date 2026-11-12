@@ -116,11 +116,12 @@ export async function buildColabRenderPackage(project: StudioProject): Promise<B
   bundle.file("README-COLAB.txt", [
     "GridSplit Motion Studio · Colab GPU render",
     "",
-    "1. Open GridSplit_Motion_Studio_T4.ipynb in Google Colab.",
-    "2. Choose Runtime → Change runtime type → T4 GPU if that option is available.",
-    "3. Run the notebook cell and upload this complete package ZIP when prompted.",
-    "4. The notebook uses NVIDIA NVENC when FFmpeg and the runtime expose h264_nvenc; otherwise it uses libx264.",
-    "5. The validated MP4 is downloaded at the end of the cell.",
+    "1. Extract this ZIP on your device so you can access the .ipynb file.",
+    "2. In Google Colab, choose File → Upload notebook and select GridSplit_Motion_Studio_T4.ipynb.",
+    "3. Choose Runtime → Change runtime type → T4 GPU when that option is available.",
+    "4. Run the notebook cell and upload the original complete package ZIP when prompted.",
+    "5. The notebook probes NVIDIA NVENC and falls back to CPU libx264 if the GPU encoder is unavailable or fails.",
+    "6. The validated MP4 is downloaded at the end of the cell."
     "",
     "Colab GPU availability and session limits are controlled by Google. This package contains your project media; upload it only to a Colab account you trust.",
     "The notebook does not call AI inference APIs or require an API key."
