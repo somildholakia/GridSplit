@@ -119,6 +119,7 @@ describe("motion layer contracts", () => {
     expect(isVideoClipEdit({ ...edit, particleIntensity: 101 })).toBe(false);
     expect(isVideoClipEdit({ ...edit, keyframes: [{ ...keys[0], scale: 2 }, keys[2]] })).toBe(false);
     expect(isVideoClipEdit({ ...edit, parallaxAssetId: " " })).toBe(false);
+    expect(isVideoClipEdit({ ...edit, keyframes: [keys[0], keys[0], keys[2]] })).toBe(false);
   });
 
   it("accepts explicit software and NVIDIA render encoder preferences", () => {
