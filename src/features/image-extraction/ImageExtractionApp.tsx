@@ -105,10 +105,10 @@ function createUniformCells(width: number, height: number, columns: number, rows
 function createCellsFromGuides(
   width: number,
   height: number,
-  verticalCuts: number[],
+  verticalCutsByRow: number[][],
   horizontalCuts: number[],
 ): Cell[] {
-  return buildCellsFromGuides(width, height, verticalCuts, horizontalCuts).map((cell) => ({
+  return buildCellsFromGuides(width, height, verticalCutsByRow, horizontalCuts).map((cell) => ({
     ...cell,
     id: makeCellId(cell.row, cell.column, cell.x, cell.y),
     confidence: 0,
@@ -358,25 +358,27 @@ function App() {
     setNotice("Applied an evenly spaced " + requestedColumns + " × " + requestedRows + " grid. Switch back to boundary detection to restore row-specific crops.");
   };
 
-  const applyGuidedGrid = (verticalCuts: number[], horizontalCuts: number[]) => {
+  const applyGuidedGrid = (verticalCutsByRow: number[][], horizontalCuts: number[]) => {
     if (!loaded) return;
     const nextCells = createCellsFromGuides(
       loaded.image.naturalWidth,
       loaded.image.naturalHeight,
-      verticalCuts,
+      verticalCutsByRow,
       horizontalCuts,
     );
     setCells(nextCells);
     setActiveCellId(null);
     setIsSampleLayoutPristine(false);
-    setColumnsInput(String(verticalCuts.length + 1));
+    const maxColumns = Math.max(1, ...verticalCutsByRow.map((cuts) => cuts.length + 1));
+    setColumnsInput(String(maxColumns));
     setRowsInput(String(horizontalCuts.length + 1));
     setDetectedRows(horizontalCuts.length + 1);
     setConfidence({ x: 0, y: 0 });
     setError("");
     setNotice(
-      "Applied " + verticalCuts.length + " vertical and " + horizontalCuts.length +
-      " horizontal guides. " + nextCells.length + " independently positioned regions are ready for review.",
+      "Applied row-specific vertical guides across " + verticalCutsByRow.length + " rows and " +
+      horizontalCuts.length + " full-width horizontal guides. " + nextCells.length +
+      " independently positioned regions are ready for review.",
     );
   };
 
