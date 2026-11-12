@@ -23,3 +23,24 @@
   .grid-guide-editor.is-fullscreen .grid-guide-stage-shell{padding:5px}
   .grid-guide-editor.is-fullscreen .grid-guide-footer{margin-top:8px}
 }
+
+
+/* One-paste coordinate terminal */
+.grid-guide-coordinate-terminal{margin:14px 0 12px;padding:12px;border:1px solid rgba(203,232,137,.22);border-radius:9px;background:rgba(7,12,20,.72)}
+.grid-guide-terminal-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:9px}
+.grid-guide-terminal-title{display:flex;align-items:center;gap:7px;color:#d9f19b;font-size:9px;font-weight:850;letter-spacing:1.15px}
+.grid-guide-terminal-heading p{margin:5px 0 0;color:#98a8bd;font-size:10px;line-height:1.45}
+.grid-guide-terminal-heading>span{flex:0 0 auto;padding:5px 7px;border:1px solid #344259;border-radius:5px;color:#dbe5f2;font-size:9px;font-weight:750;font-variant-numeric:tabular-nums}
+.grid-guide-terminal-input{display:block;width:100%;min-height:108px;resize:vertical;padding:10px 11px;border:1px solid #35445a;border-radius:7px;outline:none;background:#080d15;color:#d6e8b1;font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2}
+.grid-guide-terminal-input:focus{border-color:#cbe889;box-shadow:0 0 0 2px rgba(203,232,137,.12)}
+.grid-guide-terminal-input::placeholder{color:#718096;opacity:.9}
+.grid-guide-terminal-footer{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px}
+.grid-guide-terminal-footer>span{color:#8190a5;font-size:9px;line-height:1.4}
+.grid-guide-terminal-footer>div{display:flex;gap:6px;flex:0 0 auto}
+.grid-guide-terminal-clear,.grid-guide-terminal-apply{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:30px;padding:6px 9px;border:1px solid #3b4a60;border-radius:6px;background:#202b3b;color:#c8d4e4;font:inherit;font-size:9px;font-weight:700;cursor:pointer}
+.grid-guide-terminal-apply{border-color:#cbe889;background:#cbe889;color:#18220d}
+.grid-guide-terminal-apply:disabled{opacity:.4;cursor:not-allowed}
+.grid-guide-terminal-status{margin-top:8px;padding:7px 9px;border-radius:6px;font-size:9px;line-height:1.5}
+.grid-guide-terminal-status.success{border:1px solid rgba(145,205,118,.28);background:rgba(80,128,65,.12);color:#c7edaa}
+.grid-guide-terminal-status.error{border:1px solid rgba(255,135,135,.3);background:rgba(150,50,50,.12);color:#ffb4b4}
+@media(max-width:760px){.grid-guide-terminal-heading{flex-direction:column;gap:7px}.grid-guide-terminal-footer{align-items:flex-start;flex-direction:column}.grid-guide-terminal-footer>div{width:100%}.grid-guide-terminal-footer>div button{flex:1}.grid-guide-terminal-input{min-height:130px}}
