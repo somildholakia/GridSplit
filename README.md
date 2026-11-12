@@ -13,7 +13,8 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 - Versioned JSON backup export/import. Imported copies receive fresh project, scene, and block IDs; existing projects are kept.
 - Paste scripts or import TXT, DOCX, and text-based PDF files locally (10 MB import limit).
 - Parse chapter/part headings, scene/sequence headings, Markdown headings, paragraphs, narration, dialogue, SFX, and music cues.
-- Recognise `[NARRATOR]`, `[CHARACTER: NAME]`, `[SFX: NAME]`, and `[MUSIC: NAME]` markers.
+- Recognise `[NARRATOR]`, `[CHARACTER: NAME]`, `[SFX: NAME]`, and `[MUSIC: NAME]` markers plus narration/voiceover, screenplay-style speaker labels, music/BGM/score, SFX/foley/ambience and bracketed stage directions.
+- Keep ordinary prose mentioning music or sound classified as narration rather than misclassifying it as a production cue.
 - Retain the original script separately from the editable scene breakdown.
 - Edit chapter and scene titles, segment type, dialogue speaker, SFX/music cue labels, and block text.
 - Add, remove, reorder, split, merge, and move scene blocks between adjacent scenes.
@@ -27,6 +28,7 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 - Keep loopback as the default; arbitrary remote hosts and insecure HTTP tunnels are rejected, and there is no automatic remote fallback.
 - In temporary GPU mode, selected narration/dialogue text is sent over HTTPS to the configured runtime; generated WAVs are still stored locally in browser IndexedDB.
 - Generate, cancel, retry, and regenerate narration/dialogue blocks independently.
+- Use **Generate all remaining** to synthesize pending narration/dialogue segments sequentially with progress, cancellation, ready-segment skipping and retry. Music/SFX cues are not sent to TTS.
 - Persist WAV audio locally in IndexedDB; review with the browser audio player and download individual WAV files.
 - The Kokoro model and matching voice file are user-installed and are not bundled or downloaded by GridSplit. Real model-backed synthesis/playback smoke testing remains an explicit acceptance step.
 
@@ -43,7 +45,7 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 
 ### Production Studio (M22–M31 implementation)
 
-- Store numbered storyboard images in a project, review sequence gaps/duplicates, correct frame numbers, and reorder images.
+- Store up to 1,200 numbered storyboard images in a project, review sequence gaps/duplicates, correct frame numbers, and reorder images.
 - Map multiple images to scenes and reuse images across scenes.
 - Build an editable image/audio timeline from measured WAV durations, with playhead, seek, preview, and clip editing.
 - Mix narration, dialogue, music and SFX on four independent tracks with gain, mute/solo and fade controls. Import music/SFX locally.
@@ -53,6 +55,16 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 - Restore an archive as a new editable project, remapping IDs and restoring media into browser-local IndexedDB.
 
 Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). GitHub Actions [run #199](https://github.com/somildholakia/GridSplit/actions/runs/42858412750) passed 9 Python tests (including HTTP ZIP upload → local FFmpeg render → MP4 download), lint, 91 Vitest tests across 18 files, typecheck, production build, static artifact upload and production npm audit (0 vulnerabilities at the high-severity threshold). Browser/device acceptance remains a separate release check.
+
+### Browser Image Animation Studio (M37)
+
+- Open **Production Studio → Image animation** to animate one selected image or the full ordered project sequence.
+- Choose Ken Burns zoom, zoom-out, pan-left, pan-right, floating motion or cinematic drift.
+- Set 3–60 seconds per image and motion intensity; output uses a 1280 × 720 canvas at 30 FPS.
+- Render in-browser with `canvas.captureStream()` and `MediaRecorder`. MP4 is selected only when the browser supports a suitable codec; otherwise output is WebM.
+- Recorder chunks write to OPFS when available; browsers without OPFS use an in-memory Blob fallback.
+- This creates camera-style movement from stills, not generative object/character animation. It does not add timeline audio; use the optional local FFmpeg renderer for the full timeline mix.
+- Rendering is real-time: a 60-minute output takes about 60 minutes to record. Long exports depend on browser storage, memory and codec support.
 
 **Local rendering:** FFmpeg and ffprobe must be installed separately. GridSplit does not bundle binaries/codecs or use a hosted renderer. Follow [local-render/README.md](local-render/README.md) to start the loopback-only renderer. The installed build must provide H.264 (libx264) and AAC encoders.
 ### Image Splitter
@@ -70,7 +82,7 @@ Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). 
 - A synthetic performance regression covers 500 scenes, 500 images and 1,000 timeline clips with a 10-second CI ceiling. The local renderer allows at most two active jobs and retains at most eight finished jobs for up to six hours.
 - The TTS sidecar validates loopback Host headers, and both sidecars validate their local request boundaries. The optional local TTS Python graph is pinned in `local-tts/uv.lock`; CI checks the lock with `uv lock --check` and audits the synchronized environment with `pip-audit --strict` (`pip-audit` remains dev-only). See [the security review](docs/SECURITY_REVIEW.md).
 
-**Release boundary:** M06–M34 implementation, the local-media acceptance runner (PR #14), the exact-image 196-crop preset (PR #15), and its corrected 209-candidate geometry (PR #17) are merged. CI run [#254](https://github.com/somildholakia/GridSplit/actions/runs/42888121310) passed the corrected preset tests, sidecar/security checks, lint, typecheck and production build; post-merge main CI [#255](https://github.com/somildholakia/GridSplit/actions/runs/42888303569) also passed. Current main application commit is `4757035`. Production still serves the older frontend runtime commit `9f43fc8` at [gridsplit-kappa.vercel.app](https://gridsplit-kappa.vercel.app); Vercel rejected the production deployment attempt with HTTP 402 `api-deployments-free-per-day` and a 24-hour retry window, so the corrected preset is merged but **not live yet**. The public smoke test covers the older production build; no real Kokoro/media processing is claimed. The exact 1536 × 864 sample has a SHA-256-gated, deterministic no-AI correction preset: 209 detected candidates (15 / 16 × 11 / 18), with the title, 11 repeated-number panels and continuation card excluded to leave 196. Browser export and pixel review remain open. An independent 196-crop diagnostic ZIP is available as a reference, not an app export. M14–M16 real Kokoro acceptance, M22–M25 image/timeline playback acceptance, and M36 full-media export/restore/re-render remain open. See [the milestone checklist](docs/CHECKPOINTS.md), [sample analysis](docs/SAMPLE_ANALYSIS.md) and [release gates](docs/M32-M36.md).
+**Release boundary:** M01–M37 implementation is merged. PR #22 and post-merge main CI runs [#43184510763](https://github.com/somildholakia/GridSplit/actions/runs/43184510763) and [#43185852867](https://github.com/somildholakia/GridSplit/actions/runs/43185852867) passed. Current main commit `e30fba7e` is deployed at [gridsplit-studio.vercel.app](https://gridsplit-studio.vercel.app) on the secondary Vercel account. Real Kokoro synthesis/playback/download and M36 target-device browser media export → archive restore → re-render remain open.
 
 ## Run locally
 
