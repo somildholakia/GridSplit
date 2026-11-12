@@ -59,6 +59,8 @@ export interface VideoClipEdit {
   particleIntensity?: number;
   /** Transparent foreground cutout image to move separately from the background. */
   parallaxAssetId?: string;
+  /** Clean-plate image with the foreground object removed. Required with parallaxAssetId. */
+  parallaxBackgroundAssetId?: string;
   parallaxAmount?: number;
 }
 
@@ -171,6 +173,8 @@ export function isVideoClipEdit(value: unknown): value is VideoClipEdit {
     && (value.particlePreset === undefined || isParticlePreset(value.particlePreset))
     && (value.particleIntensity === undefined || isFiniteInRange(value.particleIntensity, 0, 100))
     && (value.parallaxAssetId === undefined || (typeof value.parallaxAssetId === "string" && value.parallaxAssetId.trim().length > 0))
+    && (value.parallaxBackgroundAssetId === undefined || (typeof value.parallaxBackgroundAssetId === "string" && value.parallaxBackgroundAssetId.trim().length > 0))
+    && (value.parallaxAssetId === undefined) === (value.parallaxBackgroundAssetId === undefined)
     && (value.parallaxAmount === undefined || isFiniteInRange(value.parallaxAmount, 0, 100));
 }
 
