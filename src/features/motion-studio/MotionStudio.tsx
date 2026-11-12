@@ -190,24 +190,9 @@ export default function MotionStudio() {
     && Number.isFinite(audioDuration) && audioDuration <= 24 * 60 * 60;
 
   useEffect(() => {
-    const liveIds = new Set(images.map((item) => item.asset.id));
-    for (const [id, image] of imageCacheRef.current.entries()) {
-      if (!liveIds.has(id)) {
-        image.src = "";
-        imageCacheRef.current.delete(id);
-      }
-    }
-    for (const item of images) {
-      if (imageCacheRef.current.has(item.asset.id)) continue;
-      const image = new Image();
-      image.onload = () => {
-        const audio = audioRef.current;
-        const time = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : playhead;
-        drawAtTime(time);
-      };
-      image.src = item.objectUrl;
-      imageCacheRef.current.set(item.asset.id, image);
-    }
+    imageCacheRef.current.forEach((image) => { image.src = ""; });
+    imageCacheRef.current.clear();
+    drawAtTime(playhead);
   }, [images]);
 
   useEffect(() => {
@@ -237,8 +222,22 @@ export default function MotionStudio() {
     const safeTime = Math.max(0, Math.min(time, Math.max(0, audioDuration - 0.001)));
     const index = Math.min(images.length - 1, Math.floor(safeTime / secondsPerImage));
     const imageItem = images[index];
-    const image = imageItem ? imageCacheRef.current.get(imageItem.asset.id) : undefined;
-    if (!image) return;
+    if (!imageItem) return;
+    let image = imageCacheRef.current.get(imageItem.asset.id);
+    if (!image) {
+      imageCacheRef.current.forEach((cached) => { cached.src = ""; });
+      imageCacheRef.current.clear();
+      image = new Image();
+      image.onload = () => {
+        const audio = audioRef.current;
+        drawAtTime(audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime);
+      };
+      image.onerror = () => setNotice("Could not decode " + imageItem.asset.name + " for the preview.");
+      imageCacheRef.current.set(imageItem.asset.id, image);
+      image.src = imageItem.objectUrl;
+      return;
+    }
+    if (!image.complete || !image.naturalWidth) return;
     const localProgress = Math.max(0, Math.min(1, (safeTime - index * secondsPerImage) / secondsPerImage));
     drawMotionFrame(canvas, image, effect, localProgress, zoomStrength);
   }
