@@ -17,6 +17,7 @@ type ActiveGuide = {
 
 type GridGuideEditorProps = {
   image: HTMLImageElement;
+  open: boolean;
   initialColumns: number;
   initialRows: number;
   onApply: (verticalCuts: number[], horizontalCuts: number[]) => void;
@@ -54,55 +55,13 @@ function moveGuide(guides: Guide[], id: string, nextPosition: number): Guide[] {
     .sort((left, right) => left.position - right.position);
 }
 
-function GuideControls({
-  axis,
-  guides,
-  active,
-  onAdd,
-  onRemove,
-  onSelect,
-}: {
-  axis: GuideAxis;
-  guides: Guide[];
-  active: boolean;
-  onAdd: () => void;
-  onRemove: () => void;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="grid-guide-axis">
-      <div>
-        <b>{axis === "vertical" ? "Column cuts" : "Row cuts"}</b>
-        <small>{guides.length} guide{guides.length === 1 ? "" : "s"} · {guides.length + 1} {axis === "vertical" ? "columns" : "rows"}</small>
-      </div>
-      <div className="grid-guide-axis-actions">
-        <button type="button" onClick={onAdd} disabled={guides.length >= 59} aria-label={"Add " + axis + " cut"}><Plus size={14} /> Add</button>
-        <button type="button" onClick={onRemove} disabled={!active} aria-label={"Remove selected " + axis + " cut"}><Minus size={14} /> Remove</button>
-      </div>
-      {guides.length > 0 && (
-        <div className="grid-guide-line-list">
-          {guides.map((guide, index) => (
-            <button
-              type="button"
-              key={guide.id}
-              className={active && guide.id === activeGuideIdPlaceholder ? "active" : ""}
-              onClick={() => onSelect(guide.id)}
-            >
-              {axis === "vertical" ? "V" : "H"}{index + 1} · {guide.position.toFixed(1)}%
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function guideCountLabel(vertical: Guide[], horizontal: Guide[]): string {
   return ((vertical.length + 1) * (horizontal.length + 1)).toLocaleString() + " output regions";
 }
 
 export function GridGuideEditor({
   image,
+  open,
   initialColumns,
   initialRows,
   onApply,
@@ -230,6 +189,8 @@ export function GridGuideEditor({
   const selectedHorizontal = activeGuide?.axis === "horizontal" ? activeGuide.id : null;
   const aspectRatio = image.naturalWidth / Math.max(1, image.naturalHeight);
   const stageWidth = Math.min(920, Math.max(150, Math.round(520 * aspectRatio)));
+
+  if (!open) return null;
 
   return (
     <section className="grid-guide-editor">
