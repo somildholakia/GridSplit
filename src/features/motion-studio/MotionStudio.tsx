@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown, ArrowUp, AudioLines, CheckCircle2, Clapperboard, FileAudio,
   ImagePlus, Loader2, RefreshCw, ShieldCheck, Sparkles, Square,
-  Trash2, Upload, WandSparkles, KeyRound, Layers3, Flame, CloudSnow, CloudRain, Sparkles as SparklesIcon,
+  Trash2, Upload, WandSparkles, KeyRound, Layers3, Flame, Cloud, CloudSnow, CloudRain, Sparkles as SparklesIcon,
 } from "lucide-react";
 import type { StudioProject, ProjectImageAsset, ProjectTimelineClip } from "../../lib/projectStore";
 import type {
@@ -530,6 +530,15 @@ export default function MotionStudio() {
     setSelectedKeyframeIndex(Math.max(0, Math.min(selectedKeyframeIndex, next.length - 1)));
   };
 
+  const resetSelectedKeyframes = () => {
+    if (!selectedImage) return;
+    setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id
+      ? { ...item, keyframes: [], customKeyframes: false }
+      : item));
+    setSelectedKeyframeIndex(0);
+    setNotice("The selected image is using the current camera-motion preset again.");
+  };
+
   const handleAudioFile = (file?: File) => {
     if (!file || rendering) return;
     if (!file.type.startsWith("audio/") && !/\.(wav|mp3|m4a|aac|ogg|opus|flac)$/i.test(file.name)) {
@@ -942,6 +951,7 @@ export default function MotionStudio() {
               <div className="motion-keyframe-actions">
                 <button type="button" className="motion-secondary-button" disabled={rendering || editableKeyframes.length >= 32} onClick={addKeyframe}><KeyRound size={13} /> Add / replace keyframe</button>
                 <button type="button" className="motion-secondary-button" disabled={rendering || editableKeyframes.length <= 2} onClick={removeSelectedKeyframe}><Trash2 size={13} /> Remove selected</button>
+                <button type="button" className="motion-secondary-button" disabled={rendering || !selectedImage.customKeyframes} onClick={resetSelectedKeyframes}><RefreshCw size={13} /> Reset to preset</button>
               </div>
               {selectedKeyframe && <div className="motion-keyframe-controls">
                 <label className="motion-range-field">Keyframe time <b>{Math.round(selectedKeyframe.time * 100)}%</b>
@@ -1009,7 +1019,7 @@ export default function MotionStudio() {
 
         <aside className="motion-studio-side-column">
           <section className="motion-panel motion-render-panel">
-            <div className="motion-panel-heading"><div><span>03 · EXPORT</span><h2>Render your video</h2><p>Final rendering uses the local FFmpeg engine.</p></div></div>
+            <div className="motion-panel-heading"><div><span>06 · EXPORT</span><h2>Render your video</h2><p>Final rendering uses the local FFmpeg engine.</p></div></div>
             <label className="motion-field">Aspect ratio<select value={aspectRatio} disabled={rendering} onChange={(event) => setAspectRatio(event.target.value as AspectRatio)}><option value="16:9">16:9 · YouTube</option><option value="9:16">9:16 · Shorts / Reels</option><option value="1:1">1:1 · Square</option></select></label>
             <label className="motion-field">Resolution<select value={outputSize} disabled={rendering} onChange={(event) => setOutputSize(event.target.value as OutputSize)}><option value="1080p">1080p · Full HD</option><option value="720p">720p · HD</option></select></label>
             <label className="motion-field">Frame rate<select value={fps} disabled={rendering} onChange={(event) => setFps(Number(event.target.value))}><option value={24}>24 FPS · cinematic</option><option value={30}>30 FPS · standard</option><option value={60}>60 FPS · smooth</option></select></label>
@@ -1027,7 +1037,7 @@ export default function MotionStudio() {
               {!rendererReady && <div className="motion-install-note"><b>Start the local engine</b><code>python local-render/server.py --allow-origin http://localhost:5173</code><small>For the deployed site, allow its exact HTTPS origin instead. Keep the sidecar running while rendering.</small></div>}
             </div>
             <button type="button" className="motion-colab-button" disabled={!canRender || colabExporting || rendering} onClick={() => void exportForColab()}>
-              {colabExporting ? <Loader2 size={14} /> : <CloudSnow size={14} />}
+              {colabExporting ? <Loader2 size={14} /> : <Cloud size={14} />}
               {colabExporting ? "Preparing Colab package…" : "Export Colab / T4 package"}
             </button>
             <p className="motion-colab-caption">Creates a ZIP containing the project, renderer and Colab notebook. GPU acceleration is used only when Google provides a compatible T4/NVENC runtime.</p>
@@ -1042,7 +1052,7 @@ export default function MotionStudio() {
           <section className="motion-panel motion-limits-panel">
             <b><Sparkles size={14} /> WHAT THIS MODE DOES</b>
             <p>Creates movement with camera animation, zoom, pan and transitions. It does not use an AI image-to-video model or invent new subject motion.</p>
-            <p>Particle overlays, layered parallax and keyframe-driven graphic elements are planned as separate effect layers.</p>
+            <p>Custom keyframes, procedural particles and manually supplied transparent foreground cutouts are included as separate animation layers. Subject cutouts are not inferred automatically.</p>
           </section>
         </aside>
       </div>
