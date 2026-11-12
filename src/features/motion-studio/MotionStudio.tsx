@@ -285,7 +285,7 @@ export default function MotionStudio() {
         setNotice(error instanceof Error ? error.message : "An image could not be decoded.");
       }
     }
-    setImages((current) => sortNaturally([...current, ...newImages]));
+    setImages((current) => [...current, ...sortNaturally(newImages)].map((item, order) => ({ ...item, asset: { ...item.asset, order, sequenceNumber: order + 1 } })));
     if (newImages.length) setNotice("Imported " + newImages.length + " image(s). Originals remain unchanged.");
   };
 
@@ -322,7 +322,7 @@ export default function MotionStudio() {
       if (cached) cached.src = "";
       imageCacheRef.current.delete(id);
     }
-    setImages((current) => sortNaturally(current.filter((item) => item.asset.id !== id)));
+    setImages((current) => current.filter((item) => item.asset.id !== id).map((item, order) => ({ ...item, asset: { ...item.asset, order, sequenceNumber: order + 1 } })));
   };
 
   const moveImage = (index: number, delta: -1 | 1) => {
