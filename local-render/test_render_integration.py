@@ -27,8 +27,8 @@ def png_rgba_pixel(red: int, green: int, blue: int, alpha: int) -> bytes:
     def chunk(kind: bytes, data: bytes) -> bytes:
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
     header = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)
-    image = b"\\x00" + bytes((red, green, blue, alpha))
-    return b"\\x89PNG\\r\\n\\x1a\\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(image)) + chunk(b"IEND", b"")
+    image = b"\x00" + bytes((red, green, blue, alpha))
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(image)) + chunk(b"IEND", b"")
 
 
 def wav_tone(path: Path, seconds: float = 2.0, rate: int = 48000) -> None:
