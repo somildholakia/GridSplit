@@ -90,6 +90,9 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
     .filter(clip=>clip.track==="audio")
     .map(clip=>clip.sceneId+":"+clip.startSeconds+":"+clip.durationSeconds)
     .join("|");
+  const mixAssetSyncKey=assets
+    .map(asset=>asset.id+":"+asset.kind+":"+(asset.sceneId??"")+":"+asset.startSeconds)
+    .join("|");
   useEffect(()=>{
     const sceneStarts=new Map((project.timelineClips??[])
       .filter(clip=>clip.track==="audio")
@@ -105,7 +108,7 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
     if(changed)updateAssets(next);
   // The timeline key deliberately tracks only audio clip positions/durations.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[audioTimelineKey,project.id]);
+  },[audioTimelineKey,mixAssetSyncKey,project.id]);
 
 
   useEffect(() => () => {
