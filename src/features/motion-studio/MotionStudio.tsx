@@ -214,8 +214,9 @@ export default function MotionStudio() {
 
   function drawAtTime(time: number): void {
     const canvas = canvasRef.current;
-    if (!canvas || !images.length || !secondsPerImage) {
-      const context = canvas?.getContext("2d");
+    if (!canvas) return;
+    if (!images.length || !secondsPerImage) {
+      const context = canvas.getContext("2d");
       context?.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
