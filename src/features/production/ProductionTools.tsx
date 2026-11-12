@@ -84,6 +84,30 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
   }, [data.audioMixTracks, tracks, updateTracks]);
   const readyIssues = useMemo(() => getRenderReadiness(data), [data.imageAssets, data.timelineClips, data.mixAssets, data.renderProfile]);
 
+  // Imported music starts at the programme head. Scene-bound SFX follows its
+  // scene's audio clip whenever the generated speech/image schedule is rebuilt.
+  const audioTimelineKey=(project.timelineClips??[])
+    .filter(clip=>clip.track==="audio")
+    .map(clip=>clip.sceneId+":"+clip.startSeconds+":"+clip.durationSeconds)
+    .join("|");
+  useEffect(()=>{
+    const sceneStarts=new Map((project.timelineClips??[])
+      .filter(clip=>clip.track==="audio")
+      .map(clip=>[clip.sceneId,clip.startSeconds]));
+    if(!sceneStarts.size||!assets.length)return;
+    let changed=false;
+    const next=assets.map(asset=>{
+      const start=asset.kind==="music"?0:(asset.sceneId?sceneStarts.get(asset.sceneId):undefined);
+      if(start===undefined||Math.abs(asset.startSeconds-start)<0.001)return asset;
+      changed=true;
+      return {...asset,startSeconds:start};
+    });
+    if(changed)updateAssets(next);
+  // The timeline key deliberately tracks only audio clip positions/durations.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[audioTimelineKey,project.id]);
+
+
   useEffect(() => () => {
     previewSources.current.forEach((source) => { try { source.stop(); } catch { /* already ended */ } });
     void previewContext.current?.close();
@@ -118,6 +142,7 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
             bytes: file.size,
             kind: selectedTrack,
             trackId: target.id,
+            sceneId: selectedTrack === "sfx" ? project.scenes[0]?.id : undefined,
             startSeconds: 0,
             durationSeconds: buffer.duration,
             order: assets.length + added,
@@ -315,8 +340,8 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
         </article>)}
       </div>
       <div className="mix-import-row"><div><h3>Music & sound effects</h3><p>Import local files; they are copied into this project’s IndexedDB store.</p></div><select aria-label="Audio asset track" value={selectedTrack} onChange={(event) => setSelectedTrack(event.target.value as "music" | "sfx")}><option value="music">Music track</option><option value="sfx">SFX track</option></select><label className="production-tool-button"><Plus size={14}/> Add audio<input type="file" accept="audio/*" multiple disabled={busy} onChange={(event) => { void importAudio(event.target.files); event.currentTarget.value = ""; }}/></label></div>
-      {assets.length ? <div className="mix-asset-list">{assets.map((asset) => <article key={asset.id}><div><b>{asset.name}</b><small>{TRACK_LABELS[asset.kind]} · {formatTime(asset.durationSeconds)} · {(asset.bytes / 1024 / 1024).toFixed(1)} MB</small></div><label>Start <input type="number" min="0" step="0.1" value={asset.startSeconds} onChange={(event) => updateAssets(assets.map((item) => item.id === asset.id ? { ...item, startSeconds: Math.max(0, Number(event.target.value) || 0) } : item))}/> s</label><button onClick={() => void removeMixAsset(asset.id)}>Remove</button></article>)}</div> : <div className="production-tools-empty">Import music or SFX to create additional mix lanes.</div>}
-      <p className="production-tools-footnote">Mute and solo state is shared by local preview and the renderer. Imported music/SFX files remain on-device and are included in a complete project archive.</p>
+      {assets.length ? <div className="mix-asset-list">{assets.map((asset) => <article key={asset.id}><div><b>{asset.name}</b><small>{TRACK_LABELS[asset.kind]} · {formatTime(asset.durationSeconds)} · {(asset.bytes / 1024 / 1024).toFixed(1)} MB</small></div>{asset.kind === "sfx" ? <label>Sync to scene <select aria-label={"Scene for "+asset.name} value={asset.sceneId??""} onChange={(event) => updateAssets(assets.map((item) => item.id === asset.id ? { ...item, sceneId: event.target.value || undefined } : item))}><option value="">Manual placement</option>{project.scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.title}</option>)}</select></label> : <span className="mix-auto-sync-label">Auto · programme start</span>}<label>Start <input type="number" min="0" step="0.1" value={asset.startSeconds} onChange={(event) => updateAssets(assets.map((item) => item.id === asset.id ? { ...item, sceneId: asset.kind === "sfx" ? undefined : item.sceneId, startSeconds: Math.max(0, Number(event.target.value) || 0) } : item))}/> s</label><button onClick={() => void removeMixAsset(asset.id)}>Remove</button></article>)}</div> : <div className="production-tools-empty">Import music or SFX to create additional mix lanes.</div>}
+      <p className="production-tools-footnote">Mute and solo state is shared by local preview and the renderer. Music automatically starts at the programme head. Assign each SFX clip to a scene and its start follows that scene as the timeline changes; choose Manual placement to take control.</p>
     </div>}
     {tab === "effects" && <div className="production-tools-panel">
       <div className="production-tools-title"><div><h3>Transitions & image motion</h3><p>Configure per-image-clip transitions and optional Ken Burns motion.</p></div><span>{imageClips.length} image clips</span></div>
