@@ -6,6 +6,19 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 
 ## [Unreleased]
 
+### Added — 2026-11-12 (PR #22)
+- Added browser Image Animation Studio with six camera-motion presets, selected-image or ordered-project output, configurable duration/intensity, MP4 where supported and WebM fallback.
+- Added OPFS chunked recording writes where supported, with in-memory Blob fallback.
+- Added sequential **Generate all remaining** for narration/dialogue TTS with progress, cancellation, ready-segment skipping and retry. Music/SFX cues remain excluded.
+- Expanded deterministic classification for narration/voiceover, screenplay speakers, music/BGM/score, SFX/foley/ambience and bracketed stage directions.
+- Increased Production Studio project image capacity to 1,200.
+
+### Verified
+- PR #22 merged at `e30fba7e`.
+- PR CI [#43184510763](https://github.com/somildholakia/GridSplit/actions/runs/43184510763) and post-merge main CI [#43185852867](https://github.com/somildholakia/GridSplit/actions/runs/43185852867) passed.
+- Secondary Vercel deployment `gridsplit-studio.vercel.app` is READY on this commit.
+- Real Kokoro and M36 target-device acceptance remain open.
+
 ### Added
 - Added a cohesive editorial colour system across the dashboard, script editor, image splitter, audio studio, production timeline and mix/export workspace. The refresh uses warm paper surfaces, ink-toned typography, cobalt, coral, marigold and mint accents, plus responsive states; processing and local-storage workflows are unchanged.
 - Added an exact-file, non-AI correction preset for the supplied 1536 × 864 storyboard sheet. The detector layout is 209 candidates (15 / 16 × 11 / 18); the preset excludes the title, 11 repeated-number panels and continuation card to leave 196 selected images.
