@@ -628,6 +628,10 @@ export default function MotionStudio() {
       durationSeconds: audioDuration,
       order: 0,
     };
+    const imageAssetRecords = images.flatMap((item, order) => [
+      { ...item.asset, order, sequenceNumber: order + 1 },
+      ...(item.foreground ? [{ ...item.foreground.asset, order: images.length + order, sequenceNumber: null }] : []),
+    ]);
     const transitionSeconds = transition === "cut" ? 0 : transitionDuration;
     const videoClipEdits: VideoClipEdit[] = timelineClips.map((clip, index) => ({
       clipId: clip.id,
@@ -636,6 +640,14 @@ export default function MotionStudio() {
       transitionOut: transition,
       transitionDurationSeconds: transitionSeconds,
       zoom: zoomStrength,
+      keyframes: images[index].keyframes.length
+        ? images[index].keyframes
+        : createPresetKeyframes(effect, zoomStrength),
+      particlePreset,
+      particleIntensity,
+      ...(images[index].foreground
+        ? { parallaxAssetId: images[index].foreground!.asset.id, parallaxAmount: parallaxStrength }
+        : {}),
     }));
     const profileDimensions = outputDimensions(aspectRatio, outputSize);
     const renderProfile: RenderProfile = {
@@ -643,6 +655,7 @@ export default function MotionStudio() {
       fps,
       aspectRatio,
       quality: "balanced",
+      encoder: "software",
     };
     const project: StudioProject = {
       id: projectId,
@@ -657,11 +670,7 @@ export default function MotionStudio() {
       }],
       createdAt: now,
       updatedAt: now,
-      imageAssets: images.map((item, order) => ({
-        ...item.asset,
-        order,
-        sequenceNumber: order + 1,
-      })),
+      imageAssets: imageAssetRecords,
       imageMappings: [{ sceneId, imageIds: images.map((item) => item.asset.id) }],
       timelineClips,
       audioMixTracks: [mixTrack],
@@ -674,6 +683,10 @@ export default function MotionStudio() {
       for (const item of images) {
         await saveProjectImageBlob(item.asset.id, item.file);
         savedImageIds.push(item.asset.id);
+        if (item.foreground) {
+          await saveProjectImageBlob(item.foreground.asset.id, item.foreground.file);
+          savedImageIds.push(item.foreground.asset.id);
+        }
       }
       await saveProjectMedia(projectId, audioAssetId, audioFile);
       return project;
