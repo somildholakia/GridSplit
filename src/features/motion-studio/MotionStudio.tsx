@@ -16,6 +16,7 @@ import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
 import { buildEvenImageTimeline } from "./motionTiming";
+import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
 import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
 import { buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
 import "./motion-studio.css";
@@ -26,6 +27,9 @@ type MotionImage = {
   file: File;
   objectUrl: string;
   foreground?: MotionForeground;
+  depthMap?: MotionForeground;
+  depthFocus?: { x: number; y: number };
+  depthMotionAmount?: number;
   keyframes: MotionKeyframe[];
   customKeyframes: boolean;
   particlePreset?: ParticlePreset;
@@ -258,6 +262,7 @@ export default function MotionStudio() {
   const [particlePreset, setParticlePreset] = useState<ParticlePreset>("none");
   const [particleIntensity, setParticleIntensity] = useState(55);
   const [parallaxStrength, setParallaxStrength] = useState(45);
+  const [depthMapWorking, setDepthMapWorking] = useState(false);
   const [colabExporting, setColabExporting] = useState(false);
   const [transition, setTransition] = useState<TransitionKind>("dissolve");
   const [transitionDuration, setTransitionDuration] = useState(0.6);
@@ -297,6 +302,7 @@ export default function MotionStudio() {
   const selectedParticles = selectedImage
     ? resolveParticleSettings(selectedImage.particlePreset, selectedImage.particleIntensity, particlePreset, particleIntensity)
     : { preset: particlePreset, intensity: particleIntensity };
+  const selectedDepthFocus = selectedImage?.depthFocus ?? { x: 0.5, y: 0.45 };
 
 
   useEffect(() => {
@@ -498,6 +504,73 @@ export default function MotionStudio() {
     }
   };
 
+  const estimateDepthForImage = async (imageId: string) => {
+    const source = images.find((item) => item.asset.id === imageId);
+    if (!source || rendering || depthMapWorking) return;
+    setDepthMapWorking(true);
+    setNotice("Estimating a composition-based depth map locally in your browser…");
+    try {
+      const bitmap = await createImageBitmap(source.file);
+      const scale = Math.min(1, 640 / Math.max(bitmap.width, bitmap.height));
+      const width = Math.max(2, Math.round(bitmap.width * scale));
+      const height = Math.max(2, Math.round(bitmap.height * scale));
+      const sourceCanvas = document.createElement("canvas");
+      sourceCanvas.width = width;
+      sourceCanvas.height = height;
+      const context = sourceCanvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("This browser could not create a local depth map canvas.");
+      context.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+      const sourcePixels = context.getImageData(0, 0, width, height);
+      const focus = source.depthFocus ?? { x: 0.5, y: 0.45 };
+      const depth = createCompositionDepthMap(sourcePixels.data, width, height, focus, 0.82);
+      context.putImageData(depthMapToImageData(depth, width, height), 0, 0);
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        sourceCanvas.toBlob((value) => value ? resolve(value) : reject(new Error("The browser could not encode the depth map.")), "image/png");
+      });
+      const file = new File([blob], "depth-" + source.asset.name.replace(/\.[^.]+$/, "") + ".png", { type: "image/png" });
+      const objectUrl = URL.createObjectURL(file);
+      objectUrlsRef.current.add(objectUrl);
+      const assetId = crypto.randomUUID();
+      const asset: ProjectImageAsset = {
+        id: assetId,
+        name: file.name,
+        relativePath: "motion-studio/depth-maps/" + file.name,
+        mimeType: "image/png",
+        bytes: file.size,
+        sequenceNumber: null,
+        order: source.asset.order,
+        width,
+        height,
+        fingerprint: file.name + ":" + file.size + ":" + file.lastModified,
+      };
+      setImages((current) => current.map((item) => {
+        if (item.asset.id !== imageId) return item;
+        if (item.depthMap) {
+          URL.revokeObjectURL(item.depthMap.objectUrl);
+          objectUrlsRef.current.delete(item.depthMap.objectUrl);
+        }
+        return { ...item, depthMap: { asset, file, objectUrl }, depthMotionAmount: item.depthMotionAmount ?? 35 };
+      }));
+      setNotice("Approximate depth map created locally. Adjust the focus point and rebuild it for a better composition.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not estimate image depth.");
+    } finally {
+      setDepthMapWorking(false);
+    }
+  };
+
+  const removeDepthMap = (imageId: string) => {
+    const target = images.find((item) => item.asset.id === imageId);
+    if (target?.depthMap) {
+      URL.revokeObjectURL(target.depthMap.objectUrl);
+      objectUrlsRef.current.delete(target.depthMap.objectUrl);
+    }
+    setImages((current) => current.map((item) => item.asset.id === imageId
+      ? { ...item, depthMap: undefined }
+      : item));
+  };
+
   const removeForegroundLayer = (imageId: string) => {
     const target = images.find((item) => item.asset.id === imageId);
     if (target?.foreground) {
@@ -601,6 +674,10 @@ export default function MotionStudio() {
         if (depthCached) depthCached.src = "";
         imageCacheRef.current.delete("depth:" + target.foreground.asset.id);
       }
+      if (target.depthMap) {
+        URL.revokeObjectURL(target.depthMap.objectUrl);
+        objectUrlsRef.current.delete(target.depthMap.objectUrl);
+      }
       const cached = imageCacheRef.current.get("base:" + id) ?? imageCacheRef.current.get(id);
       if (cached) cached.src = "";
       imageCacheRef.current.delete("base:" + id);
@@ -676,6 +753,7 @@ export default function MotionStudio() {
     const imageAssetRecords = images.flatMap((item, order) => [
       { ...item.asset, order, sequenceNumber: order + 1 },
       ...(item.foreground ? [{ ...item.foreground.asset, order: images.length + order, sequenceNumber: null }] : []),
+      ...(item.depthMap ? [{ ...item.depthMap.asset, order: images.length * 2 + order, sequenceNumber: null }] : []),
     ]);
     const transitionSeconds = transition === "cut" ? 0 : transitionDuration;
     const videoClipEdits: VideoClipEdit[] = timelineClips.map((clip, index) => ({
@@ -692,6 +770,9 @@ export default function MotionStudio() {
       particleIntensity: resolveParticleSettings(images[index].particlePreset, images[index].particleIntensity, particlePreset, particleIntensity).intensity,
       ...(images[index].foreground
         ? { parallaxAssetId: images[index].foreground!.asset.id, parallaxAmount: parallaxStrength }
+        : {}),
+      ...(images[index].depthMap
+        ? { depthMapAssetId: images[index].depthMap!.asset.id, depthMotionAmount: images[index].depthMotionAmount ?? 35 }
         : {}),
     }));
     const profileDimensions = outputDimensions(aspectRatio, outputSize);
@@ -731,6 +812,10 @@ export default function MotionStudio() {
         if (item.foreground) {
           await saveProjectImageBlob(item.foreground.asset.id, item.foreground.file);
           savedImageIds.push(item.foreground.asset.id);
+        }
+        if (item.depthMap) {
+          await saveProjectImageBlob(item.depthMap.asset.id, item.depthMap.file);
+          savedImageIds.push(item.depthMap.asset.id);
         }
       }
       await saveProjectMedia(projectId, audioAssetId, audioFile);
@@ -819,6 +904,10 @@ export default function MotionStudio() {
         const depthCached = imageCacheRef.current.get("depth:" + item.foreground.asset.id);
         if (depthCached) depthCached.src = "";
         imageCacheRef.current.delete("depth:" + item.foreground.asset.id);
+      }
+      if (item.depthMap) {
+        URL.revokeObjectURL(item.depthMap.objectUrl);
+        objectUrlsRef.current.delete(item.depthMap.objectUrl);
       }
       const cached = imageCacheRef.current.get("base:" + item.asset.id) ?? imageCacheRef.current.get(item.asset.id);
       if (cached) cached.src = "";
@@ -1078,14 +1167,50 @@ export default function MotionStudio() {
               <div><span>05 · DEPTH & PARALLAX</span><h2>Separate foreground from background</h2><p>Attach a transparent cutout to each image with its Layer control.</p></div>
               <Layers3 size={20} />
             </div>
-            <label className="motion-range-field">Parallax strength <b>{parallaxStrength}%</b>
+            {selectedImage ? <>
+              <div className="motion-depth-estimator">
+                <b>LOCAL DEPTH ESTIMATOR</b>
+                <p>Builds a lightweight grayscale depth field from the image's composition, focus point and visual contrast. It runs in your browser with no API, model download or upload.</p>
+                <div className="motion-depth-focus-grid">
+                  <label>Focus X <b>{Math.round(selectedDepthFocus.x * 100)}%</b>
+                    <input type="range" min="0" max="100" step="1" value={Math.round(selectedDepthFocus.x * 100)} disabled={rendering || depthMapWorking} onChange={(event) => {
+                      const x = Number(event.target.value) / 100;
+                      setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id ? { ...item, depthFocus: { ...(item.depthFocus ?? { x: 0.5, y: 0.45 }), x } } : item));
+                    }} />
+                  </label>
+                  <label>Focus Y <b>{Math.round(selectedDepthFocus.y * 100)}%</b>
+                    <input type="range" min="0" max="100" step="1" value={Math.round(selectedDepthFocus.y * 100)} disabled={rendering || depthMapWorking} onChange={(event) => {
+                      const y = Number(event.target.value) / 100;
+                      setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id ? { ...item, depthFocus: { ...(item.depthFocus ?? { x: 0.5, y: 0.45 }), y } } : item));
+                    }} />
+                  </label>
+                </div>
+                <button type="button" className="motion-secondary-button" disabled={rendering || depthMapWorking} onClick={() => void estimateDepthForImage(selectedImage.asset.id)}>
+                  {depthMapWorking ? <Loader2 size={13} /> : <WandSparkles size={13} />}
+                  {depthMapWorking ? "Estimating…" : selectedImage.depthMap ? "Rebuild depth map" : "Estimate depth locally"}
+                </button>
+                {selectedImage.depthMap && <div className="motion-depth-map-preview">
+                  <img src={selectedImage.depthMap.objectUrl} alt="Estimated grayscale depth map" />
+                  <div><b>Depth map ready</b><span>Brighter regions are treated as nearer. Rebuild after changing the focus point.</span></div>
+                  <button type="button" className="motion-secondary-button" disabled={rendering} onClick={() => removeDepthMap(selectedImage.asset.id)}>Remove map</button>
+                </div>}
+                {selectedImage.depthMap && <label className="motion-range-field">3D displacement strength <b>{selectedImage.depthMotionAmount ?? 35}%</b>
+                  <input type="range" min="0" max="100" step="5" value={selectedImage.depthMotionAmount ?? 35} disabled={rendering} onChange={(event) => {
+                    const value = Number(event.target.value);
+                    setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id ? { ...item, depthMotionAmount: value } : item));
+                  }} />
+                </label>}
+              </div>
+              <div className="motion-parallax-divider" />
+            </> : <p className="motion-note">Select an image above to estimate its depth map.</p>}
+            <label className="motion-range-field">Manual cutout parallax strength <b>{parallaxStrength}%</b>
               <input type="range" min="0" max="100" step="5" value={parallaxStrength} disabled={rendering} onChange={(event) => setParallaxStrength(Number(event.target.value))} />
             </label>
             <div className="motion-depth-summary">
-              <b>{images.filter((item) => item.foreground).length} / {images.length} images have depth layers</b>
-              <span>Use a transparent PNG/WebP cutout aligned to its original image. Background and foreground layers move independently.</span>
+              <b>{images.filter((item) => item.depthMap).length} estimated maps · {images.filter((item) => item.foreground).length} transparent cutouts</b>
+              <span>Depth-map displacement is a subtle warp of the original image. Transparent cutouts remain available for more noticeable independent foreground motion.</span>
             </div>
-            <p className="motion-note">Depth is manually supplied. This workflow does not call a segmentation API or infer masks automatically.</p>
+            <p className="motion-note">This is a composition-based approximation, not a neural monocular-depth model or accurate 3D reconstruction. The final warp is rendered locally by FFmpeg.</p>
           </section>
         </div>
 
