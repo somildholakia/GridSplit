@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPresetKeyframes, insertMotionKeyframe, sampleMotionKeyframes } from "./motionLayers";
+import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
 
 describe("Motion Studio animation layers", () => {
   it("creates deterministic keyframe presets for zoom and pan", () => {
@@ -26,6 +26,18 @@ describe("Motion Studio animation layers", () => {
     const keys = createPresetKeyframes("zoom-out", 1.4);
     expect(sampleMotionKeyframes(keys, -1).scale).toBe(1.4);
     expect(sampleMotionKeyframes(keys, 2).scale).toBe(1);
+  });
+
+  it("resolves image-specific particle overrides over global defaults", () => {
+    expect(resolveParticleSettings(undefined, undefined, "snow", 40)).toEqual({
+      preset: "snow", intensity: 40,
+    });
+    expect(resolveParticleSettings("embers", 75, "snow", 40)).toEqual({
+      preset: "embers", intensity: 75,
+    });
+    expect(resolveParticleSettings("none", 140, "snow", 40)).toEqual({
+      preset: "none", intensity: 100,
+    });
   });
 
   it("inserts or replaces a keyframe at the same timestamp", () => {
