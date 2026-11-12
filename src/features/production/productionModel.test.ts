@@ -11,6 +11,9 @@ import {
   timelineDurationSeconds,
   resizeImageClipKeepingSceneDuration,
   setAllImageClipDurations,
+  setAllImageClipDurationsAcrossTimeline,
+  resizeImageClipKeepingTimelineDuration,
+  buildEvenTimeline,
   splitImageClipAtTime,
   type SequenceAsset,
 } from "./productionModel";
@@ -182,4 +185,74 @@ describe("automatic schedule and timeline editing", () => {
     expect(parts[1].durationSeconds).toBeCloseTo(2.25, 8);
   });
 
+});
+
+
+
+describe("even image distribution across the complete audio runtime", () => {
+  it("gives 20 images exactly 30 seconds each across a 10-minute audio timeline", () => {
+    let nextId = 0;
+    const clips = buildEvenTimeline([
+      { sceneId: "scene-a", durationSeconds: 240 },
+      { sceneId: "scene-b", durationSeconds: 360 },
+    ], Array.from({ length: 20 }, (_, index) => "image-" + (index + 1)), () => "even-" + (++nextId));
+
+    const images = clips.filter((clip) => clip.track === "images").sort((a, b) => a.order - b.order);
+    const audio = clips.filter((clip) => clip.track === "audio").sort((a, b) => a.order - b.order);
+    expect(images).toHaveLength(20);
+    expect(images.every((clip) => Math.abs(clip.durationSeconds - 30) < 1e-9)).toBe(true);
+    expect(images[0].startSeconds).toBe(0);
+    expect(images[19].startSeconds + images[19].durationSeconds).toBe(600);
+    expect(images[8].sceneId).toBe("scene-b");
+    expect(audio.reduce((sum, clip) => sum + clip.durationSeconds, 0)).toBe(600);
+    expect(timelineDurationSeconds(clips)).toBe(600);
+  });
+
+  it("ripple-resizes one image but keeps the full audio duration continuously covered", () => {
+    let nextId = 0;
+    const clips = buildEvenTimeline([
+      { sceneId: "scene-a", durationSeconds: 240 },
+      { sceneId: "scene-b", durationSeconds: 360 },
+    ], Array.from({ length: 20 }, (_, index) => "image-" + (index + 1)), () => "even-" + (++nextId));
+    const target = clips.find((clip) => clip.track === "images" && clip.order === 5)!;
+    const resized = resizeImageClipKeepingTimelineDuration(clips, target.id, 45.25);
+    const images = resized.filter((clip) => clip.track === "images").sort((a, b) => a.startSeconds - b.startSeconds);
+    expect(images.find((clip) => clip.id === target.id)?.durationSeconds).toBe(45.25);
+    expect(images[0].startSeconds).toBe(0);
+    images.slice(1).forEach((clip, index) => {
+      expect(clip.startSeconds).toBeCloseTo(images[index].startSeconds + images[index].durationSeconds, 8);
+    });
+    expect(images.at(-1)!.startSeconds + images.at(-1)!.durationSeconds).toBeCloseTo(600, 8);
+  });
+
+  it("applies a shared hold duration globally and lets the final image fill the audio tail", () => {
+    let nextId = 0;
+    const clips = buildEvenTimeline([
+      { sceneId: "scene-a", durationSeconds: 300 },
+      { sceneId: "scene-b", durationSeconds: 300 },
+    ], Array.from({ length: 20 }, (_, index) => "image-" + (index + 1)), () => "even-" + (++nextId));
+    const updated = setAllImageClipDurationsAcrossTimeline(clips, 30)!;
+    const images = updated.filter((clip) => clip.track === "images").sort((a, b) => a.order - b.order);
+    expect(images.every((clip) => clip.durationSeconds === 30)).toBe(true);
+    expect(images.at(-1)!.startSeconds + images.at(-1)!.durationSeconds).toBe(600);
+  });
+
+  it("rejects a global hold duration that leaves less than 0.01 seconds for the final image", () => {
+    let nextId = 0;
+    const clips = buildEvenTimeline([
+      { sceneId: "scene-a", durationSeconds: 10 },
+    ], ["a", "b", "c"], () => "even-" + (++nextId));
+    expect(setAllImageClipDurationsAcrossTimeline(clips, 5)).toBeNull();
+  });
+
+  it("deduplicates repeated image IDs when making a single continuous sequence", () => {
+    let nextId = 0;
+    const clips = buildEvenTimeline(
+      [{ sceneId: "scene-a", durationSeconds: 12 }],
+      ["same", "same", "second"],
+      () => "even-" + (++nextId),
+    );
+    expect(clips.filter((clip) => clip.track === "images")).toHaveLength(2);
+    expect(clips.filter((clip) => clip.track === "images").reduce((sum, clip) => sum + clip.durationSeconds, 0)).toBe(12);
+  });
 });
