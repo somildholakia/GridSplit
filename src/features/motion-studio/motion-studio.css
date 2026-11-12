@@ -128,3 +128,8 @@
 .motion-colab-button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;border:1px solid #7a5ec2;border-radius:8px;background:#2c2143;color:#e5d9ff;font-size:10px;font-weight:800;cursor:pointer}
 .motion-colab-caption{margin-top:-5px}
 @media(max-width:680px){.motion-keyframe-controls{grid-template-columns:1fr}.motion-keyframe-controls .motion-range-field:first-child{grid-column:auto}.motion-keyframe-actions{flex-direction:column}.motion-image-actions{max-width:34px}}
+
+.motion-particle-defaults,.motion-particle-override{display:grid;gap:10px;padding:12px;border:1px solid #ffffff14;border-radius:8px;background:#0e1723}
+.motion-particle-defaults>b,.motion-particle-override>b{color:#c9ef75;font-size:9px;letter-spacing:.8px;overflow-wrap:anywhere}
+.motion-particle-override{border-color:#bca0ff38;background:#171326}
+.motion-particle-override .motion-secondary-button{justify-self:start}
