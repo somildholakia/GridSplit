@@ -235,6 +235,16 @@ def encoder_available(ffmpeg: str, encoder: str) -> bool:
             if not gpu:
                 return False
             subprocess.run([gpu], capture_output=True, text=True, timeout=10, check=True)
+            # Encoder presence and an attached GPU are not enough: run a one-frame
+            # NVENC probe to catch container/driver mismatches before the real job.
+            probe = subprocess.run(
+                [ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "lavfi",
+                 "-i", "color=c=black:s=64x64:r=1:d=0.1", "-frames:v", "1",
+                 "-c:v", "h264_nvenc", "-f", "null", "-"],
+                capture_output=True, text=True, timeout=20,
+            )
+            if probe.returncode != 0:
+                return False
         return True
     except (OSError, subprocess.SubprocessError):
         return False
