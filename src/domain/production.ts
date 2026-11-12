@@ -2,6 +2,20 @@ export type MixTrackKind = "narration" | "dialogue" | "music" | "sfx";
 export type TransitionKind = "cut" | "fade" | "dissolve" | "wipe-left" | "wipe-right";
 export type ImageEffectKind = "none" | "ken-burns" | "pan-left" | "pan-right" | "zoom-in" | "zoom-out";
 export type AspectRatio = "16:9" | "9:16" | "1:1";
+export type ParticlePreset = "none" | "embers" | "snow" | "rain" | "confetti" | "magic";
+export type RenderEncoder = "software" | "nvidia";
+
+export interface MotionKeyframe {
+  /** Normalized clip time from 0 to 1. */
+  time: number;
+  /** Camera zoom multiplier. */
+  scale: number;
+  /** Normalized crop origin from 0 (left/top) to 1 (right/bottom). */
+  panX: number;
+  panY: number;
+  /** Rotation in degrees. */
+  rotation: number;
+}
 
 export interface AudioMixTrack {
   id: string;
@@ -38,6 +52,14 @@ export interface VideoClipEdit {
   transitionOut: TransitionKind;
   transitionDurationSeconds: number;
   zoom: number;
+  /** Optional authored transform keys; when present these override the motion preset. */
+  keyframes?: MotionKeyframe[];
+  /** Optional procedural overlay generated during FFmpeg rendering. */
+  particlePreset?: ParticlePreset;
+  particleIntensity?: number;
+  /** Transparent foreground cutout image to move separately from the background. */
+  parallaxAssetId?: string;
+  parallaxAmount?: number;
 }
 
 export interface RenderProfile {
@@ -46,6 +68,8 @@ export interface RenderProfile {
   fps: number;
   aspectRatio: AspectRatio;
   quality: "high" | "balanced" | "compact";
+  /** NVIDIA NVENC is selected only by the optional Colab/T4 export workflow. */
+  encoder?: RenderEncoder;
 }
 
 export interface GainPoint {
@@ -142,7 +166,12 @@ export function isVideoClipEdit(value: unknown): value is VideoClipEdit {
     && isTransitionKind(value.transitionIn)
     && isTransitionKind(value.transitionOut)
     && isFiniteInRange(value.transitionDurationSeconds, 0, 5)
-    && isFiniteInRange(value.zoom, 1, 1.5);
+    && isFiniteInRange(value.zoom, 1, 1.5)
+    && (value.keyframes === undefined || (Array.isArray(value.keyframes) && value.keyframes.length >= 2 && value.keyframes.length <= 32 && value.keyframes.every(isMotionKeyframe)))
+    && (value.particlePreset === undefined || isParticlePreset(value.particlePreset))
+    && (value.particleIntensity === undefined || isFiniteInRange(value.particleIntensity, 0, 100))
+    && (value.parallaxAssetId === undefined || (typeof value.parallaxAssetId === "string" && value.parallaxAssetId.trim().length > 0))
+    && (value.parallaxAmount === undefined || isFiniteInRange(value.parallaxAmount, 0, 100));
 }
 
 export function isRenderProfile(value: unknown): value is RenderProfile {
@@ -154,7 +183,22 @@ export function isRenderProfile(value: unknown): value is RenderProfile {
     && Number.isFinite(value.fps)
     && [23.976, 24, 25, 29.97, 30, 50, 59.94, 60].some((fps) => Math.abs(Number(value.fps) - fps) < 0.001)
     && ["16:9", "9:16", "1:1"].includes(String(value.aspectRatio))
-    && ["high", "balanced", "compact"].includes(String(value.quality));
+    && ["high", "balanced", "compact"].includes(String(value.quality))
+    && (value.encoder === undefined || value.encoder === "software" || value.encoder === "nvidia");
+}
+
+export function isMotionKeyframe(value: unknown): value is MotionKeyframe {
+  if (!isRecord(value)) return false;
+  return isFiniteInRange(value.time, 0, 1)
+    && isFiniteInRange(value.scale, 1, 1.5)
+    && isFiniteInRange(value.panX, 0, 1)
+    && isFiniteInRange(value.panY, 0, 1)
+    && isFiniteInRange(value.rotation, -25, 25);
+}
+
+export function isParticlePreset(value: unknown): value is ParticlePreset {
+  return value === "none" || value === "embers" || value === "snow" || value === "rain"
+    || value === "confetti" || value === "magic";
 }
 
 export function isMixTrackKind(value: unknown): value is MixTrackKind {
