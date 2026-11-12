@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown, ArrowUp, AudioLines, CheckCircle2, Clapperboard, FileAudio,
-  ImagePlus, Loader2, Play, RefreshCw, ShieldCheck, Sparkles, Square,
+  ImagePlus, Loader2, RefreshCw, ShieldCheck, Sparkles, Square,
   Trash2, Upload, WandSparkles,
 } from "lucide-react";
 import type { StudioProject, ProjectImageAsset, ProjectTimelineClip } from "../../lib/projectStore";
@@ -15,6 +15,7 @@ import {
 import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
+import { buildEvenImageTimeline } from "./motionTiming";
 import "./motion-studio.css";
 
 type MotionImage = {
@@ -24,8 +25,6 @@ type MotionImage = {
 };
 
 type OutputSize = "720p" | "1080p";
-type AudioProbe = HTMLAudioElement & { mozAudioChannelType?: string };
-
 const EFFECTS: Array<{ value: ImageEffectKind; label: string }> = [
   { value: "ken-burns", label: "Ken Burns · cinematic push" },
   { value: "zoom-in", label: "Slow zoom in" },
@@ -50,9 +49,10 @@ function sortNaturally(items: MotionImage[]): MotionImage[] {
 }
 
 function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds - minutes * 60;
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00.00";
+  const centiseconds = Math.round(seconds * 100);
+  const minutes = Math.floor(centiseconds / 6000);
+  const remaining = (centiseconds % 6000) / 100;
   return minutes + ":" + remaining.toFixed(2).padStart(5, "0");
 }
 
@@ -173,12 +173,13 @@ export default function MotionStudio() {
   const [soundtrackVolume, setSoundtrackVolume] = useState(1);
   const [audioFadeIn, setAudioFadeIn] = useState(0.5);
   const [audioFadeOut, setAudioFadeOut] = useState(1.5);
-  const audioRef = useRef<AudioProbe | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const objectUrlsRef = useRef<Set<string>>(new Set());
   const audioObjectUrlRef = useRef("");
   const renderControllerRef = useRef<AbortController | null>(null);
+  const animationRef = useRef<number | null>(null);
 
   const dimensions = useMemo(() => outputDimensions(aspectRatio, outputSize), [aspectRatio, outputSize]);
   const secondsPerImage = images.length && audioDuration > 0 ? audioDuration / images.length : 0;
@@ -225,8 +226,6 @@ export default function MotionStudio() {
       animationRef.current = null;
     };
   }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize]);
-
-  const animationRef = useRef<number | null>(null);
 
   function drawAtTime(time: number): void {
     const canvas = canvasRef.current;
@@ -367,22 +366,9 @@ export default function MotionStudio() {
     const trackId = crypto.randomUUID();
     const audioAssetId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const perImage = audioDuration / images.length;
-    let cursor = 0;
-    const timelineClips: ProjectTimelineClip[] = images.map((item, index) => {
-      const duration = index === images.length - 1 ? audioDuration - cursor : perImage;
-      const startSeconds = cursor;
-      cursor += duration;
-      return {
-        id: crypto.randomUUID(),
-        track: "images",
-        sceneId,
-        assetId: item.asset.id,
-        startSeconds,
-        durationSeconds: duration,
-        order: index,
-      };
-    });
+    const timelineClips: ProjectTimelineClip[] = buildEvenImageTimeline(
+      images.map((item) => item.asset.id), audioDuration, sceneId,
+    );
     const mixTrack: AudioMixTrack = {
       id: trackId,
       kind: "music",
@@ -445,9 +431,21 @@ export default function MotionStudio() {
       videoClipEdits,
       renderProfile,
     };
-    await Promise.all(images.map((item) => saveProjectImageBlob(item.asset.id, item.file)));
-    await saveProjectMedia(projectId, audioAssetId, audioFile);
-    return project;
+    const savedImageIds: string[] = [];
+    try {
+      for (const item of images) {
+        await saveProjectImageBlob(item.asset.id, item.file);
+        savedImageIds.push(item.asset.id);
+      }
+      await saveProjectMedia(projectId, audioAssetId, audioFile);
+      return project;
+    } catch (error) {
+      await Promise.all([
+        ...savedImageIds.map((id) => deleteProjectImageBlob(id).catch(() => undefined)),
+        deleteProjectMedia(projectId, audioAssetId).catch(() => undefined),
+      ]);
+      throw error;
+    }
   };
 
   const startRender = async () => {
@@ -584,9 +582,9 @@ export default function MotionStudio() {
                   <button type="button" title="Remove image" aria-label="Remove image" disabled={rendering} onClick={() => removeImage(item.asset.id)}><Trash2 size={13} /></button>
                 </div>
               </article>)}
-            </div> : <label className="motion-dropzone">
+            </div> : <label className="motion-dropzone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void handleImageFiles(event.dataTransfer.files); }}>
               <ImagePlus size={27} />
-              <b>Drop your storyboard images here</b>
+              <b>Choose or drop your storyboard images here</b>
               <span>Images are ordered naturally: 1, 2, 3 … 10, 11.</span>
               <input type="file" accept="image/png,image/jpeg,image/webp,image/*" multiple disabled={rendering} onChange={(event) => { void handleImageFiles(event.currentTarget.files); event.currentTarget.value = ""; }} />
             </label>}
