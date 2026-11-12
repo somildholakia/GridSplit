@@ -8,7 +8,7 @@ const sceneHeading = /^(?:scene|sequence)\s+\d+\b.*$/i;
 type Classification = Pick<ParsedBlock, "kind" | "text"> & Partial<Pick<ParsedBlock, "speaker" | "cue">>;
 
 function classifyParagraph(raw: string): Classification {
-  const trimmed = raw.trim().replace(/^\\*{1,2}(.*?)\\*{1,2}\\s*/, "$1 ");
+  const trimmed = raw.trim().replace(/^\*{1,2}(.*?)\*{1,2}\s*/, "$1 ");
   const bracket = trimmed.match(/^\[([^\]]+)\]\s*([\s\S]*)$/);
   const label = (bracket?.[1] ?? "").trim();
   const body = (bracket?.[2] ?? "").trim();
