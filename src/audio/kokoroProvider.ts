@@ -1,5 +1,6 @@
-import type { LocalTtsProvider, TtsAudioResult, TtsEngineStatus, TtsSynthesisRequest, TtsVoice } from "./types";
+import type { AudioApiCapabilities, LocalTtsProvider, TtsAudioResult, TtsEngineStatus, TtsSynthesisRequest, TtsVoice } from "./types";
 import { readWavMetadata } from "./wav";
+
 export function isCloudflareQuickTunnelEndpoint(input: string): boolean {
   try {
     const url = new URL(input.trim());
@@ -26,44 +27,99 @@ export function normalizeLocalEndpoint(input: string): string {
   url.pathname = url.pathname.replace(/\/+$/, ""); url.search = ""; url.hash = "";
   return url.toString().replace(/\/$/, "");
 }
+
+export type AudioApiRequestOptions = {
+  method?: "GET" | "POST";
+  payload?: unknown;
+  signal?: AbortSignal;
+};
+
+/**
+ * Send remote Quick Tunnel requests through GridSplit's same-origin Vercel function.
+ * Cloudflare's bypass header is added server-side so the browser never sends a
+ * custom cross-origin header that would trigger a blocked OPTIONS preflight.
+ * Local loopback requests continue to go directly to the local sidecar.
+ */
+export async function requestAudioApi(
+  inputEndpoint: string,
+  path: "health" | "voices" | "capabilities" | "synthesize" | "generate-music" | "generate-sfx",
+  options: AudioApiRequestOptions = {},
+): Promise<Response> {
+  const endpoint = normalizeLocalEndpoint(inputEndpoint);
+  const method = options.method ?? "GET";
+  const isRemote = isCloudflareQuickTunnelEndpoint(endpoint);
+
+  if (isRemote) {
+    if (method === "GET") {
+      const query = new URLSearchParams({ endpoint, path });
+      return fetch(`/api/audio-proxy?${query.toString()}`, {
+        method: "GET",
+        cache: "no-store",
+        signal: options.signal,
+      });
+    }
+    return fetch("/api/audio-proxy", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint, path, payload: options.payload ?? {} }),
+      signal: options.signal,
+    });
+  }
+
+  const url = `${endpoint}/${path}`;
+  const init: RequestInit = {
+    method,
+    cache: "no-store",
+    signal: options.signal,
+  };
+  if (method === "POST") {
+    init.headers = { "Content-Type": "application/json" };
+    init.body = JSON.stringify(options.payload ?? {});
+  }
+  return fetch(url, init);
+}
+
 async function errorMessage(response: Response): Promise<string> {
   const body = await response.text().catch(() => "");
   if (body) {
-    try { const parsed = JSON.parse(body) as { detail?: unknown; error?: unknown };
+    try {
+      const parsed = JSON.parse(body) as { detail?: unknown; error?: unknown };
       if (typeof parsed.detail === "string") return parsed.detail;
       if (typeof parsed.error === "string") return parsed.error;
-    } catch { return body.slice(0, 240); }
+    } catch {
+      return body.slice(0, 240);
+    }
   }
   return `TTS request failed (${response.status}).`;
 }
+
 /** Kokoro adapter for loopback sidecars and explicitly selected HTTPS Cloudflare Quick Tunnels. */
 export class KokoroLocalProvider implements LocalTtsProvider {
   readonly id = "kokoro-local";
   readonly label: string;
   private readonly endpoint: string;
+
   constructor(endpoint: string) {
     this.endpoint = normalizeLocalEndpoint(endpoint);
     this.label = isCloudflareQuickTunnelEndpoint(this.endpoint)
       ? "Kokoro ONNX · temporary GPU" : "Kokoro ONNX · local";
   }
-  private requestHeaders(contentType?: string): HeadersInit {
-    const headers: Record<string, string> = {};
-    if (contentType) headers["Content-Type"] = contentType;
-    // Cloudflare Quick Tunnels may show an HTML browser-warning interstitial to fetch().
-    // This header asks Cloudflare to pass API requests through to the Colab origin.
-    if (isCloudflareQuickTunnelEndpoint(this.endpoint)) headers["cf-skip-browser-warning"] = "true";
-    return headers;
-  }
+
   async check(): Promise<TtsEngineStatus> {
-    const response = await fetch(`${this.endpoint}/health`, { cache: "no-store", headers: this.requestHeaders() });
+    const response = await requestAudioApi(this.endpoint, "health", { signal: AbortSignal.timeout(20_000) });
     if (!response.ok) throw new Error(await errorMessage(response));
     const value = await response.json() as TtsEngineStatus;
-    return { ready: value.ready === true, engine: typeof value.engine === "string" ? value.engine : "Kokoro ONNX",
+    return {
+      ready: value.ready === true,
+      engine: typeof value.engine === "string" ? value.engine : "Kokoro ONNX",
       model: typeof value.model === "string" ? value.model : undefined,
-      message: typeof value.message === "string" ? value.message : undefined };
+      message: typeof value.message === "string" ? value.message : undefined,
+    };
   }
+
   async listVoices(): Promise<TtsVoice[]> {
-    const response = await fetch(`${this.endpoint}/voices`, { cache: "no-store", headers: this.requestHeaders() });
+    const response = await requestAudioApi(this.endpoint, "voices", { signal: AbortSignal.timeout(20_000) });
     if (!response.ok) throw new Error(await errorMessage(response));
     const value = await response.json() as { voices?: unknown };
     if (!Array.isArray(value.voices)) throw new Error("The TTS engine returned an invalid voice catalog.");
@@ -84,20 +140,39 @@ export class KokoroLocalProvider implements LocalTtsProvider {
         && typeof item.language === "string" && typeof item.languageName === "string" ? [item] : [];
     });
   }
+
+  async capabilities(): Promise<AudioApiCapabilities> {
+    const response = await requestAudioApi(this.endpoint, "capabilities", { signal: AbortSignal.timeout(20_000) });
+    if (!response.ok) throw new Error(await errorMessage(response));
+    return await response.json() as AudioApiCapabilities;
+  }
+
   async synthesize(request: TtsSynthesisRequest): Promise<TtsAudioResult> {
     const text = request.text.trim();
     if (!text) throw new Error("There is no text to generate.");
     if (text.length > 5000) throw new Error("Split this segment into shorter blocks (maximum 5,000 characters).");
     if (!request.voiceId.trim()) throw new Error("Assign a voice before generating this segment.");
-    const response = await fetch(`${this.endpoint}/synthesize`, { method: "POST",
-      headers: this.requestHeaders("application/json"), signal: request.signal,
-      body: JSON.stringify({ text, voice_id: request.voiceId, language: request.language, speed: Math.min(2, Math.max(0.5, request.speed)) }) });
+    const response = await requestAudioApi(this.endpoint, "synthesize", {
+      method: "POST",
+      signal: request.signal,
+      payload: {
+        text,
+        voice_id: request.voiceId,
+        language: request.language,
+        speed: Math.min(2, Math.max(0.5, request.speed)),
+      },
+    });
     if (!response.ok) throw new Error(await errorMessage(response));
     const blob = await response.blob();
     if (!blob.size) throw new Error("The local TTS engine returned an empty audio file.");
     const metadata = readWavMetadata(await blob.arrayBuffer());
-    return { blob: new Blob([blob], { type: "audio/wav" }), sampleCount: metadata.sampleCount,
-      sampleRate: metadata.sampleRate, channels: metadata.channels,
-      durationSeconds: metadata.sampleCount / metadata.sampleRate, format: "wav" };
+    return {
+      blob: new Blob([blob], { type: "audio/wav" }),
+      sampleCount: metadata.sampleCount,
+      sampleRate: metadata.sampleRate,
+      channels: metadata.channels,
+      durationSeconds: metadata.sampleCount / metadata.sampleRate,
+      format: "wav",
+    };
   }
 }

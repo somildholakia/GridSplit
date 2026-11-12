@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { KokoroLocalProvider, normalizeLocalEndpoint } from "./kokoroProvider";
+import { KokoroLocalProvider, normalizeLocalEndpoint, requestAudioApi } from "./kokoroProvider";
 
 describe("Kokoro TTS endpoint allowlist", () => {
   it("accepts loopback endpoints and removes trailing paths", () => {
@@ -37,7 +37,7 @@ describe("Kokoro TTS endpoint allowlist", () => {
     }
   });
 
-  it("sends Cloudflare's browser-warning bypass header only to Quick Tunnels", async () => {
+  it("uses the same-origin proxy for Quick Tunnel health checks without browser custom headers", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(
       JSON.stringify({ ready: true, engine: "Kokoro ONNX GPU" }),
       { status: 200, headers: { "Content-Type": "application/json" } },
@@ -45,12 +45,54 @@ describe("Kokoro TTS endpoint allowlist", () => {
     vi.stubGlobal("fetch", fetchMock);
     try {
       await new KokoroLocalProvider("https://demo.trycloudflare.com").check();
-      const options = fetchMock.mock.calls[0][1] as RequestInit;
-      expect(new Headers(options.headers).get("cf-skip-browser-warning")).toBe("true");
-      fetchMock.mockClear();
+      const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain("/api/audio-proxy?");
+      expect(url).toContain("endpoint=https%3A%2F%2Fdemo.trycloudflare.com");
+      expect(url).toContain("path=health");
+      expect(options.method).toBe("GET");
+      expect(new Headers(options.headers).has("cf-skip-browser-warning")).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("sends Quick Tunnel synthesis through the same-origin POST proxy", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]),
+      { status: 200, headers: { "Content-Type": "audio/wav" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await requestAudioApi("https://demo.trycloudflare.com", "synthesize", {
+        method: "POST",
+        payload: { text: "Hello", voice_id: "af_heart", language: "en-us", speed: 1 },
+      });
+      const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("/api/audio-proxy");
+      expect(options.method).toBe("POST");
+      expect(JSON.parse(String(options.body))).toEqual({
+        endpoint: "https://demo.trycloudflare.com",
+        path: "synthesize",
+        payload: { text: "Hello", voice_id: "af_heart", language: "en-us", speed: 1 },
+      });
+      expect(new Headers(options.headers).get("Content-Type")).toBe("application/json");
+      expect(new Headers(options.headers).has("cf-skip-browser-warning")).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps loopback requests direct", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ ready: true, engine: "Kokoro ONNX GPU" }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
       await new KokoroLocalProvider("http://127.0.0.1:8765").check();
-      const localOptions = fetchMock.mock.calls[0][1] as RequestInit;
-      expect(new Headers(localOptions.headers).has("cf-skip-browser-warning")).toBe(false);
+      const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("http://127.0.0.1:8765/health");
+      expect(new Headers(options.headers).has("cf-skip-browser-warning")).toBe(false);
     } finally {
       vi.unstubAllGlobals();
     }

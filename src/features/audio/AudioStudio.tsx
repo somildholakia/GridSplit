@@ -6,7 +6,7 @@ import { deleteGeneratedAudio, readGeneratedAudio, saveGeneratedAudio } from "..
 import { saveProjectMedia } from "../../lib/projectMediaStore";
 import { normalizeAudioMixTracks, type MixAudioAsset } from "../../domain/production";
 import { DEFAULT_TTS_ENDPOINT, type StudioAudioSegment, type StudioCharacter, type TtsVoice } from "../../audio/types";
-import { isCloudflareQuickTunnelEndpoint, KokoroLocalProvider } from "../../audio/kokoroProvider";
+import { isCloudflareQuickTunnelEndpoint, KokoroLocalProvider, requestAudioApi } from "../../audio/kokoroProvider";
 import "./audio-studio.css";
 
 type Props = { project: StudioProject; onUpdate: (patch: Partial<StudioProject>) => void };
@@ -139,11 +139,8 @@ export default function AudioStudio({ project, onUpdate }: Props) {
       setVoices(available);
       let music = false, sfx = false;
       try {
-        const response = await fetch(`${endpointDraft.replace(/\/+$/, "")}/capabilities`, { cache: "no-store", headers: remoteGpu ? { "cf-skip-browser-warning": "true" } : undefined });
-        if (response.ok) {
-          const caps = await response.json() as { music?: { ready?: boolean }; sfx?: { ready?: boolean } };
-          music = caps.music?.ready === true; sfx = caps.sfx?.ready === true;
-        }
+        const caps = await provider.capabilities();
+        music = caps.music?.ready === true; sfx = caps.sfx?.ready === true;
       } catch { /* Older TTS-only sidecars remain usable for speech. */ }
       setMusicReady(music); setSfxReady(sfx); setEngineReady(true);
       setEngineMessage(`${status.engine}${status.model ? ` · ${status.model}` : ""} is ready · ${available.length} voices · ${music ? "MusicGen ready" : "music unavailable"} · ${sfx ? "SFX ready" : "SFX unavailable"}.`);
@@ -254,11 +251,9 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     const controller = new AbortController();
     controllerRef.current = controller;
     try {
-      const base = endpointDraft.replace(/\/+$/, "");
-      const response = await fetch(`${base}/generate-${kind}`, {
+      const response = await requestAudioApi(endpointDraft, kind === "music" ? "generate-music" : "generate-sfx", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(remoteGpu ? { "cf-skip-browser-warning": "true" } : {}) },
-        body: JSON.stringify({ prompt, duration_seconds: kind === "music" ? 20 : 6, ...(kind === "music" ? { steps: 30 } : { steps: 60 }) }),
+        payload: { prompt, duration_seconds: kind === "music" ? 20 : 6, ...(kind === "music" ? { steps: 30 } : { steps: 60 }) },
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -343,16 +338,16 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     </section>
 
     <section className="audio-panel">
-      <div className="audio-panel-title"><div><span className="audio-step">M13–M14</span><div><h2>Kokoro engine</h2><p>Use the local sidecar or an explicitly configured HTTPS Cloudflare Quick Tunnel for a temporary Colab GPU.</p></div></div>
+      <div className="audio-panel-title"><div><span className="audio-step">M13–M14</span><div><h2>Kokoro engine</h2><p>Use the local sidecar or a temporary Colab GPU. Quick Tunnel traffic is relayed through GridSplit’s same-origin API so browser CORS preflight does not hit Cloudflare.</p></div></div>
         <span className={engineReady ? "audio-engine-state ready" : "audio-engine-state"}>{engineReady ? <CheckCircle2 size={13}/> : <Server size={13}/>} {engineReady ? "Ready" : "Not connected"}</span></div>
       <div className="audio-engine-config"><label>Engine address<input value={endpointDraft} onChange={(event) => { setEndpointDraft(event.target.value); setEngineReady(false); setEngineMessage("Test the updated engine address before generating."); }} spellCheck={false}/></label>
         <button className="audio-primary-button" onClick={() => { onUpdate({ ttsEndpoint: endpointDraft }); void checkEngine(); }}><RefreshCw size={14}/> Test connection</button></div>
       <p className="audio-engine-message"><ShieldCheck size={14}/>{engineMessage}</p>
-      {remoteGpu && <p className="audio-remote-warning" role="note">Temporary remote GPU mode: narration and dialogue text are sent over HTTPS to the configured Colab runtime. Generated WAV files and project data remain in this browser. The Quick Tunnel is unauthenticated while active, so stop its tunnel and Colab runtime when you finish.</p>}
+      {remoteGpu && <p className="audio-remote-warning" role="note">Temporary remote GPU mode: audio requests are relayed through GridSplit over HTTPS to the configured Colab runtime. Generated WAV files and project data remain in this browser. The Quick Tunnel is unauthenticated while active, so stop its tunnel and Colab runtime when you finish.</p>}
       <div className="audio-engine-help"><b>First-time setup</b><span>For local generation, install the optional sidecar and model/voice files yourself. No weights are bundled. Run these commands from the repository root's local-tts folder.</span>
         <code>cd local-tts && uv sync --locked --no-dev</code><code>uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765</code>
         <span>For the deployed site, allow its exact browser origin before starting the local sidecar. Windows PowerShell: <code>$env:GRIDSPLIT_ALLOWED_ORIGINS="https://gridsplit-studio.vercel.app"</code>. macOS/Linux: prefix the server command with <code>GRIDSPLIT_ALLOWED_ORIGINS=https://gridsplit-studio.vercel.app</code>.</span>
-        <b>Temporary Colab GPU</b><span>Start the CUDA Kokoro API, its CORS-enabled browser API on port 8001, then run <code>cloudflared tunnel --url http://127.0.0.1:8001</code>. Paste the generated HTTPS <code>*.trycloudflare.com</code> URL above and keep all three Colab cells running. Text is sent to Colab only when this remote endpoint is selected.</span>
+        <b>Temporary Colab GPU</b><span>Run the combined Colab audio API on port 8765, then run <code>cloudflared tunnel --url http://127.0.0.1:8765</code>. Paste the generated HTTPS <code>*.trycloudflare.com</code> URL above and keep the API and tunnel cells running. GridSplit relays requests server-to-server to avoid browser CORS preflight against Cloudflare.</span>
         <a href="https://github.com/somildholakia/GridSplit/tree/main/local-tts" target="_blank" rel="noreferrer">Local setup guide in the repository</a></div>
     </section>
 
@@ -416,6 +411,6 @@ export default function AudioStudio({ project, onUpdate }: Props) {
         {!sortedSegments.length && <div className="audio-empty">No narration or dialogue blocks yet. Add them in Script studio and return here.</div>}
       </div>
     </section>
-    <p className="audio-footnote"><ShieldCheck size={14}/> {remoteGpu ? "In temporary GPU mode, narration/dialogue text is sent to the configured Colab endpoint over HTTPS. Generated WAV files and voice assignments remain in this browser." : "Text, generated WAV files, and voice assignments remain on this device."} Audio blobs are stored separately in IndexedDB; the project JSON keeps only small metadata.</p>
+    <p className="audio-footnote"><ShieldCheck size={14}/> {remoteGpu ? "In temporary GPU mode, narration/dialogue text is relayed over HTTPS to the configured Colab endpoint. Generated WAV files and voice assignments remain in this browser." : "Text, generated WAV files, and voice assignments remain on this device."} Audio blobs are stored separately in IndexedDB; the project JSON keeps only small metadata.</p>
   </section>;
 }
