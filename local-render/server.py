@@ -181,10 +181,13 @@ def particle_overlay_expressions(preset: str, intensity: float, width: int, heig
     strength = clamp(float(intensity), 0, 100) / 100
     if strength <= 0:
         return None
-    plate_width = max(160, width // 2)
-    plate_height = max(90, height // 2)
-    count = max(5, min(28, int(5 + strength * 23)))
-    radius = 2.1 + strength * 2.3
+    # Generate the particle mask at one-quarter output dimensions, then upscale
+    # it with the video frame. This keeps 4K exports from evaluating dozens of
+    # particle distance expressions at full frame resolution.
+    plate_width = max(160, width // 4)
+    plate_height = max(90, height // 4)
+    count = max(5, min(18, int(4 + strength * 14)))
+    radius = 1.5 + strength * 1.8
     masks: list[str] = []
     for index in range(count):
         x0 = ((index * 37 + 13) % 97) / 100 * plate_width
