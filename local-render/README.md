@@ -24,13 +24,13 @@ For another local Vite address or an explicitly trusted static deployment, pass 
 You can use the public static frontend while rendering stays on your own computer. From the repository root, start the renderer with the exact production origin:
 
 ```bash
-python local-render/server.py --allow-origin https://gridsplit-kappa.vercel.app
+python local-render/server.py --allow-origin https://gridsplit-studio.vercel.app
 ```
 
 For local development, use `--allow-origin http://localhost:5173`. To use both the local development page and the public website, pass both flags:
 
 ```bash
-python local-render/server.py --allow-origin http://localhost:5173 --allow-origin https://gridsplit-kappa.vercel.app
+python local-render/server.py --allow-origin http://localhost:5173 --allow-origin https://gridsplit-studio.vercel.app
 ```
 
 Keep the browser endpoint at `http://127.0.0.1:8766`. The production site does not proxy media to Vercel: the browser sends the archive directly to the loopback renderer on the same computer. Never bind the renderer to a LAN interface or configure a remote processing host.
@@ -65,20 +65,20 @@ Terminal 1 (PowerShell, from the repository root):
 
 ```powershell
 cd local-tts
-$env:GRIDSPLIT_ALLOWED_ORIGINS = "https://gridsplit-kappa.vercel.app"
+$env:GRIDSPLIT_ALLOWED_ORIGINS = "https://gridsplit-studio.vercel.app"
 uv run --no-sync uvicorn server:app --host 127.0.0.1 --port 8765
 ```
 
 Terminal 2 (from the repository root):
 
 ```powershell
-python local-render/server.py --allow-origin https://gridsplit-kappa.vercel.app
+python local-render/server.py --allow-origin https://gridsplit-studio.vercel.app
 ```
 
 Terminal 3 (from the repository root):
 
 ```powershell
-python local-render/acceptance_check.py --origin https://gridsplit-kappa.vercel.app
+python local-render/acceptance_check.py --origin https://gridsplit-studio.vercel.app
 ```
 
 The runner checks both sidecar health endpoints and the exact-origin private-network CORS preflights, requests a real short Kokoro WAV, packages that WAV with a tiny test image in a valid GridSplit archive, uploads it only to the loopback renderer, polls the render job, downloads the MP4 and verifies H.264/AAC, dimensions and duration with ffprobe. It writes `gridsplit-local-acceptance-report.json`, `gridsplit-local-acceptance/kokoro-acceptance.wav` and `gridsplit-local-acceptance/kokoro-acceptance.mp4`.
