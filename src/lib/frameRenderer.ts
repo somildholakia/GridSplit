@@ -38,7 +38,7 @@ export function drawCropToFrame(
     const backgroundX = (frameWidth - backgroundWidth) / 2;
     const backgroundY = (frameHeight - backgroundHeight) / 2;
     context.save();
-    context.filter = "blur(28px)";
+    context.filter = "blur(" + Math.max(1, Math.round(frameWidth * 0.014)) + "px)";
     context.drawImage(
       source,
       crop.x,
