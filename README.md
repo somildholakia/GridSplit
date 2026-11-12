@@ -12,7 +12,7 @@ GridSplit Studio is a local-first workspace for preparing scripts and storyboard
 - Browser-local autosave and restore, with a visible save-failure state.
 - Versioned JSON backup export/import. Imported copies receive fresh project, scene, and block IDs; existing projects are kept.
 - Paste scripts or import TXT, DOCX, and text-based PDF files locally (10 MB import limit).
-- Parse chapter/part headings, scene/sequence headings, Markdown headings, paragraphs, narration, dialogue, SFX, and music cues.
+- Parse chapter/part headings, scene/sequence headings, Markdown headings, paragraphs, narration, dialogue, SFX, and music cues. Consecutive explicit cue lines are split into separate blocks even without blank lines; multi-line narration/dialogue continuations are preserved.
 - Recognise `[NARRATOR]`, `[CHARACTER: NAME]`, `[SFX: NAME]`, and `[MUSIC: NAME]` markers plus narration/voiceover, screenplay-style speaker labels, music/BGM/score, SFX/foley/ambience and bracketed stage directions.
 - Keep ordinary prose mentioning music or sound classified as narration rather than misclassifying it as a production cue.
 - Retain the original script separately from the editable scene breakdown.
@@ -82,7 +82,7 @@ Milestone notes: [M22–M25](docs/M22-M25.md) and [M26–M31](docs/M26-M31.md). 
 - A synthetic performance regression covers 500 scenes, 500 images and 1,000 timeline clips with a 10-second CI ceiling. The local renderer allows at most two active jobs and retains at most eight finished jobs for up to six hours.
 - The TTS sidecar validates loopback Host headers, and both sidecars validate their local request boundaries. The optional local TTS Python graph is pinned in `local-tts/uv.lock`; CI checks the lock with `uv lock --check` and audits the synchronized environment with `pip-audit --strict` (`pip-audit` remains dev-only). See [the security review](docs/SECURITY_REVIEW.md).
 
-**Release boundary:** M01–M37 implementation is merged. PR #22 and post-merge main CI runs [#43184510763](https://github.com/somildholakia/GridSplit/actions/runs/43184510763) and [#43185852867](https://github.com/somildholakia/GridSplit/actions/runs/43185852867) passed. Current main commit `e30fba7e` is deployed at [gridsplit-studio.vercel.app](https://gridsplit-studio.vercel.app) on the secondary Vercel account. Real Kokoro synthesis/playback/download and M36 target-device browser media export → archive restore → re-render remain open.
+**Release boundary:** M01–M37 implementation and parser hardening are merged. PR #24 CI [#43189628916](https://github.com/somildholakia/GridSplit/actions/runs/43189628916) and post-merge main CI [#43189842050](https://github.com/somildholakia/GridSplit/actions/runs/43189842050) passed; the live [parser QA](https://agent.tinyfish.ai/runs/99a45313-0ead-4439-a8e0-c2b6c5ae5e0c) confirmed correct block separation and TTS queueing. Current main commit `2e0d43d` is deployed at [gridsplit-studio.vercel.app](https://gridsplit-studio.vercel.app) on the secondary Vercel account. Real Kokoro synthesis/playback/download and M36 target-device browser media export → archive restore → re-render remain open.
 
 ## Run locally
 
