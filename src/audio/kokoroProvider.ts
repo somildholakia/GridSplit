@@ -46,8 +46,16 @@ export class KokoroLocalProvider implements LocalTtsProvider {
     this.label = isCloudflareQuickTunnelEndpoint(this.endpoint)
       ? "Kokoro ONNX · temporary GPU" : "Kokoro ONNX · local";
   }
+  private requestHeaders(contentType?: string): HeadersInit {
+    const headers: Record<string, string> = {};
+    if (contentType) headers["Content-Type"] = contentType;
+    // Cloudflare Quick Tunnels may show an HTML browser-warning interstitial to fetch().
+    // This header asks Cloudflare to pass API requests through to the Colab origin.
+    if (isCloudflareQuickTunnelEndpoint(this.endpoint)) headers["cf-skip-browser-warning"] = "true";
+    return headers;
+  }
   async check(): Promise<TtsEngineStatus> {
-    const response = await fetch(`${this.endpoint}/health`, { cache: "no-store" });
+    const response = await fetch(`${this.endpoint}/health`, { cache: "no-store", headers: this.requestHeaders() });
     if (!response.ok) throw new Error(await errorMessage(response));
     const value = await response.json() as TtsEngineStatus;
     return { ready: value.ready === true, engine: typeof value.engine === "string" ? value.engine : "Kokoro ONNX",
@@ -55,7 +63,7 @@ export class KokoroLocalProvider implements LocalTtsProvider {
       message: typeof value.message === "string" ? value.message : undefined };
   }
   async listVoices(): Promise<TtsVoice[]> {
-    const response = await fetch(`${this.endpoint}/voices`, { cache: "no-store" });
+    const response = await fetch(`${this.endpoint}/voices`, { cache: "no-store", headers: this.requestHeaders() });
     if (!response.ok) throw new Error(await errorMessage(response));
     const value = await response.json() as { voices?: unknown };
     if (!Array.isArray(value.voices)) throw new Error("The TTS engine returned an invalid voice catalog.");
@@ -82,7 +90,7 @@ export class KokoroLocalProvider implements LocalTtsProvider {
     if (text.length > 5000) throw new Error("Split this segment into shorter blocks (maximum 5,000 characters).");
     if (!request.voiceId.trim()) throw new Error("Assign a voice before generating this segment.");
     const response = await fetch(`${this.endpoint}/synthesize`, { method: "POST",
-      headers: { "Content-Type": "application/json" }, signal: request.signal,
+      headers: this.requestHeaders("application/json"), signal: request.signal,
       body: JSON.stringify({ text, voice_id: request.voiceId, language: request.language, speed: Math.min(2, Math.max(0.5, request.speed)) }) });
     if (!response.ok) throw new Error(await errorMessage(response));
     const blob = await response.blob();
