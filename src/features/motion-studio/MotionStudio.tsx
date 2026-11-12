@@ -16,7 +16,7 @@ import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
 import { buildEvenImageTimeline } from "./motionTiming";
-import { createPresetKeyframes, insertMotionKeyframe, sampleMotionKeyframes } from "./motionLayers";
+import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
 import { buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
 import "./motion-studio.css";
 
@@ -28,6 +28,8 @@ type MotionImage = {
   foreground?: MotionForeground;
   keyframes: MotionKeyframe[];
   customKeyframes: boolean;
+  particlePreset?: ParticlePreset;
+  particleIntensity?: number;
 };
 
 type OutputSize = "720p" | "1080p";
@@ -292,6 +294,9 @@ export default function MotionStudio() {
     ? selectedImage.keyframes
     : selectedImage ? createPresetKeyframes(effect, zoomStrength) : [];
   const selectedKeyframe = editableKeyframes[Math.min(selectedKeyframeIndex, Math.max(0, editableKeyframes.length - 1))];
+  const selectedParticles = selectedImage
+    ? resolveParticleSettings(selectedImage.particlePreset, selectedImage.particleIntensity, particlePreset, particleIntensity)
+    : { preset: particlePreset, intensity: particleIntensity };
 
 
   useEffect(() => {
@@ -396,7 +401,8 @@ export default function MotionStudio() {
         }
       }
     }
-    drawParticlePreview(canvas, particlePreset, localProgress, particleIntensity);
+    const particles = resolveParticleSettings(imageItem.particlePreset, imageItem.particleIntensity, particlePreset, particleIntensity);
+    drawParticlePreview(canvas, particles.preset, localProgress, particles.intensity);
   }
 
   useEffect(() => () => {
@@ -682,8 +688,9 @@ export default function MotionStudio() {
       keyframes: images[index].keyframes.length
         ? images[index].keyframes
         : createPresetKeyframes(effect, zoomStrength),
-      particlePreset,
-      particleIntensity,
+      ...resolveParticleSettings(images[index].particlePreset, images[index].particleIntensity, particlePreset, particleIntensity),
+      particlePreset: resolveParticleSettings(images[index].particlePreset, images[index].particleIntensity, particlePreset, particleIntensity).preset,
+      particleIntensity: resolveParticleSettings(images[index].particlePreset, images[index].particleIntensity, particlePreset, particleIntensity).intensity,
       ...(images[index].foreground
         ? { parallaxAssetId: images[index].foreground!.asset.id, parallaxAmount: parallaxStrength }
         : {}),
@@ -1010,19 +1017,54 @@ export default function MotionStudio() {
               <div><span>04 · PARTICLE EFFECTS</span><h2>Layer procedural particles</h2><p>Effekseer-inspired overlays rendered locally as a separate pass.</p></div>
               <Flame size={20} />
             </div>
-            <label className="motion-field">Particle preset
-              <select value={particlePreset} disabled={rendering} onChange={(event) => setParticlePreset(event.target.value as ParticlePreset)}>
-                <option value="none">No particles</option>
-                <option value="embers">Fire embers</option>
-                <option value="snow">Snowfall</option>
-                <option value="rain">Rain streaks</option>
-                <option value="confetti">Confetti</option>
-                <option value="magic">Magic sparks</option>
-              </select>
-            </label>
-            <label className="motion-range-field">Effect density <b>{particleIntensity}%</b>
-              <input type="range" min="0" max="100" step="5" value={particleIntensity} disabled={rendering || particlePreset === "none"} onChange={(event) => setParticleIntensity(Number(event.target.value))} />
-            </label>
+            <div className="motion-particle-defaults">
+              <b>GLOBAL DEFAULTS</b>
+              <label className="motion-field">Default particle preset
+                <select value={particlePreset} disabled={rendering} onChange={(event) => setParticlePreset(event.target.value as ParticlePreset)}>
+                  <option value="none">No particles</option>
+                  <option value="embers">Fire embers</option>
+                  <option value="snow">Snowfall</option>
+                  <option value="rain">Rain streaks</option>
+                  <option value="confetti">Confetti</option>
+                  <option value="magic">Magic sparks</option>
+                </select>
+              </label>
+              <label className="motion-range-field">Default density <b>{particleIntensity}%</b>
+                <input type="range" min="0" max="100" step="5" value={particleIntensity} disabled={rendering || particlePreset === "none"} onChange={(event) => setParticleIntensity(Number(event.target.value))} />
+              </label>
+            </div>
+            <div className="motion-particle-override">
+              <b>SELECTED IMAGE · {selectedImage ? selectedImage.asset.name : "NONE"}</b>
+              {selectedImage ? <>
+                <label className="motion-field">This image's particle effect
+                  <select value={selectedImage.particlePreset ?? "inherit"} disabled={rendering} onChange={(event) => {
+                    const value = event.target.value;
+                    setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id
+                      ? { ...item, particlePreset: value === "inherit" ? undefined : value as ParticlePreset }
+                      : item));
+                  }}>
+                    <option value="inherit">Use global default ({particlePreset})</option>
+                    <option value="none">No particles</option>
+                    <option value="embers">Fire embers</option>
+                    <option value="snow">Snowfall</option>
+                    <option value="rain">Rain streaks</option>
+                    <option value="confetti">Confetti</option>
+                    <option value="magic">Magic sparks</option>
+                  </select>
+                </label>
+                <label className="motion-range-field">Image density <b>{selectedParticles.intensity}%</b>
+                  <input type="range" min="0" max="100" step="5" value={selectedParticles.intensity} disabled={rendering || selectedParticles.preset === "none"} onChange={(event) => {
+                    const value = Number(event.target.value);
+                    setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id
+                      ? { ...item, particleIntensity: value }
+                      : item));
+                  }} />
+                </label>
+                <button type="button" className="motion-secondary-button" disabled={rendering || (selectedImage.particlePreset === undefined && selectedImage.particleIntensity === undefined)} onClick={() => setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id
+                  ? { ...item, particlePreset: undefined, particleIntensity: undefined }
+                  : item))}>Reset image to global defaults</button>
+              </> : <p className="motion-note">Select an image in the sequence to customize its effect.</p>}
+            </div>
             <div className="motion-effect-legend">
               <span><Flame size={13} /> Fire embers</span>
               <span><CloudSnow size={13} /> Snow</span>
