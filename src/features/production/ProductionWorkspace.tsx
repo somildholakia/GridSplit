@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Pause, Play, RefreshCw, SlidersHorizontal, Square, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Pause, Play, RefreshCw, SlidersHorizontal, Sparkles, Square, Trash2 } from "lucide-react";
 import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import ProductionTools from "./ProductionTools";
 import ImageAnimationStudio from "./ImageAnimationStudio";
 import { measureWavBlob } from "../../lib/mediaTimeline";
-import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
+import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, distributeImagesAcrossScenes, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
 import "./production-workspace.css";
 
 type ProductionProject = StudioProject & { imageAssets?: SequenceAsset[]; imageMappings?: SceneImageMapping[]; timelineClips?: TimelineClip[] };
@@ -142,6 +142,14 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     updateAssets(assets.map(a=>a.id===id?{...a,sequenceNumber:number}:a));
   };
   const mappedFor=(sceneId:string)=>mappings.find(m=>m.sceneId===sceneId)?.imageIds??[];
+  const autoMapImages=()=>{
+    if(!assets.length||!project.scenes.length)return;
+    const hasMappings=mappings.some(mapping=>mapping.imageIds.length>0);
+    if(hasMappings&&!window.confirm("Replace the current scene image assignments with an even, sequence-ordered distribution?"))return;
+    const next=distributeImagesAcrossScenes(assets,project.scenes.map(scene=>scene.id));
+    updateMappings(next);
+    setMessage("Automatically assigned "+assets.length+" ordered images across "+project.scenes.length+" scenes. Review the assignments, then generate narration; the timeline will synchronize from measured WAV durations.");
+  };
   const toggleMapping=(sceneId:string,imageId:string)=>{
     const selected=new Set(mappedFor(sceneId));
     if(selected.has(imageId))selected.delete(imageId);else selected.add(imageId);
@@ -313,7 +321,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
       </article>)}</div>}
       <p className="production-footnote">Repeated frame numbers and matching content fingerprints are flagged for review, not silently deleted. Correct frame numbers and visual order independently.</p>
     </div>}
-    {activeTab==="mapping"&&<div className="production-section"><p className="production-help">Select any number of images for each scene. The same image may be reused in multiple scenes, and each scene may contain multiple images.</p>
+    {activeTab==="mapping"&&<div className="production-section"><div className="production-actions"><button className="production-button primary" disabled={!assets.length||!project.scenes.length} onClick={autoMapImages}><Sparkles size={14}/> Auto-assign sequence to scenes</button><span>{mappings.reduce((count,mapping)=>count+mapping.imageIds.length,0)} scene assignments</span></div><p className="production-help">Auto-assign divides your ordered image sequence into balanced, consecutive scene batches. You can still fine-tune every scene below. The same image can also be selected in multiple scenes manually.</p>
       {!assets.length||!project.scenes.length?<div className="production-empty">Add images and create scenes before mapping.</div>:project.scenes.map(scene=><article className="production-scene-map" key={scene.id}><header><b>{scene.title}</b><span>{mappedFor(scene.id).length} image(s)</span></header><div className="production-map-grid">{assets.map(asset=><label key={asset.id} className={mappedFor(scene.id).includes(asset.id)?"selected":""}>{thumbs[asset.id]?<img src={thumbs[asset.id]} alt=""/>:<span className="production-thumb-placeholder"/>}<input type="checkbox" checked={mappedFor(scene.id).includes(asset.id)} onChange={()=>toggleMapping(scene.id,asset.id)}/><span>{asset.name}</span></label>)}</div></article>)}
     </div>}
     {activeTab==="timeline"&&<div className="production-section">

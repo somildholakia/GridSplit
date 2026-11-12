@@ -45,3 +45,22 @@
 .block-meta-input{flex:0 0 88px;width:88px;min-width:0;min-height:29px;padding:5px 6px;border:1px solid #ffffff14;border-radius:5px;outline:0;background:#111c2a;color:#cbd5e3;font-size:8px}
 .block-meta-input::placeholder{color:#64738a}
 @media(max-width:680px){.block-type-select{flex-basis:76px;width:76px}.block-meta-input{flex-basis:78px;width:78px}}
+
+/* Guided workflow dashboard */
+.guided-workflow{margin-top:26px;padding:20px;border:1px solid rgba(201,239,117,.19);border-radius:13px;background:linear-gradient(120deg,rgba(201,239,117,.055),rgba(21,30,45,.72) 48%)}
+.guided-workflow-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:16px}
+.guided-kicker{color:#c9ef75;font-size:8px;font-weight:850;letter-spacing:1.5px}
+.guided-workflow-heading h2{margin:6px 0 4px;color:#f0f4fa;font-size:19px;letter-spacing:-.5px}
+.guided-workflow-heading p{margin:0;color:#8e9cb1;font-size:10px;line-height:1.5}
+.guided-project-name{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 9px;border:1px solid #ffffff18;border-radius:6px;color:#b9c6d8;font-size:9px}
+.guided-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.guided-step{min-width:0;display:flex;align-items:center;gap:9px;padding:12px 10px;border:1px solid #ffffff16;border-radius:8px;background:rgba(10,17,28,.55);color:#cbd5e3;text-align:left;transition:border-color .16s,background .16s}
+.guided-step:hover:not(:disabled),.guided-step-current{border-color:#c9ef7566;background:rgba(201,239,117,.07)}
+.guided-step-number{flex:0 0 24px;height:24px;display:grid;place-items:center;border-radius:6px;background:#ffffff0d;color:#c9ef75;font-size:9px;font-weight:800}
+.guided-step>span:nth-child(2){display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
+.guided-step b{font-size:10px;color:#e7edf5}
+.guided-step small{font-size:8px;line-height:1.35;color:#8391a7}
+.guided-step>svg{flex:0 0 auto;color:#9cacbf}
+.guided-step:disabled{opacity:.38;cursor:not-allowed}
+@media(max-width:900px){.guided-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.guided-workflow{padding:15px}.guided-workflow-heading{align-items:flex-start;flex-direction:column}.guided-project-name{max-width:100%}.guided-steps{grid-template-columns:1fr}.guided-step{padding:11px}}

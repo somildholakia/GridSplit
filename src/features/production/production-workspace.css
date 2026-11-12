@@ -32,3 +32,5 @@
 
 
 /* Image animation workspace */
+
+.production-actions .production-button.primary{display:inline-flex;align-items:center;gap:7px}
