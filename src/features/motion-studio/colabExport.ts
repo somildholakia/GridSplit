@@ -46,6 +46,11 @@ print("Selected encoder:", profile["encoder"])
 print("Output:", profile["width"], "x", profile["height"], "at", profile["fps"], "FPS")
 
 run = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+if run.returncode != 0 and profile.get("encoder") == "h264_nvenc":
+    print("NVENC render failed in this runtime; retrying with CPU libx264.")
+    project.setdefault("renderProfile", {})["encoder"] = "software"
+    command, expected_duration, profile = renderer.render_command(project, manifest, render_root)
+    run = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 if run.returncode != 0:
     raise RuntimeError("FFmpeg render failed:\n" + run.stdout[-8000:])
 
