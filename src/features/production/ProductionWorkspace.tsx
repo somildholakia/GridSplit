@@ -193,7 +193,6 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   ].join("::");
   const autoSyncRevisionRef=useRef(0);
   // The serialized source key captures the media/mapping inputs intentionally.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{
     const revision=++autoSyncRevisionRef.current;
     let cancelled=false;
