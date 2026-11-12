@@ -511,9 +511,11 @@ export default function MotionStudio() {
 
   const updateSelectedKeyframe = (patch: Partial<MotionKeyframe>) => {
     if (!selectedImage || !selectedKeyframe) return;
+    const updatedKeyframe = { ...selectedKeyframe, ...patch };
     const next = editableKeyframes.map((item, index) => index === selectedKeyframeIndex
-      ? { ...item, ...patch }
+      ? updatedKeyframe
       : item).sort((a, b) => a.time - b.time);
+    setSelectedKeyframeIndex(next.indexOf(updatedKeyframe));
     setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id
       ? { ...item, keyframes: next, customKeyframes: true }
       : item));
