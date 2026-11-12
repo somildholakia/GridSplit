@@ -1053,7 +1053,7 @@ export default function MotionStudio() {
                 </button>)}
               </div>
               <p>All clips are auto-fitted to the soundtrack. Reordering changes sequence, not the total video duration.</p>
-            </div>
+            </div>}
             {images.length ? <div className="motion-image-list">
               <div className="motion-list-header"><b>IMAGE ORDER</b><button type="button" disabled={rendering} onClick={clearImages}><Trash2 size={13} /> Clear all</button></div>
               {images.map((item, index) => <article
