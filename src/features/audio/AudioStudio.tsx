@@ -139,7 +139,7 @@ export default function AudioStudio({ project, onUpdate }: Props) {
       setVoices(available);
       let music = false, sfx = false;
       try {
-        const response = await fetch(`${endpointDraft.replace(/\\/+$/, "")}/capabilities`, { cache: "no-store", headers: remoteGpu ? { "cf-skip-browser-warning": "true" } : undefined });
+        const response = await fetch(`${endpointDraft.replace(/\/+$/, "")}/capabilities`, { cache: "no-store", headers: remoteGpu ? { "cf-skip-browser-warning": "true" } : undefined });
         if (response.ok) {
           const caps = await response.json() as { music?: { ready?: boolean }; sfx?: { ready?: boolean } };
           music = caps.music?.ready === true; sfx = caps.sfx?.ready === true;
@@ -254,7 +254,7 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     const controller = new AbortController();
     controllerRef.current = controller;
     try {
-      const base = endpointDraft.replace(/\\/+$/, "");
+      const base = endpointDraft.replace(/\/+$/, "");
       const response = await fetch(`${base}/generate-${kind}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(remoteGpu ? { "cf-skip-browser-warning": "true" } : {}) },
