@@ -3,6 +3,8 @@ import { AlertCircle, CheckCircle2, Download, Mic, RefreshCw, RotateCcw, Server,
 import type { StudioProject } from "../../lib/projectStore";
 import { ensureSpeakerCharacters, reconcileAudioSegments, updateAudioSegment } from "../../lib/audioWorkflow";
 import { deleteGeneratedAudio, readGeneratedAudio, saveGeneratedAudio } from "../../audio/audioStore";
+import { saveProjectMedia } from "../../lib/projectMediaStore";
+import { normalizeAudioMixTracks, type MixAudioAsset } from "../../domain/production";
 import { DEFAULT_TTS_ENDPOINT, type StudioAudioSegment, type StudioCharacter, type TtsVoice } from "../../audio/types";
 import { isCloudflareQuickTunnelEndpoint, KokoroLocalProvider } from "../../audio/kokoroProvider";
 import "./audio-studio.css";
@@ -40,6 +42,10 @@ export default function AudioStudio({ project, onUpdate }: Props) {
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [activeCueId, setActiveCueId] = useState<string | null>(null);
+  const [cueErrors, setCueErrors] = useState<Record<string, string>>({});
+  const [musicReady, setMusicReady] = useState(false);
+  const [sfxReady, setSfxReady] = useState(false);
   const batchCancelledRef = useRef(false);
   const controllerRef = useRef<AbortController | null>(null);
   const onUpdateRef = useRef(onUpdate);
@@ -130,8 +136,17 @@ export default function AudioStudio({ project, onUpdate }: Props) {
       const status = await provider.check();
       if (!status.ready) { setEngineMessage(status.message || "The TTS engine is reachable but its model files are not ready."); return; }
       const available = await provider.listVoices();
-      setVoices(available); setEngineReady(true);
-      setEngineMessage(`${status.engine}${status.model ? ` · ${status.model}` : ""} is ready · ${available.length} voices detected.`);
+      setVoices(available);
+      let music = false, sfx = false;
+      try {
+        const response = await fetch(`${endpointDraft.replace(/\/+$/, "")}/capabilities`, { cache: "no-store", headers: remoteGpu ? { "cf-skip-browser-warning": "true" } : undefined });
+        if (response.ok) {
+          const caps = await response.json() as { music?: { ready?: boolean }; sfx?: { ready?: boolean } };
+          music = caps.music?.ready === true; sfx = caps.sfx?.ready === true;
+        }
+      } catch { /* Older TTS-only sidecars remain usable for speech. */ }
+      setMusicReady(music); setSfxReady(sfx); setEngineReady(true);
+      setEngineMessage(`${status.engine}${status.model ? ` · ${status.model}` : ""} is ready · ${available.length} voices · ${music ? "MusicGen ready" : "music unavailable"} · ${sfx ? "SFX ready" : "SFX unavailable"}.`);
     } catch (error) { setEngineMessage(error instanceof Error ? error.message : "Could not connect to the TTS engine."); }
   };
 
@@ -221,6 +236,74 @@ export default function AudioStudio({ project, onUpdate }: Props) {
       language: voices[0]?.language ?? "en-us", speed: 1 }]);
     setNewCharacter("");
   };
+
+  const productionCues = project.scenes.flatMap((scene) => scene.blocks
+    .filter((block) => block.kind === "music" || block.kind === "sfx")
+    .map((block) => ({ scene, block, kind: block.kind as "music" | "sfx" })));
+  const mixAssets = (project.mixAssets ?? []) as MixAudioAsset[];
+
+  const generateProductionCue = async (scene: StudioProject["scenes"][number], block: StudioProject["scenes"][number]["blocks"][number], kind: "music" | "sfx") => {
+    const cueId = `cue:${scene.id}:${block.id}`;
+    if (!provider || !engineReady) { setNotice("Connect the Colab audio engine before generating music or SFX."); return; }
+    if (kind === "music" && !musicReady) { setNotice("This Colab runtime does not advertise /generate-music. Restart it with the full audio-generation notebook."); return; }
+    if (kind === "sfx" && !sfxReady) { setNotice("This Colab runtime does not advertise /generate-sfx. Restart it with the full audio-generation notebook."); return; }
+    const prompt = [block.cue, block.text].filter(Boolean).join(": ").trim();
+    if (!prompt) { setNotice("Add a descriptive prompt to this music or SFX cue first."); return; }
+    setActiveCueId(cueId);
+    setCueErrors((current) => ({ ...current, [cueId]: "" }));
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    try {
+      const base = endpointDraft.replace(/\/+$/, "");
+      const response = await fetch(`${base}/generate-${kind}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(remoteGpu ? { "cf-skip-browser-warning": "true" } : {}) },
+        body: JSON.stringify({ prompt, duration_seconds: kind === "music" ? 20 : 6, ...(kind === "music" ? { steps: 30 } : { steps: 60 }) }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        throw new Error(body.slice(0, 400) || `${kind.toUpperCase()} generation failed (${response.status}).`);
+      }
+      const raw = await response.blob();
+      if (!raw.size) throw new Error("The audio model returned an empty WAV file.");
+      const blob = new Blob([raw], { type: "audio/wav" });
+      const context = new AudioContext();
+      let duration: number;
+      try { duration = (await context.decodeAudioData(await blob.arrayBuffer())).duration; }
+      finally { await context.close(); }
+      const tracks = normalizeAudioMixTracks(project.audioMixTracks, () => crypto.randomUUID());
+      const targetTrack = tracks.find((track) => track.kind === kind);
+      if (!targetTrack) throw new Error(`The ${kind} mixer track is unavailable.`);
+      const existing = mixAssets.find((asset) => asset.sourceBlockId === block.id && asset.sourceSceneId === scene.id && asset.kind === kind);
+      const id = existing?.id ?? crypto.randomUUID();
+      await saveProjectMedia(project.id, id, blob);
+      const nextAsset: MixAudioAsset = {
+        id, name: `${kind}-${scene.title.replace(/[^a-z0-9_-]+/gi, "-")}-${block.id}.wav`,
+        mimeType: "audio/wav", bytes: blob.size, kind, trackId: targetTrack.id,
+        ...(kind === "sfx" ? { sceneId: scene.id } : {}),
+        sourceBlockId: block.id, sourceSceneId: scene.id,
+        startSeconds: existing?.startSeconds ?? 0, durationSeconds: duration,
+        order: existing?.order ?? mixAssets.length,
+      };
+      const nextAssets = existing
+        ? mixAssets.map((asset) => asset.id === id ? nextAsset : asset)
+        : [...mixAssets, nextAsset];
+      onUpdate({
+        audioMixTracks: tracks,
+        mixAssets: nextAssets,
+      } as Partial<StudioProject>);
+      setNotice(`${kind === "music" ? "Music" : "Sound effect"} generated and added to the ${kind} mixer track.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `${kind} generation failed.`;
+      setCueErrors((current) => ({ ...current, [cueId]: message }));
+      setNotice(message);
+    } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
+      setActiveCueId(null);
+    }
+  };
+
   const sortedSegments = segments.map((segment) => ({ segment, ...blockForSegment(project, segment) })).filter((item) => item.block);
 
   return <section className="audio-studio-view">
@@ -274,14 +357,36 @@ export default function AudioStudio({ project, onUpdate }: Props) {
     </section>
 
     <section className="audio-panel">
-      <div className="audio-panel-title"><div><span className="audio-step">M15–M16</span><div><h2>Generated segments</h2><p>Generate narration and dialogue one by one automatically, or review individual segments.</p></div></div>
+      <div className="audio-panel-title"><div><span className="audio-step">M15–M16</span><div><h2>Generated segments</h2><p>Generate narration and dialogue one by one, and generate music/SFX cues separately.</p></div></div>
         <div className="audio-batch-controls"><span className="audio-count">{segments.filter((item) => item.status === "ready").length} / {segments.length} ready</span>
           {batchRunning
             ? <button className="audio-secondary-button" onClick={cancelBatch}><Square size={13}/> Stop batch</button>
             : <button className="audio-primary-button" disabled={!engineReady || activeGeneration !== null || !sortedSegments.some(({ segment, block }) => segment.status !== "ready" && segment.status !== "generating" && Boolean(block?.text.trim()))} onClick={() => void generateAllRemaining()}><Sparkles size={13}/> Generate all remaining</button>}
         </div></div>
       {batchRunning && <div className="audio-batch-progress" role="status"><div><span>Generating audio sequentially</span><b>{batchProgress.current} / {batchProgress.total}</b></div><progress max={Math.max(1, batchProgress.total)} value={batchProgress.current}/><small>Existing completed audio is skipped. Failed segments do not stop the remaining queue.</small></div>}
-      <p className="audio-cue-note">Music and sound-effect blocks are kept as separate production cues and excluded from speech generation. Only narration and dialogue are sent to the TTS engine.</p>
+      <p className="audio-cue-note">Narration and dialogue use Kokoro. Music and SFX cues below use the separate MusicGen and AudioLDM 2 endpoints and are saved directly to the project mixer.</p>
+      <div className="audio-segment-list">
+        {productionCues.map(({ scene, block, kind }) => {
+          const cueId = `cue:${scene.id}:${block.id}`;
+          const asset = mixAssets.find((item) => item.sourceBlockId === block.id && item.sourceSceneId === scene.id && item.kind === kind);
+          const busy = activeCueId === cueId;
+          const ready = Boolean(asset);
+          const available = kind === "music" ? musicReady : sfxReady;
+          return <article className="audio-segment" key={cueId}>
+            <div className="audio-segment-top"><div><span>{scene.title}</span><b>{kind === "music" ? "Background music" : "Sound effect"}</b></div>
+              <span className={`audio-status ${busy ? "generating" : ready ? "ready" : "pending"}`}>{busy ? "generating" : ready ? "ready · in mixer" : "pending"}</span></div>
+            <p className="audio-segment-text">{[block.cue, block.text].filter(Boolean).join(": ")}</p>
+            {cueErrors[cueId] && <p className="audio-segment-error"><AlertCircle size={13}/>{cueErrors[cueId]}</p>}
+            <div className="audio-segment-actions">
+              <button className={ready ? "audio-secondary-button" : "audio-primary-button"} disabled={!engineReady || !available || activeCueId !== null || activeGeneration !== null || batchRunning || busy}
+                onClick={() => void generateProductionCue(scene, block, kind)}>{busy ? <><RefreshCw size={13}/> Generating…</> : ready ? <><RotateCcw size={13}/> Regenerate</> : <><Sparkles size={13}/> Generate {kind === "music" ? "music" : "SFX"}</>}</button>
+              {ready && <span className="audio-generated-note"><CheckCircle2 size={13}/> Saved to {kind} mixer</span>}
+              {!available && <span className="audio-disabled-note">{engineReady ? `Colab ${kind === "music" ? "MusicGen" : "AudioLDM 2"} endpoint unavailable.` : "Connect the audio engine first."}</span>}
+            </div>
+          </article>;
+        })}
+        {!productionCues.length && <div className="audio-empty">No music or SFX cues found. Add [MUSIC: ...] or [SFX: ...] blocks in Script studio.</div>}
+      </div>
       <div className="audio-segment-list">
         {sortedSegments.map(({ segment, scene, block }) => {
           const ready = segment.status === "ready", busy = activeGeneration === segment.id;

@@ -37,6 +37,25 @@ describe("Kokoro TTS endpoint allowlist", () => {
     }
   });
 
+  it("sends Cloudflare's browser-warning bypass header only to Quick Tunnels", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ ready: true, engine: "Kokoro ONNX GPU" }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await new KokoroLocalProvider("https://demo.trycloudflare.com").check();
+      const options = fetchMock.mock.calls[0][1] as RequestInit;
+      expect(new Headers(options.headers).get("cf-skip-browser-warning")).toBe("true");
+      fetchMock.mockClear();
+      await new KokoroLocalProvider("http://127.0.0.1:8765").check();
+      const localOptions = fetchMock.mock.calls[0][1] as RequestInit;
+      expect(new Headers(localOptions.headers).has("cf-skip-browser-warning")).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("rejects arbitrary remote hosts, LAN addresses, insecure tunnels, and credentials", () => {
     expect(() => normalizeLocalEndpoint("https://example.com")).toThrow(/loopback TTS services/);
     expect(() => normalizeLocalEndpoint("https://trycloudflare.com")).toThrow(/loopback TTS services/);

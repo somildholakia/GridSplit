@@ -19,6 +19,10 @@ export type ExportOptions = {
   originalName: string;
 };
 
+/** Standard landscape frame for long-form YouTube videos. */
+export const YOUTUBE_FRAME_WIDTH = 1920;
+export const YOUTUBE_FRAME_HEIGHT = 1080;
+
 function canvasToPng(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -40,7 +44,7 @@ export async function createImageZip(options: ExportOptions): Promise<Blob> {
 
   const safePrefix = options.prefix.trim().replace(/[^a-zA-Z0-9_.-]/g, "-") || "frame-";
   const manifestRows = [
-    ["filename", "row", "column", "x", "y", "width", "height"].join(","),
+    ["filename", "row", "column", "source_x", "source_y", "source_width", "source_height", "output_width", "output_height"].join(","),
   ];
 
   for (let index = 0; index < options.cells.length; index += 1) {
@@ -54,12 +58,24 @@ export async function createImageZip(options: ExportOptions): Promise<Blob> {
     const width = Math.max(1, Math.round(cell.width - padding * 2));
     const height = Math.max(1, Math.round(cell.height - padding * 2));
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = YOUTUBE_FRAME_WIDTH;
+    canvas.height = YOUTUBE_FRAME_HEIGHT;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Your browser could not create an image canvas.");
 
-    context.drawImage(options.image, x, y, width, height, 0, 0, width, height);
+    // Preserve the entire extracted scene: fit it inside a 16:9 canvas without stretching or cropping.
+    // High-quality browser resampling improves the appearance of enlarged source crops.
+    context.fillStyle = "#080b12";
+    context.fillRect(0, 0, YOUTUBE_FRAME_WIDTH, YOUTUBE_FRAME_HEIGHT);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    const scale = Math.min(YOUTUBE_FRAME_WIDTH / width, YOUTUBE_FRAME_HEIGHT / height);
+    const outputWidth = Math.max(1, Math.round(width * scale));
+    const outputHeight = Math.max(1, Math.round(height * scale));
+    const outputX = Math.floor((YOUTUBE_FRAME_WIDTH - outputWidth) / 2);
+    const outputY = Math.floor((YOUTUBE_FRAME_HEIGHT - outputHeight) / 2);
+    context.drawImage(options.image, x, y, width, height, outputX, outputY, outputWidth, outputHeight);
+
     const blob = await canvasToPng(canvas);
     const number = String(Math.floor(options.startNumber) + index).padStart(options.digits, "0");
     const filename = safePrefix + number + ".png";
@@ -73,6 +89,8 @@ export async function createImageZip(options: ExportOptions): Promise<Blob> {
       y,
       width,
       height,
+      YOUTUBE_FRAME_WIDTH,
+      YOUTUBE_FRAME_HEIGHT,
     ].join(","));
   }
 
@@ -80,8 +98,10 @@ export async function createImageZip(options: ExportOptions): Promise<Blob> {
   zip.file(
     "README.txt",
     "Images were cropped locally in your browser by GridSplit.\n" +
-      "No AI services or remote image-processing server were used.\n" +
-      "PNG files preserve the decoded source pixels without additional lossy compression.\n" +
+      "Every exported image is a 1920x1080 (16:9) PNG for long-form YouTube video.\n" +
+      "The complete crop is preserved and centered; non-16:9 crops receive dark letterboxing rather than being stretched or cut off.\n" +
+      "High-quality browser resampling is used when enlarging small crops; this is not AI detail reconstruction.\n" +
+      "No images were uploaded to a server.\n" +
       "Source file: " + options.originalName + "\n",
   );
 
