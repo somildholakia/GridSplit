@@ -557,8 +557,16 @@ export default function MotionStudio() {
     if (target) {
       URL.revokeObjectURL(target.objectUrl);
       objectUrlsRef.current.delete(target.objectUrl);
-      const cached = imageCacheRef.current.get(id);
+      if (target.foreground) {
+        URL.revokeObjectURL(target.foreground.objectUrl);
+        objectUrlsRef.current.delete(target.foreground.objectUrl);
+        const depthCached = imageCacheRef.current.get("depth:" + target.foreground.asset.id);
+        if (depthCached) depthCached.src = "";
+        imageCacheRef.current.delete("depth:" + target.foreground.asset.id);
+      }
+      const cached = imageCacheRef.current.get("base:" + id) ?? imageCacheRef.current.get(id);
       if (cached) cached.src = "";
+      imageCacheRef.current.delete("base:" + id);
       imageCacheRef.current.delete(id);
     }
     setImages((current) => current.filter((item) => item.asset.id !== id).map((item, order) => ({ ...item, asset: { ...item.asset, order, sequenceNumber: order + 1 } })));
@@ -738,6 +746,29 @@ export default function MotionStudio() {
     }
   };
 
+  const exportForColab = async () => {
+    if (!canRender || colabExporting || rendering) return;
+    setColabExporting(true);
+    setNotice("Preparing a portable Colab package with the project media and local renderer…");
+    let temporaryProject: StudioProject | null = null;
+    try {
+      temporaryProject = await buildRenderProject();
+      const packageBlob = await buildColabRenderPackage(temporaryProject);
+      downloadMotionPackage(packageBlob, "gridsplit-motion-studio-colab-t4.zip");
+      setNotice("Colab package created. Upload the ZIP in the included notebook; NVENC is used when the selected runtime exposes it.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not prepare the Colab package.");
+    } finally {
+      if (temporaryProject) {
+        await Promise.all([
+          ...(temporaryProject.imageAssets ?? []).map((asset) => deleteProjectImageBlob(asset.id).catch(() => undefined)),
+          ...(temporaryProject.mixAssets ?? []).map((asset) => deleteProjectMedia(temporaryProject!.id, asset.id).catch(() => undefined)),
+        ]);
+      }
+      setColabExporting(false);
+    }
+  };
+
   const cancelRender = () => renderControllerRef.current?.abort();
 
   const clearImages = () => {
@@ -745,8 +776,16 @@ export default function MotionStudio() {
     images.forEach((item) => {
       URL.revokeObjectURL(item.objectUrl);
       objectUrlsRef.current.delete(item.objectUrl);
-      const cached = imageCacheRef.current.get(item.asset.id);
+      if (item.foreground) {
+        URL.revokeObjectURL(item.foreground.objectUrl);
+        objectUrlsRef.current.delete(item.foreground.objectUrl);
+        const depthCached = imageCacheRef.current.get("depth:" + item.foreground.asset.id);
+        if (depthCached) depthCached.src = "";
+        imageCacheRef.current.delete("depth:" + item.foreground.asset.id);
+      }
+      const cached = imageCacheRef.current.get("base:" + item.asset.id) ?? imageCacheRef.current.get(item.asset.id);
       if (cached) cached.src = "";
+      imageCacheRef.current.delete("base:" + item.asset.id);
       imageCacheRef.current.delete(item.asset.id);
     });
     setImages([]);
