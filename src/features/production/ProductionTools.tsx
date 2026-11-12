@@ -107,7 +107,6 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
     });
     if(changed)updateAssets(next);
   // The timeline key deliberately tracks only audio clip positions/durations.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[audioTimelineKey,mixAssetSyncKey,project.id]);
 
 
