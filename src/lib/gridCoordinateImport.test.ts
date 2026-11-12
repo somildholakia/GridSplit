@@ -78,8 +78,8 @@ describe("bulk grid coordinate import", () => {
         horizontalCuts: [],
         verticalCutsByRow: [[200, 201]],
       }),
-      500,
-      300,
+      100,
+      60,
     )).toThrow(/duplicate lines/i);
   });
 
