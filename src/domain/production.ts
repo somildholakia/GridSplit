@@ -57,6 +57,10 @@ export interface VideoClipEdit {
   /** Optional procedural overlay generated during FFmpeg rendering. */
   particlePreset?: ParticlePreset;
   particleIntensity?: number;
+  /** Grayscale composition-depth map used for local FFmpeg displacement parallax. */
+  depthMapAssetId?: string;
+  /** Strength of the procedural depth-map displacement, from 0 to 100. */
+  depthMotionAmount?: number;
   /** Transparent foreground cutout image to move separately from the background. */
   parallaxAssetId?: string;
   /** Clean-plate image with the foreground object removed. Required with parallaxAssetId. */
@@ -172,6 +176,8 @@ export function isVideoClipEdit(value: unknown): value is VideoClipEdit {
     && (value.keyframes === undefined || isMotionKeyframeSequence(value.keyframes))
     && (value.particlePreset === undefined || isParticlePreset(value.particlePreset))
     && (value.particleIntensity === undefined || isFiniteInRange(value.particleIntensity, 0, 100))
+    && (value.depthMapAssetId === undefined || (typeof value.depthMapAssetId === "string" && value.depthMapAssetId.trim().length > 0))
+    && (value.depthMotionAmount === undefined || isFiniteInRange(value.depthMotionAmount, 0, 100))
     && (value.parallaxAssetId === undefined || (typeof value.parallaxAssetId === "string" && value.parallaxAssetId.trim().length > 0))
     && (value.parallaxBackgroundAssetId === undefined || (typeof value.parallaxBackgroundAssetId === "string" && value.parallaxBackgroundAssetId.trim().length > 0))
     && (value.parallaxAmount === undefined || isFiniteInRange(value.parallaxAmount, 0, 100));
