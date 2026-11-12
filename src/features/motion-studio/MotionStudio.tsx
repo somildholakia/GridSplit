@@ -101,7 +101,7 @@ function drawMotionFrame(
   const cover = Math.max(width / image.naturalWidth, height / image.naturalHeight);
   let zoom = effect === "none" ? 1 : 1.04 + strength * 0.08;
   let offsetX = 0;
-  let offsetY = 0;
+  const offsetY = 0;
   if (effect === "ken-burns" || effect === "zoom-in") zoom = 1.04 + strength * 0.08 + progress * (0.09 + strength * 0.08);
   if (effect === "zoom-out") zoom = 1.16 + strength * 0.12 - progress * (0.09 + strength * 0.08);
   if (effect === "pan-left") {
