@@ -241,3 +241,117 @@ export function distributeImagesAcrossScenes<T extends { id: string; order: numb
   });
   return sceneIds.map((sceneId, index) => ({ sceneId, imageIds: buckets[index] }));
 }
+
+
+/**
+ * Resize one image clip while keeping its scene's image track exactly aligned
+ * to the measured audio duration. The other image clips in that scene share
+ * the remaining time in proportion to their previous durations.
+ */
+export function resizeImageClipKeepingSceneDuration(
+  clips: TimelineClip[],
+  clipId: string,
+  requestedDurationSeconds: number,
+): TimelineClip[] {
+  const target = clips.find((clip) => clip.id === clipId && clip.track === "images");
+  if (!target || !Number.isFinite(requestedDurationSeconds) || requestedDurationSeconds <= 0) return clips;
+
+  const sceneImages = clips
+    .filter((clip) => clip.track === "images" && clip.sceneId === target.sceneId)
+    .sort((left, right) => left.order - right.order || left.startSeconds - right.startSeconds);
+  if (sceneImages.length < 2) return clips;
+
+  const audioClip = clips.find((clip) => clip.track === "audio" && clip.sceneId === target.sceneId);
+  const sceneStart = audioClip?.startSeconds ?? Math.min(...sceneImages.map((clip) => clip.startSeconds));
+  const sceneDuration = audioClip?.durationSeconds
+    ?? sceneImages.reduce((total, clip) => total + clip.durationSeconds, 0);
+  const minimum = 0.01;
+  const nextTargetDuration = Math.min(sceneDuration - minimum * (sceneImages.length - 1), Math.max(minimum, requestedDurationSeconds));
+  if (!Number.isFinite(sceneDuration) || sceneDuration <= minimum * sceneImages.length
+    || nextTargetDuration < minimum) return clips;
+
+  const remaining = sceneImages.filter((clip) => clip.id !== clipId);
+  const previousRemainingTotal = remaining.reduce((total, clip) => total + clip.durationSeconds, 0);
+  const remainingTime = sceneDuration - nextTargetDuration;
+  const durations = new Map<string, number>([[clipId, nextTargetDuration]]);
+  let allocated = 0;
+  remaining.forEach((clip, index) => {
+    const duration = index === remaining.length - 1
+      ? remainingTime - allocated
+      : previousRemainingTotal > 0
+        ? remainingTime * (clip.durationSeconds / previousRemainingTotal)
+        : remainingTime / remaining.length;
+    durations.set(clip.id, duration);
+    allocated += duration;
+  });
+
+  let cursor = sceneStart;
+  const updated = new Map<string, TimelineClip>();
+  for (const clip of sceneImages) {
+    const duration = durations.get(clip.id) ?? clip.durationSeconds;
+    updated.set(clip.id, { ...clip, startSeconds: cursor, durationSeconds: duration });
+    cursor += duration;
+  }
+  return clips.map((clip) => updated.get(clip.id) ?? clip);
+}
+
+/**
+ * Apply one target hold duration to every image in the timeline. In each scene,
+ * all images except the last receive that exact duration; the final image fills
+ * the remaining measured scene audio so there are no black gaps or uncovered
+ * audio tails. Returns null if the requested duration cannot fit a scene.
+ */
+export function setAllImageClipDurations(
+  clips: TimelineClip[],
+  requestedDurationSeconds: number,
+): TimelineClip[] | null {
+  if (!Number.isFinite(requestedDurationSeconds) || requestedDurationSeconds <= 0) return null;
+  const sceneIds = [...new Set(clips.filter((clip) => clip.track === "images").map((clip) => clip.sceneId))];
+  const duration = requestedDurationSeconds;
+  const replacements = new Map<string, TimelineClip>();
+
+  for (const sceneId of sceneIds) {
+    const images = clips
+      .filter((clip) => clip.track === "images" && clip.sceneId === sceneId)
+      .sort((left, right) => left.order - right.order || left.startSeconds - right.startSeconds);
+    if (!images.length) continue;
+    const audioClip = clips.find((clip) => clip.track === "audio" && clip.sceneId === sceneId);
+    const sceneStart = audioClip?.startSeconds ?? images[0].startSeconds;
+    const sceneDuration = audioClip?.durationSeconds ?? images.reduce((total, clip) => total + clip.durationSeconds, 0);
+    const remainder = sceneDuration - duration * (images.length - 1);
+    if (!Number.isFinite(sceneDuration) || sceneDuration <= 0 || remainder < 0.01) return null;
+
+    let cursor = sceneStart;
+    images.forEach((clip, index) => {
+      const clipDuration = index === images.length - 1 ? remainder : duration;
+      replacements.set(clip.id, { ...clip, startSeconds: cursor, durationSeconds: clipDuration });
+      cursor += clipDuration;
+    });
+  }
+
+  return clips.map((clip) => replacements.get(clip.id) ?? clip);
+}
+
+/** Split an image clip at the current playhead without changing total scene coverage. */
+export function splitImageClipAtTime(
+  clips: TimelineClip[],
+  clipId: string,
+  playheadSeconds: number,
+  makeId: () => string = () => crypto.randomUUID(),
+): TimelineClip[] {
+  const target = clips.find((clip) => clip.id === clipId && clip.track === "images");
+  if (!target || !Number.isFinite(playheadSeconds)) return clips;
+  const end = target.startSeconds + target.durationSeconds;
+  if (playheadSeconds <= target.startSeconds + 0.01 || playheadSeconds >= end - 0.01) return clips;
+
+  const firstDuration = playheadSeconds - target.startSeconds;
+  const second: TimelineClip = {
+    ...target,
+    id: makeId(),
+    startSeconds: playheadSeconds,
+    durationSeconds: end - playheadSeconds,
+    order: target.order + 0.5,
+  };
+  const first: TimelineClip = { ...target, durationSeconds: firstDuration };
+  return clips.map((clip) => clip.id === clipId ? first : clip).concat(second);
+}
