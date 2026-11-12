@@ -51,6 +51,11 @@ if run.returncode != 0 and profile.get("encoder") == "h264_nvenc":
     project.setdefault("renderProfile", {})["encoder"] = "software"
     command, expected_duration, profile = renderer.render_command(project, manifest, render_root)
     run = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+if run.returncode != 0 and profile["encoder"] == "h264_nvenc":
+    print("NVENC failed in this Colab runtime; retrying with CPU libx264.")
+    profile_settings["encoder"] = "software"
+    command, expected_duration, profile = renderer.render_command(project, manifest, render_root)
+    run = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 if run.returncode != 0:
     raise RuntimeError("FFmpeg render failed:\n" + run.stdout[-8000:])
 
