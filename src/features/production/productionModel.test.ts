@@ -9,6 +9,9 @@ import {
   orderMappingsByAssetOrder,
   sortSequence,
   timelineDurationSeconds,
+  resizeImageClipKeepingSceneDuration,
+  setAllImageClipDurations,
+  splitImageClipAtTime,
   type SequenceAsset,
 } from "./productionModel";
 
@@ -126,4 +129,57 @@ describe("automatic schedule and timeline editing", () => {
       .toEqual(["b", "a"]);
     expect(moved.find((clip) => clip.id === imageClips[1].id)?.startSeconds).toBe(2);
   });
+
+  it("resizes one image while redistributing remaining scene time and preserving audio coverage", () => {
+    let id = 0;
+    const clips = buildTimeline([
+      { sceneId: "one", durationSeconds: 42, imageIds: ["a", "b", "c"] },
+    ], () => "clip-" + (++id));
+    const target = clips.find((clip) => clip.track === "images" && clip.assetId === "b")!;
+    const resized = resizeImageClipKeepingSceneDuration(clips, target.id, 10.25);
+    const images = resized.filter((clip) => clip.track === "images").sort((a, b) => a.order - b.order);
+    expect(images.find((clip) => clip.id === target.id)?.durationSeconds).toBe(10.25);
+    expect(images.reduce((total, clip) => total + clip.durationSeconds, 0)).toBeCloseTo(42, 8);
+    expect(images[0].startSeconds).toBe(0);
+    expect(images[1].startSeconds).toBeCloseTo(images[0].durationSeconds, 8);
+    expect(images[2].startSeconds + images[2].durationSeconds).toBeCloseTo(42, 8);
+  });
+
+  it("applies one two-decimal hold duration to every image and lets the last image fill the audio tail", () => {
+    let id = 0;
+    const clips = buildTimeline([
+      { sceneId: "one", durationSeconds: 30, imageIds: ["a", "b", "c"] },
+      { sceneId: "two", durationSeconds: 12, imageIds: ["d", "e"] },
+    ], () => "clip-" + (++id));
+    const updated = setAllImageClipDurations(clips, 4.25)!;
+    const one = updated.filter((clip) => clip.track === "images" && clip.sceneId === "one").sort((a, b) => a.order - b.order);
+    const two = updated.filter((clip) => clip.track === "images" && clip.sceneId === "two").sort((a, b) => a.order - b.order);
+    expect(one.map((clip) => clip.durationSeconds)).toEqual([4.25, 4.25, 21.5]);
+    expect(two.map((clip) => clip.durationSeconds)).toEqual([4.25, 7.75]);
+    expect(one[2].startSeconds + one[2].durationSeconds).toBe(30);
+    expect(two[1].startSeconds + two[1].durationSeconds).toBe(42);
+  });
+
+  it("rejects bulk durations that cannot fit while keeping each scene covered", () => {
+    let id = 0;
+    const clips = buildTimeline([
+      { sceneId: "one", durationSeconds: 5, imageIds: ["a", "b", "c"] },
+    ], () => "clip-" + (++id));
+    expect(setAllImageClipDurations(clips, 2)).toBeNull();
+  });
+
+  it("splits an image clip at the playhead and preserves the original end time", () => {
+    let id = 0;
+    const clips = buildTimeline([
+      { sceneId: "one", durationSeconds: 10, imageIds: ["a", "b"] },
+    ], () => "clip-" + (++id));
+    const target = clips.find((clip) => clip.track === "images")!;
+    const split = splitImageClipAtTime(clips, target.id, 2.75, () => "split-1");
+    const parts = split.filter((clip) => clip.assetId === target.assetId).sort((a, b) => a.startSeconds - b.startSeconds);
+    expect(parts).toHaveLength(2);
+    expect(parts[0].durationSeconds).toBe(2.75);
+    expect(parts[1].startSeconds).toBe(2.75);
+    expect(parts[1].durationSeconds).toBeCloseTo(2.25, 8);
+  });
+
 });
