@@ -43,7 +43,7 @@ function classifyParagraph(raw: string): Classification {
   }
 
   // Screenplay-style speaker cues are generally short, uppercase labels followed by a colon.
-  const speaker = trimmed.match(/^([A-Z][A-Z0-9 _.'-]{1,28})\s*:\s*([\s\S]+)$/);
+  const speaker = trimmed.match(/^([A-Z][A-Z0-9 _.'-]{1,28})(?:\s*\([^)]{1,40}\))?\s*:\s*([\s\S]+)$/);
   if (speaker && !/^(?:NOTE|WARNING|IMPORTANT|TITLE|LOCATION|TIME|DATE)$/i.test(speaker[1].trim())) {
     return { kind: "dialogue", speaker: speaker[1].trim(), text: speaker[2].trim() };
   }

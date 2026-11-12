@@ -25,13 +25,13 @@ describe("parseScript", () => {
   });
 
   it("recognises screenplay speaker labels and bracketed stage directions", () => {
-    const scenes = parseScript("MAYA: We have to leave.\n\n[Footsteps echo in the corridor]\n\n[Music fades in]");
+    const scenes = parseScript("MAYA (whispering): We have to leave.\n\n[Footsteps echo in the corridor]\n\n[Music fades in]");
     expect(scenes[0].blocks.map(block => block.kind)).toEqual(["dialogue", "sfx", "music"]);
     expect(scenes[0].blocks[0].speaker).toBe("MAYA");
     expect(scenes[0].blocks[1].cue).toBe("Footsteps echo in the corridor");
   });
 
-  it("does not classify ordinary prose merely because it mentions music or sound", () => {
+  it("recognises markdown-formatted music labels and sound FX", () => {\n    const scenes = parseScript("**MUSIC:** A low drone fades in.\\n\\nSOUND FX: Distant engine rumble.");\n    expect(scenes[0].blocks.map(block => block.kind)).toEqual(["music", "sfx"]);\n  });\n\n  it("does not classify ordinary prose merely because it mentions music or sound", () => {
     const scenes = parseScript("The music in the room reminded her of home.\n\nHe heard a strange sound outside.");
     expect(scenes[0].blocks.map(block => block.kind)).toEqual(["narration", "narration"]);
   });
