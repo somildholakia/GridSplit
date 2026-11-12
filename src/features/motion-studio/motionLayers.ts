@@ -62,3 +62,15 @@ export type ParticlePreset = "none" | "embers" | "snow" | "rain" | "confetti" | 
 export function normalizeParticlePreset(value: string): ParticlePreset {
   return ["embers", "snow", "rain", "confetti", "magic"].includes(value) ? value as ParticlePreset : "none";
 }
+
+export function resolveParticleSettings(
+  imagePreset: ParticlePreset | undefined,
+  imageIntensity: number | undefined,
+  defaultPreset: ParticlePreset,
+  defaultIntensity: number,
+): { preset: ParticlePreset; intensity: number } {
+  return {
+    preset: imagePreset ?? defaultPreset,
+    intensity: Math.max(0, Math.min(100, imageIntensity ?? defaultIntensity)),
+  };
+}
