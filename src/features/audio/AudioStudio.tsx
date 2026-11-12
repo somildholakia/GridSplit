@@ -281,6 +281,7 @@ export default function AudioStudio({ project, onUpdate }: Props) {
             : <button className="audio-primary-button" disabled={!engineReady || activeGeneration !== null || !sortedSegments.some(({ segment, block }) => segment.status !== "ready" && segment.status !== "generating" && Boolean(block?.text.trim()))} onClick={() => void generateAllRemaining()}><Sparkles size={13}/> Generate all remaining</button>}
         </div></div>
       {batchRunning && <div className="audio-batch-progress" role="status"><div><span>Generating audio sequentially</span><b>{batchProgress.current} / {batchProgress.total}</b></div><progress max={Math.max(1, batchProgress.total)} value={batchProgress.current}/><small>Existing completed audio is skipped. Failed segments do not stop the remaining queue.</small></div>}
+      <p className="audio-cue-note">Music and sound-effect blocks are kept as separate production cues and excluded from speech generation. Only narration and dialogue are sent to the TTS engine.</p>
       <div className="audio-segment-list">
         {sortedSegments.map(({ segment, scene, block }) => {
           const ready = segment.status === "ready", busy = activeGeneration === segment.id;

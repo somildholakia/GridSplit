@@ -75,3 +75,5 @@
 .audio-batch-progress progress{width:100%;height:7px;accent-color:#a995ef}
 .audio-batch-progress small{color:var(--muted,#9292a6);font-size:10px;line-height:1.4}
 @media(max-width:560px){.audio-batch-controls{width:100%;justify-content:space-between}.audio-batch-controls button{flex:1}}
+
+.audio-cue-note{margin:-5px 0 12px;color:var(--muted,#9292a6);font-size:10px;line-height:1.5}

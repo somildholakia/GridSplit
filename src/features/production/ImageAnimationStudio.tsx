@@ -204,11 +204,11 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
 
       for (let imageIndex = 0; imageIndex < selectedImages.length; imageIndex += 1) {
         if (cancelRef.current) break;
-        let nextImage: LoadedImage | null = null;
+        const nextRef: { current: LoadedImage | null } = { current: null };
         let nextError: unknown = null;
         const nextPromise = imageIndex + 1 < selectedImages.length
           ? loadImage(selectedImages[imageIndex + 1].id, selectedImages[imageIndex + 1].name, imageUrls[selectedImages[imageIndex + 1].id])
-              .then((loaded) => { nextImage = loaded; return loaded; })
+              .then((loaded) => { nextRef.current = loaded; return loaded; })
               .catch((error: unknown) => { nextError = error; throw error; })
           : null;
         // Attach a rejection handler immediately; the awaited promise below
@@ -225,9 +225,9 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
             context.fillRect(0, 0, canvas.width, canvas.height);
             drawMotion(context, current.image, preset, local, intensity);
             const fading = local > 1 - fadeSeconds / duration && imageIndex < selectedImages.length - 1;
-            if (fading && nextImage) {
+            if (fading && nextRef.current) {
               const alpha = (local - (1 - fadeSeconds / duration)) / (fadeSeconds / duration);
-              drawMotion(context, nextImage.image, preset, 0, intensity, Math.min(1, Math.max(0, alpha)));
+              drawMotion(context, nextRef.current.image, preset, 0, intensity, Math.min(1, Math.max(0, alpha)));
             }
             const fraction = Math.min(1, (imageIndex * duration + elapsed) / totalDuration);
             const percent = Math.floor(fraction * 100);
@@ -243,7 +243,7 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
 
         current.image.src = "";
         if (cancelRef.current) {
-          if (nextImage) nextImage.image.src = "";
+          if (nextRef.current) nextRef.current.image.src = "";
           break;
         }
         if (nextPromise) {

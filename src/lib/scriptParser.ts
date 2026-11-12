@@ -8,7 +8,7 @@ const sceneHeading = /^(?:scene|sequence)\s+\d+\b.*$/i;
 type Classification = Pick<ParsedBlock, "kind" | "text"> & Partial<Pick<ParsedBlock, "speaker" | "cue">>;
 
 function classifyParagraph(raw: string): Classification {
-  const trimmed = raw.trim();
+  const trimmed = raw.trim().replace(/^\\*{1,2}(.*?)\\*{1,2}\\s*/, "$1 ");
   const bracket = trimmed.match(/^\[([^\]]+)\]\s*([\s\S]*)$/);
   const label = (bracket?.[1] ?? "").trim();
   const body = (bracket?.[2] ?? "").trim();
@@ -17,8 +17,8 @@ function classifyParagraph(raw: string): Classification {
   const character = value.match(/^(?:CHARACTER|CHAR|DIALOGUE)\s*:\s*(.+)$/i);
   if (character) return { kind: "dialogue", speaker: character[1].trim(), text: body };
 
-  const narrator = value.match(/^(?:NARRATOR|VOICE\s*OVER|VOICEOVER|VO)\s*(?::|[-–—])?\s*([\s\S]*)$/i);
-  if (narrator && (bracket || /^(?:NARRATOR|VOICE\s*OVER|VOICEOVER|VO)\s*(?::|[-–—])/i.test(trimmed))) {
+  const narrator = value.match(/^(?:NARRATOR|NARRATION|VOICE\s*OVER|VOICEOVER|VO)\s*(?::|[-–—])?\s*([\s\S]*)$/i);
+  if (narrator && (bracket || /^(?:NARRATOR|NARRATION|VOICE\s*OVER|VOICEOVER|VO)\s*(?::|[-–—])/i.test(trimmed))) {
     return { kind: "narration", text: bracket ? body : narrator[1].trim() };
   }
 
@@ -28,8 +28,8 @@ function classifyParagraph(raw: string): Classification {
     return { kind: "music", cue: label || "Music", text: description };
   }
 
-  const sfx = value.match(/^(?:SOUND\s+EFFECTS?|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])?\s*([\s\S]*)$/i);
-  if (sfx && (bracket || /^(?:SOUND\s+EFFECTS?|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])/i.test(trimmed))) {
+  const sfx = value.match(/^(?:SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])?\s*([\s\S]*)$/i);
+  if (sfx && (bracket || /^(?:SOUND\s+EFFECTS?|SOUND\s+FX|SFX|FX|FOLEY|AMBIENCE|AMBIENT\s+SOUND)(?:\s+(?:CUE|TRACK))?\s*(?::|[-–—])/i.test(trimmed))) {
     const description = bracket ? body : sfx[1].trim();
     return { kind: "sfx", cue: label || "Sound effect", text: description };
   }
