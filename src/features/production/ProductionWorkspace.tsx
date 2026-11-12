@@ -5,7 +5,7 @@ import { readGeneratedAudio } from "../../audio/audioStore";
 import ProductionTools from "./ProductionTools";
 import ImageAnimationStudio from "./ImageAnimationStudio";
 import { measureWavBlob } from "../../lib/mediaTimeline";
-import { analyseSequence, buildTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, distributeImagesAcrossScenes, resizeImageClipKeepingSceneDuration, setAllImageClipDurations, splitImageClipAtTime, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
+import { analyseSequence, buildEvenTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, distributeImagesAcrossScenes, resizeImageClipKeepingTimelineDuration, setAllImageClipDurationsAcrossTimeline, splitImageClipAtTime, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
 import "./production-workspace.css";
 
 type ProductionProject = StudioProject & { imageAssets?: SequenceAsset[]; imageMappings?: SceneImageMapping[]; timelineClips?: TimelineClip[] };
@@ -79,6 +79,10 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   useEffect(()=>{folderRef.current?.setAttribute("webkitdirectory","");folderRef.current?.setAttribute("directory","");},[]);
   const [activeTab,setActiveTab]=useState<"sequence"|"mapping"|"timeline"|"animation"|"tools">("sequence");
   const issues=useMemo(()=>analyseSequence(assets),[assets]);
+  const mappedImageIds=useMemo(()=>{
+    const mapped=new Set(mappings.flatMap(mapping=>mapping.imageIds));
+    return assets.filter(asset=>mapped.has(asset.id)).sort((left,right)=>left.order-right.order).map(asset=>asset.id);
+  },[assets,mappings]);
   const timelineDuration=timelineDurationSeconds(clips);
   const timelineWidth=Math.max(600,Math.ceil(timelineDuration*timelineZoom));
   const currentImageClip=imageClipAtTime(clips,playheadSeconds);
@@ -163,28 +167,32 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     updateMappings([...mappings.filter(mapping=>mapping.sceneId!==sceneId),{sceneId,imageIds:next}]);
   };
   const createSchedule=async()=>{
-    setBusy(true);setMessage("Measuring saved WAV audio and building the image schedule…");
+    setBusy(true);setMessage("Measuring all saved WAV audio and evenly distributing images over the complete audio…");
     try{
-      const inputs:{sceneId:string;durationSeconds:number;imageIds:string[]}[]=[];
+      const audioInputs:{sceneId:string;durationSeconds:number}[]=[];
       const warnings:string[]=[];
       for(const scene of project.scenes){
-        const ready=(project.audioSegments??[]).filter(s=>s.sceneId===scene.id&&s.status==="ready");
+        const ready=(project.audioSegments??[]).filter(segment=>segment.sceneId===scene.id&&segment.status==="ready");
         let duration=0;
         for(const segment of ready){
           const blob=await readGeneratedAudio(project.id,segment.id);
           if(!blob){warnings.push(scene.title+": missing audio file for one segment.");continue;}
-          try{duration+=(await measureWavBlob(blob)).durationSeconds;}catch{warnings.push(scene.title+": unreadable WAV segment.");}
+          try{duration+=(await measureWavBlob(blob)).durationSeconds;}
+          catch{warnings.push(scene.title+": unreadable WAV segment.");}
         }
-        if(!ready.length)warnings.push(scene.title+": no generated audio; no timed image clips were created.");
-        const imageIds=mappedFor(scene.id);
-        if(!imageIds.length)warnings.push(scene.title+": no images mapped.");
-        if(duration>0&&imageIds.length)inputs.push({sceneId:scene.id,durationSeconds:duration,imageIds});
+        if(!ready.length)warnings.push(scene.title+": no generated audio was available.");
+        if(duration>0)audioInputs.push({sceneId:scene.id,durationSeconds:duration});
       }
-      const next=buildTimeline(inputs);patchProject(onUpdate,{timelineClips:next});
+
+      if(!mappedImageIds.length)warnings.push("No images are mapped. Map the images you want to include before building the timeline.");
+      const next=buildEvenTimeline(audioInputs,mappedImageIds);
+      patchProject(onUpdate,{timelineClips:next});
       setPlayheadSeconds(0);setIsPlaying(false);playbackOriginRef.current=null;
       scheduledSourcesRef.current.forEach(source=>{try{source.stop();}catch{/* already stopped */}});
       scheduledSourcesRef.current=[];
-      setMessage("Built "+next.filter(c=>c.track==="images").length+" image clips from measured WAV durations. "+(warnings.length?warnings.join(" "):"All scenes with generated audio have mapped images."));
+      const totalAudio=audioInputs.reduce((sum,input)=>sum+input.durationSeconds,0);
+      const average=mappedImageIds.length>0&&totalAudio>0?(totalAudio/mappedImageIds.length).toFixed(2):"0.00";
+      setMessage("Evenly distributed "+mappedImageIds.length+" mapped image(s) across "+totalAudio.toFixed(2)+" seconds of measured audio ("+average+" seconds per image). The image sequence now covers the complete audio without gaps. "+(warnings.length?warnings.join(" "):"All measured audio and mapped images are included."));
       setActiveTab("timeline");
     }catch(error){setMessage(error instanceof Error?error.message:"Could not build the schedule.");}finally{setBusy(false);}
   };
@@ -202,14 +210,12 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   useEffect(()=>{
     const revision=++autoSyncRevisionRef.current;
     let cancelled=false;
-    const hasInputs=project.scenes.some(scene=>
-      (mappings.find(mapping=>mapping.sceneId===scene.id)?.imageIds.length??0)>0
-      &&(project.audioSegments??[]).some(segment=>segment.sceneId===scene.id&&segment.status==="ready"));
-    if(!hasInputs)return;
+    const hasAudio=(project.audioSegments??[]).some(segment=>segment.status==="ready");
+    if(!mappedImageIds.length||!hasAudio)return;
     const timeout=window.setTimeout(()=>{
       void (async()=>{
         try{
-          const inputs:{sceneId:string;durationSeconds:number;imageIds:string[]}[]=[];
+          const inputs:{sceneId:string;durationSeconds:number}[]=[];
           for(const scene of project.scenes){
             const ready=(project.audioSegments??[]).filter(segment=>segment.sceneId===scene.id&&segment.status==="ready");
             let duration=0;
@@ -218,14 +224,15 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
               if(!blob)continue;
               try{duration+=(await measureWavBlob(blob)).durationSeconds;}catch{/* skip unreadable audio */}
             }
-            const imageIds=mappings.find(mapping=>mapping.sceneId===scene.id)?.imageIds??[];
-            if(duration>0&&imageIds.length)inputs.push({sceneId:scene.id,durationSeconds:duration,imageIds});
+            if(duration>0)inputs.push({sceneId:scene.id,durationSeconds:duration});
           }
           if(cancelled||revision!==autoSyncRevisionRef.current)return;
-          const next=buildTimeline(inputs);
+          const next=buildEvenTimeline(inputs,mappedImageIds);
           patchProject(onUpdateRef.current,{timelineClips:next});
           setPlayheadSeconds(current=>Math.min(current,timelineDurationSeconds(next)));
-          setMessage("Auto-synced "+next.filter(clip=>clip.track==="images").length+" image clips with measured narration/dialogue audio.");
+          const totalAudio=inputs.reduce((sum,input)=>sum+input.durationSeconds,0);
+          const average=mappedImageIds.length>0&&totalAudio>0?(totalAudio/mappedImageIds.length).toFixed(2):"0.00";
+          setMessage("Auto-synced "+mappedImageIds.length+" images evenly over "+totalAudio.toFixed(2)+" seconds of measured audio ("+average+" seconds per image), covering the full soundtrack.");
         }catch(error){
           if(!cancelled)setMessage(error instanceof Error?error.message:"Automatic media synchronization failed.");
         }
@@ -238,13 +245,13 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     const clip=clips.find(item=>item.id===id);
     if(!clip)return;
     if(clip.track==="images"){
-      const updated=resizeImageClipKeepingSceneDuration(clips,id,value);
+      const updated=resizeImageClipKeepingTimelineDuration(clips,id,value);
       if(updated===clips){
-        setMessage("This scene needs at least two image clips to change one image's hold time while keeping the full audio covered.");
+        setMessage("The image sequence needs enough total audio time to keep every image visible for at least 0.01 seconds.");
         return;
       }
       patchProject(onUpdate,{timelineClips:updated});
-      setMessage("Updated image duration to two-decimal precision. Other images in this scene were ripple-adjusted proportionally, keeping the scene aligned to its measured audio.");
+      setMessage("Updated image duration to two-decimal precision. Other images were ripple-adjusted across the full timeline so the sequence still covers all measured audio.");
       return;
     }
     patchProject(onUpdate,{timelineClips:clips.map(item=>item.id===id?{...item,durationSeconds:value}:item)});
@@ -253,10 +260,10 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const applyBulkImageDuration=()=>{
     const value=Number(bulkImageDuration);
     if(!Number.isFinite(value)||value<0.01){setMessage("Enter an image hold duration of at least 0.01 seconds.");return;}
-    const next=setAllImageClipDurations(clips,value);
-    if(!next){setMessage("That duration is too long for one or more scenes. Reduce it so every scene can still fit all its images inside the measured audio.");return;}
+    const next=setAllImageClipDurationsAcrossTimeline(clips,value);
+    if(!next){setMessage("That duration is too long for the complete audio. Reduce it so the final image can still fill at least 0.01 seconds.");return;}
     patchProject(onUpdate,{timelineClips:next});
-    setMessage("Applied "+value.toFixed(2)+"s to each image except the final image in each scene, which fills the remaining measured audio. The complete soundtrack remains covered.");
+    setMessage("Applied "+value.toFixed(2)+"s to every image across the full soundtrack. The final image fills the remaining audio tail, so there are no gaps.");
   };
   const fitTimeline=()=>{
     const available=Math.max(260,(timelineScrollRef.current?.clientWidth??960)-150);
@@ -362,7 +369,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
       {!assets.length||!project.scenes.length?<div className="production-empty">Add images and create scenes before mapping.</div>:project.scenes.map(scene=><article className="production-scene-map" key={scene.id}><header><b>{scene.title}</b><span>{mappedFor(scene.id).length} image(s)</span></header><div className="production-map-grid">{assets.map(asset=><label key={asset.id} className={mappedFor(scene.id).includes(asset.id)?"selected":""}>{thumbs[asset.id]?<img src={thumbs[asset.id]} alt=""/>:<span className="production-thumb-placeholder"/>}<input type="checkbox" checked={mappedFor(scene.id).includes(asset.id)} onChange={()=>toggleMapping(scene.id,asset.id)}/><span>{asset.name}</span></label>)}</div></article>)}
     </div>}
     {activeTab==="timeline"&&<div className="production-section">
-      <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Re-sync images to full audio"}</button><span>{clips.length} clips · {seconds(timelineDuration)} total</span></div>
+      <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Re-sync images to full audio"}</button><span>{clips.filter(clip=>clip.track==="images").length} images · {clips.filter(clip=>clip.track==="images").length?(timelineDuration/clips.filter(clip=>clip.track==="images").length).toFixed(2)+"s average":"—"} · {seconds(timelineDuration)} total</span></div>
       {!clips.length?<div className="production-empty">Map images to scenes and generate WAV audio, then build the initial schedule.</div>:<>
         <div className="production-playback-controls">
           <button className="production-button primary" onClick={()=>void playTimeline()}>{isPlaying?<Pause size={14}/>:<Play size={14}/>} {isPlaying?"Pause":"Play timeline"}</button>
@@ -375,7 +382,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
             <b>IMAGE HOLD TIME</b>
             <label><input aria-label="Bulk image duration in seconds" type="number" min="0.01" step="0.01" value={bulkImageDuration} onChange={event=>setBulkImageDuration(event.target.value)}/> seconds</label>
             <button className="production-button" onClick={applyBulkImageDuration}>Apply to all images</button>
-            <small>Each scene's final image automatically fills the remaining audio time.</small>
+            <small>Images run in sequence across the complete audio. The final image fills the remaining audio tail.</small>
           </div>
           <div className="production-zoom-tools">
             <b>TIMELINE ZOOM</b>

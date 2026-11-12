@@ -355,3 +355,148 @@ export function splitImageClipAtTime(
   const first: TimelineClip = { ...target, durationSeconds: firstDuration };
   return clips.map((clip) => clip.id === clipId ? first : clip).concat(second);
 }
+
+
+export type SceneAudioTimingInput = { sceneId: string; durationSeconds: number };
+
+/**
+ * Build one continuous, evenly distributed image sequence over the complete
+ * measured audio runtime. For example, 600 seconds and 20 images produces
+ * 20 consecutive 30-second clips, with the final endpoint fixed to audio end.
+ */
+export function buildEvenTimeline(
+  audioInputs: SceneAudioTimingInput[],
+  imageIds: string[],
+  makeId: () => string = () => crypto.randomUUID(),
+): TimelineClip[] {
+  let cursor = 0;
+  let audioOrder = 0;
+  const audioRanges: Array<{ sceneId: string; start: number; end: number }> = [];
+  const clips: TimelineClip[] = [];
+
+  for (const input of audioInputs) {
+    if (!input.sceneId || !Number.isFinite(input.durationSeconds) || input.durationSeconds <= 0) continue;
+    const start = cursor;
+    const end = start + input.durationSeconds;
+    audioRanges.push({ sceneId: input.sceneId, start, end });
+    clips.push({
+      id: makeId(),
+      track: "audio",
+      sceneId: input.sceneId,
+      startSeconds: start,
+      durationSeconds: input.durationSeconds,
+      order: audioOrder++,
+    });
+    cursor = end;
+  }
+
+  const orderedImages = [...new Set(imageIds.filter((id) => typeof id === "string" && id.length > 0))];
+  if (cursor <= 0 || !orderedImages.length) return clips;
+
+  const imageDuration = cursor / orderedImages.length;
+  orderedImages.forEach((assetId, index) => {
+    const start = imageDuration * index;
+    const end = index === orderedImages.length - 1 ? cursor : imageDuration * (index + 1);
+    const midpoint = start + (end - start) / 2;
+    const scene = audioRanges.find((range) => midpoint >= range.start && midpoint < range.end)
+      ?? audioRanges[audioRanges.length - 1];
+    clips.push({
+      id: makeId(),
+      track: "images",
+      sceneId: scene.sceneId,
+      assetId,
+      startSeconds: start,
+      durationSeconds: end - start,
+      order: index,
+    });
+  });
+
+  return clips;
+}
+
+function fullTimelineRange(clips: TimelineClip[]): { start: number; end: number } | null {
+  const audioClips = clips.filter((clip) => clip.track === "audio");
+  const reference = audioClips.length ? audioClips : clips.filter((clip) => clip.track === "images");
+  if (!reference.length) return null;
+  return {
+    start: Math.min(...reference.map((clip) => clip.startSeconds)),
+    end: Math.max(...reference.map((clip) => clip.startSeconds + clip.durationSeconds)),
+  };
+}
+
+/** Ripple-resize one image and proportionally redistribute all remaining images
+ * so the image sequence still spans the complete audio timeline without gaps. */
+export function resizeImageClipKeepingTimelineDuration(
+  clips: TimelineClip[],
+  clipId: string,
+  requestedDurationSeconds: number,
+): TimelineClip[] {
+  const target = clips.find((clip) => clip.id === clipId && clip.track === "images");
+  const images = clips.filter((clip) => clip.track === "images")
+    .sort((left, right) => left.startSeconds - right.startSeconds || left.order - right.order);
+  const range = fullTimelineRange(clips);
+  if (!target || !range || !Number.isFinite(requestedDurationSeconds) || requestedDurationSeconds <= 0) return clips;
+  if (images.length === 1) {
+    return clips.map((clip) => clip.id === clipId
+      ? { ...clip, startSeconds: range.start, durationSeconds: range.end - range.start }
+      : clip);
+  }
+
+  const totalDuration = range.end - range.start;
+  const minimum = 0.01;
+  if (!Number.isFinite(totalDuration) || totalDuration <= minimum * images.length) return clips;
+  const targetDuration = Math.min(
+    totalDuration - minimum * (images.length - 1),
+    Math.max(minimum, requestedDurationSeconds),
+  );
+  const remaining = images.filter((clip) => clip.id !== clipId);
+  const previousTotal = remaining.reduce((sum, clip) => sum + clip.durationSeconds, 0);
+  const available = totalDuration - targetDuration;
+  const durations = new Map<string, number>([[clipId, targetDuration]]);
+  let allocated = 0;
+
+  remaining.forEach((clip, index) => {
+    const duration = index === remaining.length - 1
+      ? available - allocated
+      : previousTotal > 0
+        ? available * clip.durationSeconds / previousTotal
+        : available / remaining.length;
+    durations.set(clip.id, duration);
+    allocated += duration;
+  });
+
+  let cursor = range.start;
+  const updates = new Map<string, TimelineClip>();
+  images.forEach((clip) => {
+    const duration = durations.get(clip.id) ?? clip.durationSeconds;
+    updates.set(clip.id, { ...clip, startSeconds: cursor, durationSeconds: duration });
+    cursor += duration;
+  });
+  return clips.map((clip) => updates.get(clip.id) ?? clip);
+}
+
+/** Apply a common hold duration to the whole image sequence; the final image
+ * fills the remaining measured audio duration exactly. */
+export function setAllImageClipDurationsAcrossTimeline(
+  clips: TimelineClip[],
+  requestedDurationSeconds: number,
+): TimelineClip[] | null {
+  if (!Number.isFinite(requestedDurationSeconds) || requestedDurationSeconds <= 0) return null;
+  const images = clips.filter((clip) => clip.track === "images")
+    .sort((left, right) => left.startSeconds - right.startSeconds || left.order - right.order);
+  const range = fullTimelineRange(clips);
+  if (!range || !images.length) return null;
+
+  const totalDuration = range.end - range.start;
+  const finalDuration = totalDuration - requestedDurationSeconds * (images.length - 1);
+  if (!Number.isFinite(totalDuration) || totalDuration <= 0 || finalDuration < 0.01) return null;
+
+  let cursor = range.start;
+  const updates = new Map<string, TimelineClip>();
+  images.forEach((clip, index) => {
+    const duration = index === images.length - 1 ? finalDuration : requestedDurationSeconds;
+    updates.set(clip.id, { ...clip, startSeconds: cursor, durationSeconds: duration });
+    cursor += duration;
+  });
+  return clips.map((clip) => updates.get(clip.id) ?? clip);
+}
