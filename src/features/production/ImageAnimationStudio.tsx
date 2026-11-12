@@ -107,7 +107,7 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || exporting) return;
     let frame = 0;
     let raf = 0;
     let loaded: LoadedImage | null = null;
@@ -143,7 +143,7 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
       disposed = true;
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [images, imageUrls, selectedId, preset, intensity, duration]);
+  }, [images, imageUrls, selectedId, preset, intensity, duration, exporting]);
 
   useEffect(() => () => {
     cancelRef.current = true;
@@ -296,7 +296,7 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
     <header className="image-animation-heading">
       <div><span>IMAGE ANIMATION · BROWSER RENDERER</span><h3>Give still images <em>camera movement.</em></h3>
         <p>Animate images with zoom, pan, drift and crossfades. No AI API, account, upload, server job or extra installation is required.</p></div>
-      <label className="image-animation-import"><ImagePlus size={14}/> Add images<input type="file" accept="image/*" multiple onChange={(event) => { onImportFiles(event.target.files); event.currentTarget.value = ""; }}/></label>
+      <label className="image-animation-import"><ImagePlus size={14}/> Add images<input type="file" accept="image/*" multiple disabled={exporting} onChange={(event) => { onImportFiles(event.target.files); event.currentTarget.value = ""; }}/></label>
     </header>
     <div className="image-animation-layout">
       <div className="image-animation-preview">
@@ -307,18 +307,18 @@ export default function ImageAnimationStudio({ images, imageUrls, onImportFiles 
         <div className="image-animation-preview-footer"><span>{images.length.toLocaleString()} images in this project</span><span>1280 × 720 · 30 FPS</span></div>
       </div>
       <div className="image-animation-settings">
-        <label>Image to animate<select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
+        <label>Image to animate<select value={selectedId} disabled={exporting} onChange={(event) => setSelectedId(event.target.value)}>
           {!images.length && <option value="">No images available</option>}
           {images.map((image) => <option key={image.id} value={image.id}>{image.order + 1}. {image.name}</option>)}
         </select></label>
-        <label>Export scope<select value={scope} onChange={(event) => setScope(event.target.value as "selected" | "all")}>
+        <label>Export scope<select value={scope} disabled={exporting} onChange={(event) => setScope(event.target.value as "selected" | "all")}>
           <option value="selected">Selected image only</option><option value="all">All project images · sequence order</option>
         </select></label>
-        <label>Motion preset<select value={preset} onChange={(event) => setPreset(event.target.value as MotionPreset)}>
+        <label>Motion preset<select value={preset} disabled={exporting} onChange={(event) => setPreset(event.target.value as MotionPreset)}>
           {PRESETS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select></label>
-        <label className="image-animation-range"><span>Duration per image <b>{duration}s</b></span><input type="range" min="3" max="60" step="1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}/></label>
-        <label className="image-animation-range"><span>Motion intensity <b>{intensity}%</b></span><input type="range" min="0" max="100" step="5" value={intensity} onChange={(event) => setIntensity(Number(event.target.value))}/></label>
+        <label className="image-animation-range"><span>Duration per image <b>{duration}s</b></span><input type="range" min="3" max="60" step="1" disabled={exporting} value={duration} onChange={(event) => setDuration(Number(event.target.value))}/></label>
+        <label className="image-animation-range"><span>Motion intensity <b>{intensity}%</b></span><input type="range" min="0" max="100" step="5" disabled={exporting} value={intensity} onChange={(event) => setIntensity(Number(event.target.value))}/></label>
         <div className="image-animation-summary"><span>{selectedImages.length.toLocaleString()} selected image(s)</span><b>{Math.floor(totalDuration / 60)}m {Math.round(totalDuration % 60)}s total</b></div>
         {exporting ? <button className="image-animation-primary" onClick={cancelExport}><Square size={14}/> Cancel export</button>
           : <button className="image-animation-primary" disabled={!selectedImages.length} onClick={() => void startExport()}><Sparkles size={14}/> Render animation</button>}
