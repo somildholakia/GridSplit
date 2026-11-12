@@ -167,7 +167,7 @@ export function isVideoClipEdit(value: unknown): value is VideoClipEdit {
     && isTransitionKind(value.transitionOut)
     && isFiniteInRange(value.transitionDurationSeconds, 0, 5)
     && isFiniteInRange(value.zoom, 1, 1.5)
-    && (value.keyframes === undefined || (Array.isArray(value.keyframes) && value.keyframes.length >= 2 && value.keyframes.length <= 32 && value.keyframes.every(isMotionKeyframe)))
+    && (value.keyframes === undefined || isMotionKeyframeSequence(value.keyframes))
     && (value.particlePreset === undefined || isParticlePreset(value.particlePreset))
     && (value.particleIntensity === undefined || isFiniteInRange(value.particleIntensity, 0, 100))
     && (value.parallaxAssetId === undefined || (typeof value.parallaxAssetId === "string" && value.parallaxAssetId.trim().length > 0))
@@ -185,6 +185,12 @@ export function isRenderProfile(value: unknown): value is RenderProfile {
     && ["16:9", "9:16", "1:1"].includes(String(value.aspectRatio))
     && ["high", "balanced", "compact"].includes(String(value.quality))
     && (value.encoder === undefined || value.encoder === "software" || value.encoder === "nvidia");
+}
+
+function isMotionKeyframeSequence(value: unknown): value is MotionKeyframe[] {
+  if (!Array.isArray(value) || value.length < 2 || value.length > 32) return false;
+  return value.every((item, index) => isMotionKeyframe(item)
+    && (index === 0 || item.time > (value[index - 1] as MotionKeyframe).time));
 }
 
 export function isMotionKeyframe(value: unknown): value is MotionKeyframe {
