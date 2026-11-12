@@ -390,7 +390,7 @@ export default function MotionStudio() {
           height: size.height,
           fingerprint: file.name + ":" + file.size + ":" + file.lastModified,
         };
-        newImages.push({ asset, file, objectUrl });
+        newImages.push({ asset, file, objectUrl, keyframes: [], customKeyframes: false });
       } catch (error) {
         URL.revokeObjectURL(objectUrl);
         objectUrlsRef.current.delete(objectUrl);
@@ -398,7 +398,97 @@ export default function MotionStudio() {
       }
     }
     setImages((current) => [...current, ...sortNaturally(newImages)].map((item, order) => ({ ...item, asset: { ...item.asset, order, sequenceNumber: order + 1 } })));
-    if (newImages.length) setNotice("Imported " + newImages.length + " image(s). Originals remain unchanged.");
+    if (newImages.length) {
+      setSelectedImageId((current) => current || newImages[0].asset.id);
+      setSelectedKeyframeIndex(0);
+      setNotice("Imported " + newImages.length + " image(s). Originals remain unchanged.");
+    }
+  };
+
+  const addForegroundLayer = async (imageId: string, file?: File) => {
+    if (!file || rendering) return;
+    if (!["image/png", "image/webp"].includes(file.type) || file.size <= 0 || file.size > 100 * 1024 * 1024) {
+      setNotice("Use a transparent PNG or WebP foreground cutout under 100 MB.");
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    objectUrlsRef.current.add(objectUrl);
+    try {
+      const size = await imageDimensions(file, objectUrl);
+      const id = crypto.randomUUID();
+      const asset: ProjectImageAsset = {
+        id,
+        name: file.name,
+        relativePath: "motion-studio/depth/" + file.name,
+        mimeType: file.type,
+        bytes: file.size,
+        sequenceNumber: null,
+        order: images.length,
+        width: size.width,
+        height: size.height,
+        fingerprint: file.name + ":" + file.size + ":" + file.lastModified,
+      };
+      setImages((current) => current.map((item) => {
+        if (item.asset.id !== imageId) return item;
+        if (item.foreground) {
+          URL.revokeObjectURL(item.foreground.objectUrl);
+          objectUrlsRef.current.delete(item.foreground.objectUrl);
+          const cached = imageCacheRef.current.get("depth:" + item.foreground.asset.id);
+          if (cached) cached.src = "";
+          imageCacheRef.current.delete("depth:" + item.foreground.asset.id);
+        }
+        return { ...item, foreground: { asset, file, objectUrl } };
+      }));
+      setNotice("Transparent foreground cutout added. It will move separately from its background during parallax rendering.");
+    } catch (error) {
+      URL.revokeObjectURL(objectUrl);
+      objectUrlsRef.current.delete(objectUrl);
+      setNotice(error instanceof Error ? error.message : "Could not load the foreground cutout.");
+    }
+  };
+
+  const removeForegroundLayer = (imageId: string) => {
+    const target = images.find((item) => item.asset.id === imageId);
+    if (target?.foreground) {
+      URL.revokeObjectURL(target.foreground.objectUrl);
+      objectUrlsRef.current.delete(target.foreground.objectUrl);
+      const cached = imageCacheRef.current.get("depth:" + target.foreground.asset.id);
+      if (cached) cached.src = "";
+      imageCacheRef.current.delete("depth:" + target.foreground.asset.id);
+    }
+    setImages((current) => current.map((item) => item.asset.id === imageId
+      ? { ...item, foreground: undefined }
+      : item));
+  };
+
+  const addKeyframe = () => {
+    if (!selectedImage) return;
+    const position = Math.max(0, Math.min(1, keyframePosition));
+    const sampled = sampleMotionKeyframes(editableKeyframes, position);
+    const next = insertMotionKeyframe(editableKeyframes, { ...sampled, time: position });
+    setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id
+      ? { ...item, keyframes: next, customKeyframes: true }
+      : item));
+    setSelectedKeyframeIndex(Math.max(0, next.findIndex((item) => Math.abs(item.time - position) < 0.0001)));
+  };
+
+  const updateSelectedKeyframe = (patch: Partial<MotionKeyframe>) => {
+    if (!selectedImage || !selectedKeyframe) return;
+    const next = editableKeyframes.map((item, index) => index === selectedKeyframeIndex
+      ? { ...item, ...patch }
+      : item).sort((a, b) => a.time - b.time);
+    setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id
+      ? { ...item, keyframes: next, customKeyframes: true }
+      : item));
+  };
+
+  const removeSelectedKeyframe = () => {
+    if (!selectedImage || editableKeyframes.length <= 2) return;
+    const next = editableKeyframes.filter((_, index) => index !== selectedKeyframeIndex);
+    setImages((current) => current.map((item) => item.asset.id === selectedImage.asset.id
+      ? { ...item, keyframes: next, customKeyframes: true }
+      : item));
+    setSelectedKeyframeIndex(Math.max(0, Math.min(selectedKeyframeIndex, next.length - 1)));
   };
 
   const handleAudioFile = (file?: File) => {
