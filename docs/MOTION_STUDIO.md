@@ -43,4 +43,11 @@ The current FFmpeg pipeline uses the repository's existing `libx264` software en
 
 This first version creates **procedural camera animation**, not AI-generated motion inside the depicted subject. It moves and scales the complete still image and transitions between images. It does not animate a person's limbs, facial expressions, hair, smoke, water, or other objects independently.
 
-Effekseer is a useful upstream reference for a later transparent particle/effect layer. Synfig is a useful reference for a separate 2D keyframe and layer-animation workspace. Neither desktop editor is embedded in this page. Particle overlays, layered parallax, masks, manual keyframes, and per-image effect overrides are future extensions and should be implemented as isolated effect layers rather than changing the existing Production Studio.
+## Advanced animation layers
+
+- **Keyframes:** each image can have its own scale, horizontal/vertical crop position, and rotation keys. Values are interpolated between keys and rendered by FFmpeg.
+- **Particles:** procedural embers, snow, rain, confetti, and magic-spark overlays are rendered as an independent transparent effect pass. These are stylized graphics rather than generated footage.
+- **Parallax:** attach a manually prepared transparent PNG/WebP foreground cutout to an image. The renderer moves the cutout separately from its background. GridSplit does not infer masks or remove backgrounds automatically.
+- **Colab/T4:** use **Export Colab / T4 package** to download a ZIP containing your media archive, the local renderer, and a runnable notebook. Open the notebook in Colab and choose a T4 GPU when available. The renderer probes NVENC first and falls back to CPU libx264 if GPU encoding is unavailable or fails. Google controls free GPU availability and session limits.
+
+Synfig and Effekseer remain design references; neither desktop application is embedded in GridSplit. All new animation layers are isolated inside Motion Studio and the existing Production Studio remains unchanged.
