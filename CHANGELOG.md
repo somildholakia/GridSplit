@@ -6,6 +6,13 @@ The project is evolving from the original GridSplit contact-sheet extractor into
 
 ## [Unreleased]
 
+### Fixed — 2026-11-12 (PR #24)
+- Fixed script parsing when explicit markers appear on consecutive lines without blank separators. Narration, dialogue, music, SFX and bracketed stage directions now become distinct blocks while continuation lines remain attached to their preceding block.
+- Extracted descriptions from bracketed cues such as `[BACKGROUND MUSIC: gentle piano]` and `[SFX: footsteps]` into their own music/SFX block text and cue fields.
+- Added regression tests for consecutive markers and multi-line continuation. PR CI [#43189628916](https://github.com/somildholakia/GridSplit/actions/runs/43189628916) and post-merge main CI [#43189842050](https://github.com/somildholakia/GridSplit/actions/runs/43189842050) passed.
+- Live [post-fix browser QA](https://agent.tinyfish.ai/runs/99a45313-0ead-4439-a8e0-c2b6c5ae5e0c) confirmed six distinct blocks and only three speech segments; music/SFX were excluded from TTS.
+
+
 ### Added — 2026-11-12 (PR #22)
 - Added browser Image Animation Studio with six camera-motion presets, selected-image or ordered-project output, configurable duration/intensity, MP4 where supported and WebM fallback.
 - Added OPFS chunked recording writes where supported, with in-memory Blob fallback.
