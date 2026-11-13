@@ -114,7 +114,8 @@ export async function buildColabRenderPackage(project: StudioProject): Promise<B
     "",
     "Live workflow:",
     "1. Open GridSplit_Live_Colab_Renderer.ipynb in Colab.",
-        "3. Copy the displayed Quick Tunnel URL into GridSplit → Production Studio → Export & restore.",
+    "2. Select a T4 GPU and run all cells.",
+    "3. Copy the displayed Quick Tunnel URL into GridSplit → Production Studio → Export & restore.",
     "",
     "GPU availability and session limits are controlled by Google. No paid API key or AI model is required."
   ].join("\n"));
@@ -171,7 +172,7 @@ export function buildColabNotebook(): Blob {
     "(RENDER_ROOT / 'server.py').write_bytes(base64.b64decode(RENDERER_SOURCE_B64))",
     "(RENDER_ROOT / 'colab_server.py').write_bytes(base64.b64decode(GATEWAY_SOURCE_B64))",
     "",
-    "# Generated for this runtime only. It is not embedded in the notebook or repository.",
+    "# Prepare the bundled renderer and gateway for this Colab runtime.",
     "PORT = 8766",
     "SERVER_PROCESS = subprocess.Popen(",
     "    [sys.executable, str(RENDER_ROOT / 'colab_server.py'), '--host', '127.0.0.1', '--port', str(PORT)],",
@@ -223,7 +224,7 @@ export function buildColabNotebook(): Blob {
     "print('GridSplit Colab renderer is ready.')",
     "print('GPU visible to this runtime:', GPU_NAME or 'No NVIDIA GPU detected (CPU rendering will be used)')",
     "print('Colab Quick Tunnel URL:', GRID_SPLIT_TUNNEL_URL)",
-        "3. Copy the displayed Quick Tunnel URL into GridSplit → Production Studio → Export & restore.",
+    "print('Paste this URL into GridSplit → Production Studio → Export & restore.')",
     "print('Keep this Colab runtime running while GridSplit uploads and renders your project.')",
   ].join("\n");
 
