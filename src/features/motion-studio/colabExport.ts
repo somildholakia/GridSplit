@@ -52,7 +52,7 @@ if run.returncode != 0 and profile.get("encoder") == "h264_nvenc":
     command, expected_duration, profile = renderer.render_command(project, manifest, render_root)
     run = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 if run.returncode != 0:
-    raise RuntimeError("FFmpeg render failed:\\n" + run.stdout[-8000:])
+    raise RuntimeError("FFmpeg render failed:\n" + run.stdout[-8000:])
 
 output_path = render_root / "output.mp4"
 if not output_path.exists() or output_path.stat().st_size < 1024:
@@ -84,14 +84,14 @@ export async function buildColabRenderPackage(project: StudioProject): Promise<B
       {
         cell_type: "markdown", metadata: {},
         source: [
-          "# GridSplit Motion Studio · Colab GPU render\\n",
-          "\\n",
+          "# GridSplit Motion Studio · Colab GPU render\n",
+          "\n",
           "Upload this complete ZIP in the notebook cell. NVENC is used only after the renderer verifies it, with CPU fallback."
         ]
       },
       {
         cell_type: "code", execution_count: null, metadata: {}, outputs: [],
-        source: offlineNotebookCode.split("\\n").map((line) => line + "\\n")
+        source: offlineNotebookCode.split("\n").map((line) => line + "\n")
       }
     ],
     metadata: {
@@ -117,7 +117,7 @@ export async function buildColabRenderPackage(project: StudioProject): Promise<B
     "2. Select a T4 GPU, run all cells, then copy the Quick Tunnel URL and token into Motion Studio.",
     "",
     "GPU availability and session limits are controlled by Google. No paid API key or AI model is required."
-  ].join("\\n"));
+  ].join("\n"));
   return bundle.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 3 } });
 }
 
