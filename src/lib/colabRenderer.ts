@@ -103,7 +103,7 @@ export async function renderProjectOnColab(
   onProgress: (progress: ColabProgress) => void,
   signal?: AbortSignal,
 ): Promise<{ blob: Blob; job: LocalRenderJob }> {
-  const value = connection({ endpoint, token });
+  const value = connection(endpoint);
   const errors = getRenderReadiness(project).filter((item) => item.severity === "error");
   if (errors.length) throw new Error(errors.map((item) => item.message).join(" "));
   if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
