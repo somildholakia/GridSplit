@@ -1,4 +1,5 @@
 import type { StudioProject } from "./projectStore";
+import { DEFAULT_RENDER_PROFILE } from "../domain/production";
 import { exportPortableProject } from "./portableProject";
 import { getRenderReadiness, type LocalRenderJob } from "./localRenderer";
 
@@ -64,14 +65,13 @@ async function jsonRequest(
   payload?: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
-  const response = await fetch(method === "GET"
-    ? proxyUrl(value, path)
-    : "/api/render-proxy", {
+  const response = await fetch(proxyUrl(value, path), {
     method,
-    headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
-    body: method === "POST" ? JSON.stringify({
-      endpoint: value.endpoint, token: value.token, path, payload: payload ?? {},
-    }) : undefined,
+    headers: {
+      "X-GridSplit-Token": value.token,
+      ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+    },
+    body: method === "POST" ? JSON.stringify({ payload: payload ?? {} }) : undefined,
     signal,
     cache: "no-store",
   });
@@ -119,7 +119,13 @@ export async function renderProjectOnColab(
   let uploadId: string | null = null;
   let jobId: string | null = null;
   try {
-    const archive = await exportPortableProject(project);
+    // The same renderer verifies NVENC support and probes an actual one-frame
+    // encode before selecting h264_nvenc; an unavailable probe selects libx264.
+    const gpuProject: StudioProject = {
+      ...project,
+      renderProfile: { ...(project.renderProfile ?? DEFAULT_RENDER_PROFILE), encoder: "nvidia" },
+    };
+    const archive = await exportPortableProject(gpuProject);
     if (!archive.size || archive.size > 1024 * 1024 * 1024) {
       throw new Error("The portable project archive must be smaller than 1 GB.");
     }
@@ -135,19 +141,34 @@ export async function renderProjectOnColab(
       if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
       const start = index * CHUNK_SIZE;
       const chunk = archive.slice(start, Math.min(archive.size, start + CHUNK_SIZE));
-      const params = new URLSearchParams({
-        endpoint: value.endpoint,
-        token: value.token,
-        path: "/v1/uploads/" + uploadId + "/" + index,
-      });
-      const response = await fetch("/api/render-proxy?" + params.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/octet-stream" },
-        body: chunk,
-        signal,
-        cache: "no-store",
-      });
-      await readResponse(response);
+      const chunkPath = "/v1/uploads/" + uploadId + "/" + index;
+      let uploaded = false;
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 3 && !uploaded; attempt += 1) {
+        if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
+        try {
+          const response = await fetch(proxyUrl(value, chunkPath), {
+            method: "PUT",
+            headers: {
+              "X-GridSplit-Token": value.token,
+              "Content-Type": "application/octet-stream",
+            },
+            body: chunk,
+            signal,
+            cache: "no-store",
+          });
+          await readResponse(response);
+          uploaded = true;
+        } catch (error) {
+          lastError = error;
+          if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
+          if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 350 * (attempt + 1)));
+        }
+      }
+      if (!uploaded) {
+        throw new Error("Could not upload project chunk " + (index + 1) + " of " + chunkCount + ". " +
+          (lastError instanceof Error ? lastError.message : "Retry the render after checking the tunnel."));
+      }
       const percent = Math.round(((index + 1) / chunkCount) * 100);
       onProgress({
         stage: "uploading",
@@ -186,7 +207,10 @@ export async function renderProjectOnColab(
       if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
       const length = Math.min(CHUNK_SIZE, totalBytes - offset);
       const response = await fetch(proxyUrl(value, "/v1/jobs/" + current.id + "/output", { offset, length }), {
-        method: "GET", signal, cache: "no-store",
+        method: "GET",
+        headers: { "X-GridSplit-Token": value.token },
+        signal,
+        cache: "no-store",
       });
       if (response.status !== 206) {
         const error = await response.json().catch(() => null) as { error?: string } | null;
