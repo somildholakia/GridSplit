@@ -16,7 +16,8 @@ import {
 import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
-import { buildEvenImageTimeline, buildMotionPreviewSchedule, getMotionPreviewFrameState, moveSequenceItem } from "./motionTiming";
+import { buildMotionPreviewSchedule, getMotionPreviewFrameState, moveSequenceItem } from "./motionTiming";
+import { buildImageTimelineFromDurations, getTimelinePosition, normalizeMediaFilename, parseMotionSyncManifest, resolveMotionSyncManifest } from "./syncManifest";
 import { buildColabNotebook, buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
 import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
@@ -134,6 +135,8 @@ export default function MotionStudio() {
   const [audioUrl, setAudioUrl] = useState("");
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioError, setAudioError] = useState("");
+  const [syncDurationsByImageId, setSyncDurationsByImageId] = useState<Record<string, number>>({});
+  const [syncManifestName, setSyncManifestName] = useState("");
   const [rendererUrl, setRendererUrl] = useState("http://127.0.0.1:8766");
   const [rendererReady, setRendererReady] = useState(false);
   const [rendererMessage, setRendererMessage] = useState("Local renderer not checked yet.");
@@ -188,9 +191,10 @@ export default function MotionStudio() {
 
   const dimensions = useMemo(() => outputDimensions(aspectRatio, outputSize), [aspectRatio, outputSize]);
   const secondsPerImage = images.length && audioDuration > 0 ? audioDuration / images.length : 0;
-  const currentIndex = secondsPerImage > 0
-    ? Math.min(images.length - 1, Math.floor(Math.min(playhead, Math.max(0, audioDuration - 0.001)) / secondsPerImage))
-    : 0;
+  const timelineDurations = useMemo(() => images.map((item) =>
+    syncDurationsByImageId[item.asset.id] ?? secondsPerImage
+  ), [images, syncDurationsByImageId, secondsPerImage]);
+  const currentIndex = getTimelinePosition(playhead, timelineDurations)?.index ?? 0;
   const canRender = images.length > 0 && Boolean(audioFile) && audioDuration > 0
     && Number.isFinite(audioDuration) && audioDuration <= 24 * 60 * 60;
   const selectedImage = images.find((item) => item.asset.id === selectedImageId) ?? images[currentIndex];
@@ -232,7 +236,7 @@ export default function MotionStudio() {
       if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     };
-  }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength, selectedImageId, previewSelectedImage]);
+  }, [images, audioDuration, timelineDurations, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength, selectedImageId, previewSelectedImage]);
 
   function drawAtTime(
     time: number,
@@ -248,9 +252,8 @@ export default function MotionStudio() {
       return;
     }
     const safeTime = Math.max(0, Math.min(time, Math.max(0, audioDuration - 0.001)));
-    const timelineIndex = secondsPerImage > 0
-      ? Math.min(images.length - 1, Math.floor(safeTime / secondsPerImage))
-      : 0;
+    const timelinePosition = getTimelinePosition(safeTime, timelineDurations);
+    const timelineIndex = timelinePosition?.index ?? 0;
     const selectedIndex = images.findIndex((item) => item.asset.id === selectedImageId);
     const useSelectedPreview = previewSelectedImage && selectedIndex >= 0;
     const index = typeof forcedIndex === "number" ? forcedIndex : useSelectedPreview ? selectedIndex : timelineIndex;
@@ -274,9 +277,8 @@ export default function MotionStudio() {
       return;
     }
     if (!image.complete || !image.naturalWidth) return;
-    const localProgress = typeof forcedProgress === "number" ? forcedProgress : useSelectedPreview || !secondsPerImage
-      ? 0.5
-      : Math.max(0, Math.min(1, (safeTime - index * secondsPerImage) / secondsPerImage));
+    const localProgress = typeof forcedProgress === "number" ? forcedProgress : useSelectedPreview
+      ? 0.5 : timelinePosition?.progress ?? 0.5;
     const keyframes = imageItem.keyframes.length
       ? imageItem.keyframes
       : createPresetKeyframes(effect, zoomStrength);
@@ -321,7 +323,7 @@ export default function MotionStudio() {
       return;
     }
     const schedule = buildMotionPreviewSchedule(
-      images.map(() => secondsPerImage),
+      timelineDurations,
       transition,
       transitionDuration,
     );
@@ -353,7 +355,7 @@ export default function MotionStudio() {
       if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
       previewAnimationRef.current = null;
     };
-  }, [previewOpen, images, audioDuration, secondsPerImage, transition, transitionDuration, effect, zoomStrength, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
+  }, [previewOpen, images, audioDuration, timelineDurations, transition, transitionDuration, effect, zoomStrength, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
 
   useEffect(() => {
     if (!previewOpen) return;
@@ -429,6 +431,8 @@ export default function MotionStudio() {
         setNotice(error instanceof Error ? error.message : "An image could not be decoded.");
       }
     }
+    setSyncDurationsByImageId({});
+    setSyncManifestName("");
     setImages((current) => [...current, ...sortNaturally(newImages)].map((item, order) => ({ ...item, asset: { ...item.asset, order, sequenceNumber: order + 1 } })));
     if (newImages.length) {
       setSelectedImageId((current) => current || newImages[0].asset.id);
@@ -613,6 +617,42 @@ export default function MotionStudio() {
     setNotice("The selected image is using the current camera-motion preset again.");
   };
 
+  const handleSyncManifestFile = async (file?: File) => {
+    if (!file || rendering) return;
+    if (!audioFile || !audioDuration || !images.length) {
+      setNotice("Import all images and the matching soundtrack before applying synchronization JSON.");
+      return;
+    }
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+      setNotice("Synchronization JSON must be smaller than 10 MB.");
+      return;
+    }
+    try {
+      const manifest = parseMotionSyncManifest(JSON.parse(await file.text()));
+      const imagesByName = new Map(images.map((item) => [normalizeMediaFilename(item.asset.name), item]));
+      const orderedImages = manifest.images.map((entry) => imagesByName.get(normalizeMediaFilename(entry.fileName)));
+      if (orderedImages.some((item) => !item)) {
+        throw new Error("The sync manifest references images that are not loaded. Check the image filenames and try again.");
+      }
+      const validImages = orderedImages.filter((item): item is MotionImage => Boolean(item));
+      const durations = resolveMotionSyncManifest(
+        manifest, validImages.map((item) => item.asset.name), audioFile.name, audioDuration,
+      );
+      const durationMap = Object.fromEntries(validImages.map((item, index) => [item.asset.id, durations[index]]));
+      setImages(validImages.map((item, order) => ({
+        ...item,
+        asset: { ...item.asset, order, sequenceNumber: order + 1 },
+      })));
+      setSyncDurationsByImageId(durationMap);
+      setSyncManifestName(file.name);
+      setPlayhead(0);
+      setPreviewSelectedImage(false);
+      setNotice("Applied narration-aware timing to " + validImages.length + " images. Review the preview before rendering.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not import the synchronization JSON.");
+    }
+  };
+
   const handleAudioFile = (file?: File) => {
     if (!file || rendering) return;
     if (!file.type.startsWith("audio/") && !/\.(wav|mp3|m4a|aac|ogg|opus|flac)$/i.test(file.name)) {
@@ -631,6 +671,8 @@ export default function MotionStudio() {
     audioObjectUrlRef.current = url;
     setAudioFile(file);
     setAudioUrl(url);
+    setSyncDurationsByImageId({});
+    setSyncManifestName("");
     setAudioDuration(0);
     setPlayhead(0);
     setAudioError("");
@@ -658,6 +700,7 @@ export default function MotionStudio() {
       imageCacheRef.current.delete("base:" + id);
       imageCacheRef.current.delete(id);
     }
+    setSyncDurationsByImageId((current) => { const next = { ...current }; delete next[id]; return next; });
     setImages((current) => current.filter((item) => item.asset.id !== id).map((item, order) => ({ ...item, asset: { ...item.asset, order, sequenceNumber: order + 1 } })));
   };
 
@@ -716,8 +759,8 @@ export default function MotionStudio() {
     const trackId = crypto.randomUUID();
     const audioAssetId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const timelineClips: ProjectTimelineClip[] = buildEvenImageTimeline(
-      images.map((item) => item.asset.id), audioDuration, sceneId,
+    const timelineClips: ProjectTimelineClip[] = buildImageTimelineFromDurations(
+      images.map((item) => item.asset.id), audioDuration, sceneId, timelineDurations,
     );
     const mixTrack: AudioMixTrack = {
       id: trackId,
@@ -945,6 +988,8 @@ export default function MotionStudio() {
 
   const clearImages = () => {
     if (rendering) return;
+    setSyncDurationsByImageId({});
+    setSyncManifestName("");
     images.forEach((item) => {
       URL.revokeObjectURL(item.objectUrl);
       objectUrlsRef.current.delete(item.objectUrl);
@@ -1041,15 +1086,21 @@ export default function MotionStudio() {
                 onError={() => setAudioError("The browser could not read this audio file. Try WAV or MP3.")} />
               {audioError && <small className="motion-error">{audioError}</small>}
             </div>}
+            <div className="motion-sync-import">
+              <label className="motion-audio-button"><Layers3 size={14} /> Import sync JSON
+                <input type="file" accept="application/json,.json" disabled={rendering || !images.length || !audioFile || !audioDuration} onChange={(event) => { void handleSyncManifestFile(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} />
+              </label>
+              <small>{syncManifestName ? "Narration-aware timing · " + syncManifestName : "Load images and audio, then apply the Smart Sync JSON generated by Colab."}</small>
+            </div>
             <div className="motion-sequence-summary">
               <div><b>{images.length}</b><span>images loaded</span></div>
-              <div><b>{audioDuration > 0 && images.length ? formatTime(secondsPerImage) : "—"}</b><span>equal hold per image</span></div>
+              <div><b>{audioDuration > 0 && images.length ? formatTime(timelineDurations[currentIndex] ?? secondsPerImage) : "—"}</b><span>{syncManifestName ? "current synced hold" : "average hold per image"}</span></div>
               <div><b>{audioDuration > 0 ? formatTime(audioDuration) : "—"}</b><span>complete video length</span></div>
             </div>
             {images.length > 0 && audioDuration > 0 && <div className="motion-visual-timeline">
               <div className="motion-visual-timeline-heading">
                 <b>SEQUENCE TIMELINE</b>
-                <span>Drag clips to reorder · equal duration per image</span>
+                <span>{syncManifestName ? "Narration-aware timings · drag clips to reorder" : "Drag clips to reorder · evenly distributed timing"}</span>
               </div>
               <div className="motion-visual-timeline-track">
                 {images.map((item, index) => <button
@@ -1402,7 +1453,7 @@ export default function MotionStudio() {
                 const audio = videoPreviewAudioRef.current;
                 if (!audio || audio.paused || audio.ended) return;
                 const time = audio.currentTime;
-                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(timelineDurations, transition, transitionDuration));
                 if (state?.kind === "transition") {
                   drawAtTime(time, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
                   drawAtTime(time, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
@@ -1425,7 +1476,7 @@ export default function MotionStudio() {
               previewAnimationRef.current = null;
               if (videoPreviewAudioRef.current) {
                 const time = videoPreviewAudioRef.current.currentTime;
-                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(timelineDurations, transition, transitionDuration));
                 if (state?.kind === "clip") {
                   drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
                   setPreviewIncomingVisible(false);
@@ -1457,7 +1508,7 @@ export default function MotionStudio() {
                   audio.currentTime = Number(event.target.value);
                   previewUiTimeRef.current = audio.currentTime;
                   setPreviewPlaybackTime(audio.currentTime);
-                  const state = getMotionPreviewFrameState(audio.currentTime, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                  const state = getMotionPreviewFrameState(audio.currentTime, buildMotionPreviewSchedule(timelineDurations, transition, transitionDuration));
                   if (state?.kind === "clip") {
                     drawAtTime(audio.currentTime, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
                     setPreviewIncomingVisible(false);
