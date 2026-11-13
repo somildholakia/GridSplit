@@ -1394,22 +1394,36 @@ export default function MotionStudio() {
               <label>Fade in <span>{audioFadeIn.toFixed(1)}s</span><input type="range" min="0" max="5" step="0.1" disabled={rendering} value={audioFadeIn} onChange={(event) => setAudioFadeIn(Number(event.target.value))} /></label>
               <label>Fade out <span>{audioFadeOut.toFixed(1)}s</span><input type="range" min="0" max="10" step="0.1" disabled={rendering} value={audioFadeOut} onChange={(event) => setAudioFadeOut(Number(event.target.value))} /></label>
             </div>
-            <div className="motion-renderer-connection">
+            <div className="motion-colab-connection">
+              <div className="motion-panel-heading"><div><span>GOOGLE COLAB · GPU RENDERING</span><h2>Render on Google Colab</h2><p>Use your running Colab T4 session with the same portable project archive and FFmpeg pipeline.</p></div><Cloud size={19} /></div>
+              <button type="button" className="motion-secondary-button" onClick={downloadColabNotebook} disabled={rendering || colabExporting}><Cloud size={13} /> Download Colab notebook (.ipynb)</button>
+              <label className="motion-field">Colab Quick Tunnel URL
+                <input value={colabEndpoint} disabled={rendering} placeholder="https://your-tunnel.trycloudflare.com" onChange={(event) => { setColabEndpoint(event.target.value); setColabReady(false); }} />
+              </label>
+              <label className="motion-field">Secure connection token
+                <input type="password" autoComplete="off" value={colabToken} disabled={rendering} placeholder="Paste token from the running Colab notebook" onChange={(event) => { setColabToken(event.target.value); setColabReady(false); }} />
+              </label>
+              <button type="button" className="motion-secondary-button" onClick={() => void testColabConnection()} disabled={colabChecking || rendering || !colabEndpoint.trim() || !colabToken.trim()}>
+                {colabChecking ? <Loader2 size={13} /> : <RefreshCw size={13} />} {colabChecking ? "Testing connection…" : "Test Connection"}
+              </button>
+              <p className={colabReady ? "motion-renderer-status ready" : "motion-renderer-status"}>{colabReady ? <CheckCircle2 size={13} /> : <span className="motion-status-dot" />}{colabReady ? "Connected to authenticated Colab renderer." : "Not connected. Run the notebook in Colab and paste its URL and token."}</p>
+              <p className="motion-colab-caption">The renderer binds to loopback in Colab and is reachable only through the authenticated Quick Tunnel. The token is sent in request headers, not URL parameters.</p>
+            </div>
+                        <div className="motion-renderer-connection">
               <b><ShieldCheck size={14} /> LOCAL RENDERER</b>
               <input aria-label="Local renderer URL" value={rendererUrl} disabled={rendering} onChange={(event) => { setRendererUrl(event.target.value); setRendererReady(false); }} />
               <button type="button" className="motion-secondary-button" onClick={() => void checkRenderer()} disabled={checkingRenderer || rendering}><RefreshCw size={13} /> {checkingRenderer ? "Checking…" : "Check connection"}</button>
               <p className={rendererReady ? "motion-renderer-status ready" : "motion-renderer-status"}>{rendererReady ? <CheckCircle2 size={13} /> : <span className="motion-status-dot" />}{rendererMessage}</p>
               {!rendererReady && <div className="motion-install-note"><b>Start the local engine</b><code>python local-render/server.py --allow-origin http://localhost:5173</code><small>For the deployed site, allow its exact HTTPS origin instead. Keep the sidecar running while rendering.</small></div>}
             </div>
-            <button type="button" className="motion-colab-button" disabled={!canRender || colabExporting || rendering} onClick={() => void exportForColab()}>
-              {colabExporting ? <Loader2 size={14} /> : <Cloud size={14} />}
-              {colabExporting ? "Preparing Colab package…" : "Export Colab / T4 package"}
+            <button type="button" className="motion-colab-button" disabled={!canRender || !colabReady || rendering} onClick={() => void startColabRender()}>
+              {rendering && colabProgress ? <Loader2 size={14} /> : <Cloud size={14} />}
+              Render on Google Colab
             </button>
-            <p className="motion-colab-caption">Creates a ZIP containing the project, renderer and Colab notebook. GPU acceleration is used only when Google provides a compatible T4/NVENC runtime.</p>
             {rendering ? <div className="motion-job-status">
-              <div><Loader2 size={15} /><b>{job?.status === "running" ? "Rendering locally" : "Preparing render"}</b><span>{Math.round(job?.progress ?? 0)}%</span></div>
-              <div className="motion-progress"><span style={{ width: (job?.progress ?? 0) + "%" }} /></div>
-              <p>{job?.message || "Packaging source files locally…"}</p>
+              <div><Loader2 size={15} /><b>{colabProgress ? colabProgress.stage === "uploading" ? "Uploading to Colab" : colabProgress.stage === "downloading" ? "Downloading MP4" : job?.status === "queued" ? "Queued on Colab" : "Rendering on Colab" : job?.status === "running" ? "Rendering locally" : "Preparing render"}</b><span>{Math.round(colabProgress?.progress ?? job?.progress ?? 0)}%</span></div>
+              <div className="motion-progress"><span style={{ width: (colabProgress?.progress ?? job?.progress ?? 0) + "%" }} /></div>
+              <p>{colabProgress?.message || job?.message || "Preparing source files…"}</p>
               <button type="button" className="motion-cancel-button" onClick={cancelRender}><Square size={13} /> Cancel render</button>
             </div> : <button type="button" className="motion-render-button" disabled={!canRender || !rendererReady} onClick={() => void startRender()}><Clapperboard size={16} /> Render MP4 locally</button>}
             {notice && <p className="motion-notice" role="status">{notice}</p>}
