@@ -4,6 +4,7 @@ import { exportPortableProject } from "./portableProject";
 import { getRenderReadiness, type LocalRenderJob } from "./localRenderer";
 
 const CHUNK_SIZE = 3 * 1024 * 1024;
+const MAX_RENDER_OUTPUT = 4 * 1024 * 1024 * 1024;
 
 export type ColabProgress = {
   stage: "uploading" | "rendering" | "downloading";
@@ -79,8 +80,15 @@ async function jsonRequest(
 
 function asJob(input: Record<string, unknown>): LocalRenderJob {
   if (typeof input.id !== "string"
+    || !/^[a-f0-9]{32}$/.test(input.id)
     || !["queued", "running", "completed", "failed", "cancelled"].includes(String(input.status))) {
     throw new Error("The Colab renderer returned an invalid render job.");
+  }
+  const rawOutput = input.output && typeof input.output === "object" && !Array.isArray(input.output)
+    ? input.output as Record<string, unknown> : undefined;
+  if (rawOutput && (!Number.isSafeInteger(rawOutput.bytes) || Number(rawOutput.bytes) < 1
+    || Number(rawOutput.bytes) > MAX_RENDER_OUTPUT)) {
+    throw new Error("Colab reported an invalid or oversized MP4 output.");
   }
   return {
     id: input.id,
@@ -88,8 +96,7 @@ function asJob(input: Record<string, unknown>): LocalRenderJob {
     progress: typeof input.progress === "number" ? Math.max(0, Math.min(100, input.progress)) : 0,
     message: typeof input.message === "string" ? input.message : undefined,
     error: typeof input.error === "string" ? input.error : undefined,
-    output: input.output && typeof input.output === "object"
-      ? input.output as LocalRenderJob["output"] : undefined,
+    output: rawOutput ? rawOutput as LocalRenderJob["output"] : undefined,
   };
 }
 
