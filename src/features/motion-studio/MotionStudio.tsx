@@ -358,6 +358,15 @@ export default function MotionStudio() {
 
   useEffect(() => {
     if (!previewOpen) return;
+    const handlePreviewKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewOpen(false);
+    };
+    window.addEventListener("keydown", handlePreviewKeyDown);
+    return () => window.removeEventListener("keydown", handlePreviewKeyDown);
+  }, [previewOpen]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
     const audio = videoPreviewAudioRef.current;
     if (audio) {
       setPreviewSelectedImage(false);
