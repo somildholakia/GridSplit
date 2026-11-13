@@ -321,7 +321,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
         frameOffset+=frames;
       }
       const url=URL.createObjectURL(new Blob([output],{type:"audio/wav"})),anchor=document.createElement("a");
-      anchor.href=url;anchor.download=(project.title||"gridsplit-project").replace(/[^a-z0-9-_]+/gi,"-")+"-complete-audio.wav";
+      anchor.href=url;anchor.download=(project.name||"gridsplit-project").replace(/[^a-z0-9-_]+/gi,"-")+"-complete-audio.wav";
       document.body.appendChild(anchor);anchor.click();anchor.remove();window.setTimeout(()=>URL.revokeObjectURL(url),60_000);
       setMessage("Downloaded the complete soundtrack as one WAV file ("+ready.length+" audio segments).");
     }catch(error){setMessage(error instanceof Error?error.message:"Could not combine the generated audio.");}
