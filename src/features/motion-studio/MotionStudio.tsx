@@ -1330,8 +1330,8 @@ export default function MotionStudio() {
               <label className="motion-field">Colab Quick Tunnel URL
                 <input value={colabEndpoint} disabled={rendering} placeholder="https://your-tunnel.trycloudflare.com" onChange={(event) => { setColabEndpoint(event.target.value); setColabReady(false); }} />
               </label>
-              </label>
-                {colabChecking ? <Loader2 size={13} /> : <RefreshCw size={13} />} {colabChecking ? "Testing connection…" : "Test Connection"}
+              <button type="button" className="motion-secondary-button" onClick={() => void testColabConnection()} disabled={colabChecking || rendering || !colabEndpoint.trim()}>
+                {colabChecking ? <Loader2 size={13} /> : <RefreshCw size={13} />} {colabChecking ? "Testing connection…" : "Test connection"}
               </button>
             </div>
                         <div className="motion-renderer-connection">
