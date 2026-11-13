@@ -35,3 +35,16 @@ Source media remains in Google Drive. Temporary extracted copies and rendered ou
 - The free Colab T4 is not guaranteed. The renderer probes NVENC and falls back to CPU libx264 if GPU encoding is unavailable or fails.
 - The website can apply the manifest to already imported media for timeline preview; direct Drive render does not require browser media import.
 - Image matching quality depends on how well CLIP similarity represents the narration. Review the JSON and timeline before final publication.
+
+
+## Troubleshooting: faster-whisper / PyAV
+
+The notebook explicitly installs `faster-whisper==1.2.1` with `av==18.1.0`. The released faster-whisper decoder passes the `metadata_errors` keyword to `av.open`, while PyAV 19 removed that keyword. Installing an unpinned latest PyAV can therefore break both CUDA transcription and the CPU fallback.
+
+When running an older copy of the notebook, execute this cell:
+
+```python
+!pip -q install --force-reinstall --no-deps "av==18.1.0"
+```
+
+Then choose **Runtime → Restart session** and run the notebook again. The Ubuntu apt mirror source warning and unauthenticated Hugging Face Hub warning do not cause this PyAV exception; a Hugging Face token is optional and only affects download rate limits.
