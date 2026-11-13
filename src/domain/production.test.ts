@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   audibleTrackIds,
   buildGainAutomation,
+  isMotionKeyframe,
+  isRenderProfile,
+  isVideoClipEdit,
   createDefaultAudioMixTracks,
   normalizeAudioMixTracks,
   validateRenderProfile,
@@ -89,5 +92,45 @@ describe("render profile and preflight validation", () => {
       profile,
     });
     expect(issues.some((issue) => issue.code === "no-video-clips" && issue.severity === "error")).toBe(true);
+  });
+});
+
+describe("motion layer contracts", () => {
+  const keys = [
+    { time: 0, scale: 1, panX: 0.2, panY: 0.5, rotation: -2 },
+    { time: 0.5, scale: 1.2, panX: 0.5, panY: 0.4, rotation: 0 },
+    { time: 1, scale: 1.4, panX: 0.8, panY: 0.5, rotation: 2 },
+  ];
+
+  it("validates bounded transform keyframes", () => {
+    expect(keys.every(isMotionKeyframe)).toBe(true);
+    expect(isMotionKeyframe({ ...keys[1], scale: 2 })).toBe(false);
+    expect(isMotionKeyframe({ ...keys[1], panX: -0.1 })).toBe(false);
+    expect(isMotionKeyframe({ ...keys[1], rotation: 30 })).toBe(false);
+  });
+
+  it("validates per-clip particle and parallax settings", () => {
+    const edit = {
+      clipId: "clip-1", effect: "ken-burns", transitionIn: "dissolve", transitionOut: "cut",
+      transitionDurationSeconds: 0.6, zoom: 1.2, keyframes: keys,
+      particlePreset: "embers", particleIntensity: 45, parallaxAssetId: "foreground-1", parallaxAmount: 60,
+    };
+    expect(isVideoClipEdit(edit)).toBe(true);
+    expect(isVideoClipEdit({ ...edit, particleIntensity: 101 })).toBe(false);
+    expect(isVideoClipEdit({ ...edit, keyframes: [{ ...keys[0], scale: 2 }, keys[2]] })).toBe(false);
+    expect(isVideoClipEdit({ ...edit, parallaxAssetId: " " })).toBe(false);
+    expect(isVideoClipEdit({ ...edit, depthMapAssetId: "depth-map-1", depthMotionAmount: 38 })).toBe(true);
+    expect(isVideoClipEdit({ ...edit, depthMapAssetId: " " })).toBe(false);
+    expect(isVideoClipEdit({ ...edit, depthMotionAmount: 101 })).toBe(false);
+    expect(isVideoClipEdit({ ...edit, keyframes: [keys[0], keys[0], keys[2]] })).toBe(false);
+  });
+
+  it("accepts explicit software and NVIDIA render encoder preferences", () => {
+    const baseProfile: RenderProfile = {
+      width: 1920, height: 1080, fps: 30, aspectRatio: "16:9", quality: "balanced",
+    };
+    expect(isRenderProfile({ ...baseProfile, encoder: "software" })).toBe(true);
+    expect(isRenderProfile({ ...baseProfile, encoder: "nvidia" })).toBe(true);
+    expect(isRenderProfile({ ...baseProfile, encoder: "unknown" })).toBe(false);
   });
 });
