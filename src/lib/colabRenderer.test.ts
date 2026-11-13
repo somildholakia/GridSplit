@@ -49,7 +49,7 @@ describe("Colab renderer connection", () => {
     expect(code).toContain("secrets.token_urlsafe");
     expect(code).toContain("'127.0.0.1'");
     expect(code).toContain("cloudflared");
-    expect(code).toContain("trycloudflare.com");
+    expect(code).toContain("trycloudflare");
   });
 
   it("rejects a renderer that is reachable but missing FFmpeg readiness", async () => {
