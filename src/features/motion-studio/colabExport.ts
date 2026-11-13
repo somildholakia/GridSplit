@@ -267,10 +267,16 @@ export function buildDriveSyncNotebook(): Blob {
   const gatewayBase64 = encodeBase64(gatewaySource);
   const setupCode = [
     "!apt-get -qq update && apt-get -qq install -y ffmpeg curl",
-    "!pip -q install faster-whisper transformers accelerate pillow numpy",
+    "!pip -q install --upgrade \"faster-whisper==1.2.1\" \"av==18.1.0\" transformers accelerate pillow numpy",
     "from google.colab import drive, files",
     "from pathlib import Path",
     "import base64, importlib.util, json",
+    "import av",
+    "from importlib.metadata import version",
+    "av_version = tuple(int(part) for part in av.__version__.split('.')[:2])",
+    "print('faster-whisper:', version('faster-whisper'), '| PyAV:', av.__version__)",
+    "if av_version >= (19, 0):",
+    "    raise RuntimeError('Incompatible PyAV version. The notebook must install av==18.1.0. Restart the Colab runtime and run all cells again.')",
     "drive.mount('/content/drive')",
     "",
     "# Edit these three values if your Drive folder or filenames are different.",
