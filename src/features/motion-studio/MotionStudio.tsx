@@ -1492,7 +1492,15 @@ export default function MotionStudio() {
               if (videoPreviewAudioRef.current) {
                 const time = videoPreviewAudioRef.current.currentTime;
                 const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
-                if (state?.kind === "clip") drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+                if (state?.kind === "clip") {
+                  drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+                  setPreviewIncomingVisible(false);
+                } else if (state?.kind === "transition") {
+                  drawAtTime(time, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
+                  drawAtTime(time, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
+                  setPreviewTransitionProgress(state.progress);
+                  setPreviewIncomingVisible(true);
+                }
               }
             }}
             onEnded={() => setPreviewPlaybackTime(audioDuration)}
@@ -1513,7 +1521,15 @@ export default function MotionStudio() {
                   audio.currentTime = Number(event.target.value);
                   setPreviewPlaybackTime(audio.currentTime);
                   const state = getMotionPreviewFrameState(audio.currentTime, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
-                  if (state?.kind === "clip") drawAtTime(audio.currentTime, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+                  if (state?.kind === "clip") {
+                    drawAtTime(audio.currentTime, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+                    setPreviewIncomingVisible(false);
+                  } else if (state?.kind === "transition") {
+                    drawAtTime(audio.currentTime, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
+                    drawAtTime(audio.currentTime, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
+                    setPreviewTransitionProgress(state.progress);
+                    setPreviewIncomingVisible(true);
+                  }
                 }
               }}
             />
