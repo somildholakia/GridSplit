@@ -891,6 +891,7 @@ export default function MotionStudio() {
     setColabReady(false);
     setColabProgress(null);
     try {
+      const message = await checkColabRenderer(colabEndpoint);
       setColabReady(true);
       setNotice(message);
     } catch (error) {
