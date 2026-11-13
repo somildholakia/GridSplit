@@ -40,6 +40,7 @@ export function parseMotionSyncManifest(value: unknown): MotionSyncManifest {
     || !Number.isFinite(audioInfo.durationSeconds) || audioInfo.durationSeconds <= 0) {
     throw new Error("The synchronization JSON contains invalid audio metadata.");
   }
+  const audioDurationSeconds = audioInfo.durationSeconds;
   if (!Array.isArray(input.images) || input.images.length === 0 || input.images.length > 10000) {
     throw new Error("The synchronization JSON must contain between 1 and 10,000 image records.");
   }
@@ -59,7 +60,7 @@ export function parseMotionSyncManifest(value: unknown): MotionSyncManifest {
     const endSeconds = item.endSeconds;
     if (typeof startSeconds !== "number" || typeof endSeconds !== "number"
       || !Number.isFinite(startSeconds) || !Number.isFinite(endSeconds)
-      || startSeconds < 0 || endSeconds <= startSeconds || endSeconds > audioInfo.durationSeconds + 0.5) {
+      || startSeconds < 0 || endSeconds <= startSeconds || endSeconds > audioDurationSeconds + 0.5) {
       throw new Error("Image timing is invalid for " + item.fileName + ".");
     }
     const confidence = typeof item.confidence === "number" && Number.isFinite(item.confidence)
@@ -77,7 +78,7 @@ export function parseMotionSyncManifest(value: unknown): MotionSyncManifest {
   return {
     format: "gridsplit-motion-sync",
     version: 1,
-    audio: { fileName: audioInfo.fileName, durationSeconds: audioInfo.durationSeconds },
+    audio: { fileName: audioInfo.fileName, durationSeconds: audioDurationSeconds },
     ...(input.analysis && typeof input.analysis === "object" && !Array.isArray(input.analysis)
       ? { analysis: input.analysis as MotionSyncManifest["analysis"] } : {}),
     images,
