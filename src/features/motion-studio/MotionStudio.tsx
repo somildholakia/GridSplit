@@ -16,7 +16,7 @@ import {
 import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
-import { buildEvenImageTimeline, moveSequenceItem } from "./motionTiming";
+import { buildEvenImageTimeline, buildMotionPreviewSchedule, getMotionPreviewFrameState, moveSequenceItem } from "./motionTiming";
 import { buildColabNotebook, downloadMotionPackage } from "./colabExport";
 import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
@@ -277,6 +277,8 @@ export default function MotionStudio() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewMuted, setPreviewMuted] = useState(false);
   const [previewTime, setPreviewTime] = useState(0);
+  const [previewTransitionProgress, setPreviewTransitionProgress] = useState(0);
+  const [previewIncomingVisible, setPreviewIncomingVisible] = useState(false);
   const [transition, setTransition] = useState<TransitionKind>("dissolve");
   const [transitionDuration, setTransitionDuration] = useState(0.6);
   const [zoomStrength, setZoomStrength] = useState(1.16);
@@ -295,6 +297,7 @@ export default function MotionStudio() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoPreviewIncomingCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const previewAnimationRef = useRef<number | null>(null);
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -351,7 +354,12 @@ export default function MotionStudio() {
     };
   }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength, selectedImageId, previewSelectedImage]);
 
-  function drawAtTime(time: number, targetCanvas: HTMLCanvasElement | null = canvasRef.current): void {
+  function drawAtTime(
+    time: number,
+    targetCanvas: HTMLCanvasElement | null = canvasRef.current,
+    forcedIndex?: number,
+    forcedProgress?: number,
+  ): void {
     const canvas = targetCanvas;
     if (!canvas) return;
     if (!images.length) {
@@ -365,7 +373,7 @@ export default function MotionStudio() {
       : 0;
     const selectedIndex = images.findIndex((item) => item.asset.id === selectedImageId);
     const useSelectedPreview = previewSelectedImage && selectedIndex >= 0;
-    const index = useSelectedPreview ? selectedIndex : timelineIndex;
+    const index = typeof forcedIndex === "number" ? forcedIndex : useSelectedPreview ? selectedIndex : timelineIndex;
     const imageItem = images[index];
     if (!imageItem) return;
     const baseKey = "base:" + imageItem.asset.id;
@@ -389,7 +397,7 @@ export default function MotionStudio() {
       return;
     }
     if (!image.complete || !image.naturalWidth) return;
-    const localProgress = useSelectedPreview || !secondsPerImage
+    const localProgress = typeof forcedProgress === "number" ? forcedProgress : useSelectedPreview || !secondsPerImage
       ? 0.5
       : Math.max(0, Math.min(1, (safeTime - index * secondsPerImage) / secondsPerImage));
     const keyframes = imageItem.keyframes.length
@@ -435,11 +443,26 @@ export default function MotionStudio() {
       return;
     }
     const audio = videoPreviewAudioRef.current;
+    const schedule = buildMotionPreviewSchedule(
+      images.map(() => secondsPerImage),
+      transition,
+      transitionDuration,
+    );
     const draw = () => {
       const current = videoPreviewAudioRef.current;
       if (!current) return;
       const time = Math.min(current.currentTime, Math.max(0, audioDuration - 0.001));
-      drawAtTime(time, videoPreviewCanvasRef.current);
+      const state = getMotionPreviewFrameState(time, schedule);
+      if (state?.kind === "transition") {
+        drawAtTime(time, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
+        drawAtTime(time, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
+        setPreviewTransitionProgress(state.progress);
+        setPreviewIncomingVisible(true);
+      } else if (state?.kind === "clip") {
+        drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+        setPreviewIncomingVisible(false);
+        setPreviewTransitionProgress(0);
+      }
       setPreviewTime(time);
       if (!current.paused && !current.ended) {
         previewAnimationRef.current = requestAnimationFrame(draw);
@@ -450,12 +473,13 @@ export default function MotionStudio() {
       if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
       previewAnimationRef.current = null;
     };
-  }, [previewOpen, images, audioDuration, effect, zoomStrength, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
+  }, [previewOpen, images, audioDuration, secondsPerImage, transition, transitionDuration, effect, zoomStrength, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
 
   useEffect(() => {
     if (!previewOpen) return;
     const audio = videoPreviewAudioRef.current;
     if (audio) {
+      setPreviewSelectedImage(false);
       audio.pause();
       audio.currentTime = 0;
       setPreviewTime(0);
@@ -1189,6 +1213,7 @@ export default function MotionStudio() {
                 {!images.length && <div className="motion-preview-empty"><Clapperboard size={25} /><b>Your animated preview appears here</b><span>Import images and audio to preview the sequence.</span></div>}
               </div>
               <div className="motion-preview-footer"><span>{previewImage ? "FRAME " + (currentIndex + 1) + " / " + images.length + " · " + previewImage.asset.name : "NO FRAME SELECTED"}</span><span>{previewTime}</span></div>
+              <button type="button" className="motion-secondary-button motion-open-preview" disabled={!canRender} onClick={() => setPreviewOpen(true)}><Maximize2 size={14} /> Open Video Preview</button>
             </div>
           </section>
 
@@ -1396,6 +1421,83 @@ export default function MotionStudio() {
           </section>
         </aside>
       </div>
+      {previewOpen && <div className="motion-video-modal" role="dialog" aria-modal="true" aria-label="Fullscreen video preview" onKeyDown={(event) => { if (event.key === "Escape") setPreviewOpen(false); }}>
+        <div className="motion-video-modal-content">
+          <div className="motion-video-stage" style={{ aspectRatio: dimensions.width + " / " + dimensions.height }}>
+            <canvas
+              ref={videoPreviewCanvasRef}
+              width={dimensions.width > dimensions.height ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
+              height={dimensions.height > dimensions.width ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
+              className="motion-video-preview-layer"
+            />
+            <canvas
+              ref={videoPreviewIncomingCanvasRef}
+              width={dimensions.width > dimensions.height ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
+              height={dimensions.height > dimensions.width ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
+              className="motion-video-preview-layer motion-video-preview-incoming"
+              style={{ opacity: previewIncomingVisible ? previewTransitionProgress : 0 }}
+            />
+          </div>
+          <audio
+            ref={videoPreviewAudioRef}
+            src={audioUrl || undefined}
+            preload="auto"
+            muted={previewMuted}
+            onPlay={() => {
+              if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+              previewAnimationRef.current = requestAnimationFrame(() => {
+                const audio = videoPreviewAudioRef.current;
+                if (audio) drawAtTime(audio.currentTime, videoPreviewCanvasRef.current);
+              });
+            }}
+            onPause={() => {
+              if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+              previewAnimationRef.current = null;
+              if (videoPreviewAudioRef.current) {
+                const time = videoPreviewAudioRef.current.currentTime;
+                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                if (state?.kind === "clip") drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+              }
+            }}
+            onEnded={() => setPreviewTime(audioDuration)}
+            onTimeUpdate={(event) => setPreviewTime(event.currentTarget.currentTime)}
+          />
+          <div className="motion-video-controls">
+            <div className="motion-video-time"><span>{formatTime(previewTime)}</span><span>{formatTime(audioDuration)}</span></div>
+            <input
+              aria-label="Seek video preview"
+              type="range"
+              min="0"
+              max={Math.max(0, audioDuration)}
+              step="0.01"
+              value={Math.min(previewTime, audioDuration)}
+              onChange={(event) => {
+                const audio = videoPreviewAudioRef.current;
+                if (audio) {
+                  audio.currentTime = Number(event.target.value);
+                  setPreviewTime(audio.currentTime);
+                  const state = getMotionPreviewFrameState(audio.currentTime, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                  if (state?.kind === "clip") drawAtTime(audio.currentTime, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+                }
+              }}
+            />
+            <div className="motion-video-control-buttons">
+              <button type="button" aria-label={videoPreviewAudioRef.current?.paused ? "Play" : "Pause"} onClick={() => {
+                const audio = videoPreviewAudioRef.current;
+                if (!audio) return;
+                if (audio.paused) void audio.play();
+                else audio.pause();
+              }}>{videoPreviewAudioRef.current?.paused ? <Play size={18} /> : <Pause size={18} />}</button>
+              <button type="button" aria-label="Restart preview" onClick={() => {
+                const audio = videoPreviewAudioRef.current;
+                if (audio) { audio.currentTime = 0; setPreviewTime(0); void audio.play(); }
+              }}><RefreshCw size={17} /></button>
+              <button type="button" aria-label={previewMuted ? "Unmute" : "Mute"} onClick={() => setPreviewMuted((value) => !value)}>{previewMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
+              <button type="button" aria-label="Close video preview" onClick={() => setPreviewOpen(false)}><X size={19} /></button>
+            </div>
+          </div>
+        </div>
+      </div>}
     </section>
   );
 }
