@@ -109,29 +109,23 @@ export function resolveMotionSyncManifest(
     throw new Error("One or more image filenames in the synchronization JSON are missing from Motion Studio.");
   }
   let cursor = 0;
-  const tolerance = 0.08;
-  return manifest.images.map((item, index) => {
-    if (Math.abs(item.startSeconds - cursor) > tolerance) {
+  for (const item of manifest.images) {
+    if (Math.abs(item.startSeconds - cursor) > 0.08) {
       throw new Error("The synchronization timeline has a gap or overlap near " + item.fileName + ".");
     }
     cursor = item.endSeconds;
-    const duration = item.endSeconds - item.startSeconds;
-    if (duration < 0.2) throw new Error("Image holds must be at least 0.2 seconds.");
-    return duration;
-  }).map((duration, index) => {
-    const match = byName.get(normalizeMediaFilename(imageNames[index]));
-    return match ? match.endSeconds - match.startSeconds : duration;
-  }).reduce((ordered, _duration, index) => {
-    const match = byName.get(normalizeMediaFilename(imageNames[index]));
-    ordered.push(match ? match.endSeconds - match.startSeconds : 0);
-    return ordered;
-  }, [] as number[]).length === imageNames.length
-    ? imageNames.map((name) => {
-      const item = byName.get(normalizeMediaFilename(name));
-      if (!item) throw new Error("Missing image timing for " + name + ".");
-      return item.endSeconds - item.startSeconds;
-    })
-    : [];
+    if (item.endSeconds - item.startSeconds < 0.2) {
+      throw new Error("Image holds must be at least 0.2 seconds.");
+    }
+  }
+  if (Math.abs(cursor - actualAudioDuration) > Math.max(0.5, actualAudioDuration * 0.0005)) {
+    throw new Error("The synchronization timeline does not cover the complete soundtrack.");
+  }
+  return imageNames.map((name) => {
+    const item = byName.get(normalizeMediaFilename(name));
+    if (!item) throw new Error("Missing image timing for " + name + ".");
+    return item.endSeconds - item.startSeconds;
+  });
 }
 
 export function buildImageTimelineFromDurations(
