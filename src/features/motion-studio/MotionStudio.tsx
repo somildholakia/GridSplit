@@ -1435,7 +1435,7 @@ export default function MotionStudio() {
             <div className="motion-colab-connection">
               <div className="motion-panel-heading"><div><span>GOOGLE COLAB · GPU RENDERING</span><h2>Render on Google Colab</h2><p>Use your running Colab T4 session with the same portable project archive and FFmpeg pipeline.</p></div><Cloud size={19} /></div>
               <button type="button" className="motion-secondary-button" onClick={downloadColabNotebook} disabled={rendering}><Cloud size={13} /> Download Colab notebook (.ipynb)</button>
-              <button type="button" className="motion-secondary-button" onClick={downloadDriveSyncNotebook} disabled={rendering}><Sparkles size={13} /> Download Drive Smart Sync analyzer (.ipynb)</button>
+              <button type="button" className="motion-secondary-button" onClick={downloadDriveSyncNotebook} disabled={rendering}><Sparkles size={13} /> Download Smart Sync + Live Colab notebook (.ipynb)</button>
               <div className="motion-drive-render-fields">
                 <b><Layers3 size={14} /> DIRECT DRIVE RENDER · NO 1.28 GB BROWSER UPLOAD</b>
                 <label className="motion-field">Mounted Google Drive folder path
