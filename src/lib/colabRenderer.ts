@@ -58,7 +58,7 @@ async function jsonRequest(
     headers: {
       ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
     },
-    body: method === "POST" ? JSON.stringify({ payload: payload ?? {} }) : undefined,
+    body: method === "POST" ? JSON.stringify(payload ?? {}) : undefined,
     signal,
     cache: "no-store",
   });
