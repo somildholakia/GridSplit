@@ -161,7 +161,7 @@ class Handler(BaseHTTPRequestHandler):
                 "ready": bool(shutil.which("ffmpeg") and shutil.which("ffprobe")),
                 "ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe"),
                 "gpuAvailable": gpu, "gpuName": gpu_name,
-                "message": "Authenticated Colab FFmpeg renderer is ready.",
+                "message": "Direct Colab FFmpeg renderer is ready.",
             })
             return
         if len(parts) == 3 and parts[:2] == ["v1", "jobs"]:
