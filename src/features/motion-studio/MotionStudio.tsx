@@ -1340,7 +1340,13 @@ export default function MotionStudio() {
               width={dimensions.width > dimensions.height ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
               height={dimensions.height > dimensions.width ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
               className="motion-video-preview-layer motion-video-preview-incoming"
-              style={{ opacity: previewIncomingVisible ? previewTransitionProgress : 0 }}
+              style={previewIncomingVisible
+                ? transition === "wipe-left"
+                  ? { opacity: 1, clipPath: "inset(0 0 0 " + (100 - previewTransitionProgress * 100) + "%)" }
+                  : transition === "wipe-right"
+                    ? { opacity: 1, clipPath: "inset(0 " + (100 - previewTransitionProgress * 100) + "% 0 0)" }
+                    : { opacity: previewTransitionProgress }
+                : { opacity: 0 }}
             />
           </div>
           <audio
