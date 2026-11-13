@@ -118,8 +118,8 @@ export async function renderProjectOnColab(
       renderProfile: { ...(project.renderProfile ?? DEFAULT_RENDER_PROFILE), encoder: "nvidia" },
     };
     const archive = await exportPortableProject(gpuProject);
-    if (!archive.size || archive.size > 1024 * 1024 * 1024) {
-      throw new Error("The portable project archive must be smaller than 1 GB.");
+    if (!archive.size || archive.size > 3 * 1024 * 1024 * 1024) {
+      throw new Error("The portable project archive must be smaller than 3 GB.");
     }
     const chunkCount = Math.ceil(archive.size / CHUNK_SIZE);
     const session = await jsonRequest(value, "POST", "/v1/uploads", {
