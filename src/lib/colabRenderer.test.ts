@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { checkColabRenderer } from "./colabRenderer";
+import { buildColabNotebook } from "../features/motion-studio/colabExport";
 
 describe("Colab renderer connection", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -34,6 +35,21 @@ describe("Colab renderer connection", () => {
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     await expect(checkColabRenderer("https://abc.trycloudflare.com", "b".repeat(48)))
       .resolves.toContain("CPU encoding");
+  });
+
+  it("generates a runnable notebook with authenticated loopback rendering and Quick Tunnel setup", async () => {
+    const notebook = JSON.parse(await buildColabNotebook().text()) as {
+      cells: Array<{ cell_type: string; source: string[] }>;
+    };
+    expect(notebook.cells).toHaveLength(3);
+    const code = notebook.cells.filter((cell) => cell.cell_type === "code")
+      .map((cell) => cell.source.join("")).join("\\n");
+    expect(code).toContain("ffmpeg");
+    expect(code).toContain("nvidia-smi");
+    expect(code).toContain("secrets.token_urlsafe");
+    expect(code).toContain("'127.0.0.1'");
+    expect(code).toContain("cloudflared");
+    expect(code).toContain("trycloudflare.com");
   });
 
   it("rejects a renderer that is reachable but missing FFmpeg readiness", async () => {
