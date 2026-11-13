@@ -149,7 +149,6 @@ export default function MotionStudio() {
   const [parallaxStrength, setParallaxStrength] = useState(45);
   const [depthMapWorking, setDepthMapWorking] = useState(false);
   const [colabEndpoint, setColabEndpoint] = useState("");
-  const [colabToken, setColabToken] = useState("");
   const [colabReady, setColabReady] = useState(false);
   const [colabExporting, setColabExporting] = useState(false);
   const [colabChecking, setColabChecking] = useState(false);
@@ -893,7 +892,7 @@ export default function MotionStudio() {
     setColabReady(false);
     setColabProgress(null);
     try {
-      const message = await checkColabRenderer(colabEndpoint, colabToken);
+      const message = await checkColabRenderer(colabEndpoint);
       setColabReady(true);
       setNotice(message);
     } catch (error) {
@@ -908,14 +907,15 @@ export default function MotionStudio() {
     setRendering(true);
     setJob(null);
     setColabProgress({ stage: "uploading", progress: 0, message: "Preparing the portable project archive…" });
-    setNotice("Preparing the project for authenticated upload to Google Colab…");
+    setNotice("Preparing the project for direct upload to Google Colab…");
     const controller = new AbortController();
     renderControllerRef.current = controller;
     let temporaryProject: StudioProject | null = null;
     try {
       temporaryProject = await buildRenderProject();
       const result = await renderProjectOnColab(
-        temporaryProject, colabEndpoint, colabToken,
+        temporaryProject,
+        colabEndpoint,
         (progress) => {
           setColabProgress(progress);
           if (progress.job) setJob(progress.job);
@@ -1330,14 +1330,9 @@ export default function MotionStudio() {
               <label className="motion-field">Colab Quick Tunnel URL
                 <input value={colabEndpoint} disabled={rendering} placeholder="https://your-tunnel.trycloudflare.com" onChange={(event) => { setColabEndpoint(event.target.value); setColabReady(false); }} />
               </label>
-              <label className="motion-field">Secure connection token
-                <input type="password" autoComplete="off" value={colabToken} disabled={rendering} placeholder="Paste token from the running Colab notebook" onChange={(event) => { setColabToken(event.target.value); setColabReady(false); }} />
               </label>
-              <button type="button" className="motion-secondary-button" onClick={() => void testColabConnection()} disabled={colabChecking || rendering || !colabEndpoint.trim() || !colabToken.trim()}>
                 {colabChecking ? <Loader2 size={13} /> : <RefreshCw size={13} />} {colabChecking ? "Testing connection…" : "Test Connection"}
               </button>
-              <p className={colabReady ? "motion-renderer-status ready" : "motion-renderer-status"}>{colabReady ? <CheckCircle2 size={13} /> : <span className="motion-status-dot" />}{colabReady ? "Connected to authenticated Colab renderer." : "Not connected. Run the notebook in Colab and paste its URL and token."}</p>
-              <p className="motion-colab-caption">The renderer binds to loopback in Colab and is reachable only through the authenticated Quick Tunnel. The token is sent in request headers, not URL parameters.</p>
             </div>
                         <div className="motion-renderer-connection">
               <b><ShieldCheck size={14} /> LOCAL RENDERER</b>
