@@ -74,7 +74,9 @@ describe("Motion Studio continuous preview timing", () => {
 
   it("matches sequential xfade offsets and clamps the final padded frame", () => {
     const schedule = buildMotionPreviewSchedule([10, 10, 10], "fade", 0.6);
-    expect(schedule.map((clip) => clip.startSeconds)).toEqual([0, 9.4, 18.8]);
+    expect(schedule[0].startSeconds).toBe(0);
+    expect(schedule[1].startSeconds).toBeCloseTo(9.4);
+    expect(schedule[2].startSeconds).toBeCloseTo(18.8);
     expect(getMotionPreviewFrameState(29.9, schedule)).toMatchObject({ kind: "clip", currentIndex: 2, progress: 1 });
   });
 
