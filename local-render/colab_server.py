@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 import shutil
 import subprocess
 import tempfile
@@ -101,6 +102,290 @@ def make_job(archive: Path, project_id: str | None) -> dict:
     except Exception:
         shutil.rmtree(directory, ignore_errors=True)
         raise
+
+
+def drive_source_path(folder_value: str, filename_value: str) -> tuple[Path, Path]:
+    drive_root = Path("/content/drive").resolve()
+    folder = Path(folder_value).expanduser().resolve()
+    if folder == drive_root or drive_root not in folder.parents or not folder.is_dir():
+        raise ValueError("Choose a mounted Google Drive folder under /content/drive.")
+    relative = renderer.safe_path(filename_value)
+    source = folder.joinpath(*relative.parts).resolve()
+    if folder not in source.parents or not source.is_file():
+        raise FileNotFoundError("Could not find " + filename_value + " in the selected Drive folder.")
+    return folder, source
+
+
+def prepare_drive_job(job_id: str, payload: dict) -> None:
+    """Build a normal GridSplit render project from media that stays in mounted Drive."""
+    with renderer.JOBS_LOCK:
+        job = renderer.JOBS.get(job_id)
+        if not job or job["cancel"].is_set():
+            return
+        root = Path(job["directory"])
+        job["message"] = "Checking Google Drive source files and synchronization manifest."
+        job["progress"] = 1
+
+    try:
+        folder_value = payload.get("folderPath")
+        archive_name = payload.get("archiveName")
+        audio_name = payload.get("audioName")
+        sync = payload.get("syncManifest")
+        settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+        if not all(isinstance(value, str) and value.strip() for value in (folder_value, archive_name, audio_name)):
+            raise ValueError("Drive folder path, image ZIP filename, and audio filename are required.")
+        if not isinstance(sync, dict) or sync.get("format") != "gridsplit-motion-sync" or sync.get("version") != 1:
+            raise ValueError("Import a valid GridSplit Smart Sync JSON manifest first.")
+
+        folder, archive_path = drive_source_path(folder_value, archive_name)
+        _, audio_path = drive_source_path(folder_value, audio_name)
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
+            capture_output=True, text=True, check=True, timeout=60,
+        )
+        audio_duration = float(probe.stdout.strip())
+        if not (0 < audio_duration <= 24 * 60 * 60):
+            raise ValueError("The selected audio has an invalid duration.")
+        audio_meta = sync.get("audio")
+        if not isinstance(audio_meta, dict) or audio_meta.get("fileName") != audio_path.name:
+            raise ValueError("The synchronization JSON was generated for a different audio filename.")
+        try:
+            declared_duration = float(audio_meta.get("durationSeconds", 0))
+        except (TypeError, ValueError):
+            raise ValueError("The synchronization JSON has invalid audio duration metadata.")
+        if abs(declared_duration - audio_duration) > max(0.5, audio_duration * 0.0005):
+            raise ValueError("The Drive audio duration does not match the synchronization JSON. Re-run Smart Sync.")
+
+        sync_images = sync.get("images")
+        if not isinstance(sync_images, list) or not sync_images or len(sync_images) > renderer.MAX_ENTRIES:
+            raise ValueError("The synchronization JSON contains an invalid image list.")
+
+        root.mkdir(parents=True, exist_ok=True)
+        image_dir = root / "media" / "images"
+        audio_dir = root / "media" / "mix-audio"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        audio_dir.mkdir(parents=True, exist_ok=True)
+
+        project_id = "drive-" + uuid.uuid4().hex
+        scene_id = uuid.uuid4().hex
+        track_id = uuid.uuid4().hex
+        audio_asset_id = uuid.uuid4().hex
+        files: list[dict] = []
+        image_assets: list[dict] = []
+        timeline_clips: list[dict] = []
+        video_edits: list[dict] = []
+        seen_names: set[str] = set()
+        cursor = 0.0
+        max_expanded = 0
+
+        with zipfile.ZipFile(archive_path) as bundle:
+            image_infos: dict[str, zipfile.ZipInfo] = {}
+            for info in bundle.infolist():
+                if info.is_dir():
+                    continue
+                try:
+                    relative = renderer.safe_path(info.filename)
+                except ValueError:
+                    raise ValueError("The image ZIP contains an unsafe path.")
+                suffix = relative.suffix.lower()
+                if suffix in (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"):
+                    image_infos[relative.as_posix()] = info
+            if len(image_infos) != len(sync_images):
+                raise ValueError("Image count mismatch: ZIP contains " + str(len(image_infos))
+                                 + " images, while the sync JSON contains " + str(len(sync_images)) + ".")
+            if len(image_infos) > 10000:
+                raise ValueError("The source ZIP contains more than 10,000 images.")
+
+            for index, item in enumerate(sync_images):
+                with renderer.JOBS_LOCK:
+                    current = renderer.JOBS.get(job_id)
+                    if not current or current["cancel"].is_set():
+                        raise RuntimeError("Drive render was cancelled while preparing source files.")
+                    current["progress"] = min(12, 1 + int(11 * index / max(1, len(sync_images))))
+                    current["message"] = "Reading Drive image " + str(index + 1) + " of " + str(len(sync_images)) + "."
+
+                if not isinstance(item, dict) or not isinstance(item.get("fileName"), str):
+                    raise ValueError("A synchronization image record is invalid.")
+                file_name = renderer.safe_path(item["fileName"]).as_posix()
+                if file_name in seen_names or file_name not in image_infos:
+                    raise ValueError("Missing or duplicate image in the ZIP: " + file_name)
+                seen_names.add(file_name)
+                info = image_infos[file_name]
+                max_expanded += info.file_size
+                if max_expanded > 8 * 1024 * 1024 * 1024:
+                    raise ValueError("Extracted image media exceeds the 8 GB safety limit.")
+                try:
+                    start = float(item["startSeconds"])
+                    end = float(item["endSeconds"])
+                except (KeyError, TypeError, ValueError):
+                    raise ValueError("Invalid timing for image " + file_name)
+                if abs(start - cursor) > 0.08 or end <= start or end - start < 0.2:
+                    raise ValueError("The sync timeline contains a gap, overlap, or invalid hold near " + file_name)
+                if end > audio_duration + 0.5:
+                    raise ValueError("Image timing extends beyond the audio duration.")
+                cursor = end
+
+                asset_id = uuid.uuid4().hex
+                suffix = Path(file_name).suffix.lower()
+                target_name = asset_id + suffix
+                relative_target = "media/images/" + target_name
+                target = root / relative_target
+                digest = __import__("hashlib").sha256()
+                with bundle.open(info) as source, target.open("wb") as output:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        output.write(chunk)
+                        digest.update(chunk)
+
+                mime_type = mimetypes.guess_type(file_name)[0] or "image/jpeg"
+                width, height = 1, 1
+                try:
+                    from PIL import Image
+                    with Image.open(target) as image_file:
+                        width, height = image_file.size
+                except Exception:
+                    pass
+
+                image_assets.append({
+                    "id": asset_id, "name": Path(file_name).name,
+                    "relativePath": "motion-studio/" + file_name,
+                    "mimeType": mime_type, "bytes": info.file_size,
+                    "sequenceNumber": index + 1, "order": index,
+                    "width": width, "height": height, "fingerprint": digest.hexdigest(),
+                })
+                files.append({
+                    "path": relative_target, "sizeBytes": info.file_size,
+                    "sha256": digest.hexdigest(), "assetId": asset_id, "kind": "image",
+                })
+                clip_id = uuid.uuid4().hex
+                timeline_clips.append({
+                    "id": clip_id, "track": "images", "sceneId": scene_id,
+                    "assetId": asset_id, "startSeconds": start,
+                    "durationSeconds": end - start, "order": index,
+                })
+                transition = settings.get("transition", "dissolve")
+                if transition not in ("cut", "dissolve", "fade", "wipe-left", "wipe-right"):
+                    transition = "dissolve"
+                effect = settings.get("effect", "ken-burns")
+                if effect not in ("ken-burns", "zoom-in", "zoom-out", "pan-left", "pan-right", "none"):
+                    effect = "ken-burns"
+                video_edits.append({
+                    "clipId": clip_id, "effect": effect,
+                    "transitionIn": "cut" if index == 0 else transition,
+                    "transitionOut": transition,
+                    "transitionDurationSeconds": 0 if transition == "cut" else min(5.0, max(0.05, float(settings.get("transitionDurationSeconds", 0.6)))),
+                    "zoom": min(1.5, max(1.0, float(settings.get("zoom", 1.16)))),
+                })
+
+        if seen_names != set(image_infos):
+            raise ValueError("The sync JSON does not reference every image in the ZIP.")
+        if abs(cursor - audio_duration) > max(0.5, audio_duration * 0.0005):
+            raise ValueError("The synchronization timeline does not cover the complete audio. Re-run Smart Sync.")
+
+        audio_size = audio_path.stat().st_size
+        if audio_size <= 0 or audio_size > 3 * 1024 * 1024 * 1024:
+            raise ValueError("The soundtrack must be smaller than 3 GB.")
+        audio_target_name = audio_asset_id + audio_path.suffix.lower()
+        audio_relative = "media/mix-audio/" + audio_target_name
+        audio_target = root / audio_relative
+        shutil.copyfile(audio_path, audio_target)
+        audio_sha = renderer.sha256_file(audio_target)
+        audio_mime = mimetypes.guess_type(audio_path.name)[0] or "audio/wav"
+        files.append({
+            "path": audio_relative, "sizeBytes": audio_size,
+            "sha256": audio_sha, "assetId": audio_asset_id, "kind": "mix-audio",
+        })
+
+        try:
+            width = int(settings.get("width", 1920))
+            height = int(settings.get("height", 1080))
+            fps = float(settings.get("fps", 30))
+        except (TypeError, ValueError):
+            raise ValueError("Invalid render dimensions or frame rate.")
+        ratio = str(settings.get("aspectRatio", "16:9"))
+        if not (320 <= width <= 3840 and 320 <= height <= 3840 and width % 2 == 0 and height % 2 == 0):
+            raise ValueError("Output dimensions must be even and between 320 and 3840 pixels.")
+        if fps not in (23.976, 24, 25, 29.97, 30, 50, 59.94, 60):
+            raise ValueError("Unsupported frame rate.")
+        if ratio not in ("16:9", "9:16", "1:1"):
+            raise ValueError("Unsupported output aspect ratio.")
+
+        project = {
+            "id": project_id,
+            "name": "GridSplit Drive Smart Sync",
+            "source": "",
+            "scenes": [{
+                "id": scene_id, "title": "Drive Smart Sync", "chapter": "Motion Studio",
+                "blocks": [], "sourceText": "",
+            }],
+            "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "imageAssets": image_assets,
+            "imageMappings": [{"sceneId": scene_id, "imageIds": [item["id"] for item in image_assets]}],
+            "timelineClips": timeline_clips,
+            "audioMixTracks": [{
+                "id": track_id, "kind": "music", "name": "Drive soundtrack",
+                "volume": 1, "muted": False, "solo": False,
+                "fadeInSeconds": 0.5, "fadeOutSeconds": 1.5,
+            }],
+            "mixAssets": [{
+                "id": audio_asset_id, "name": audio_path.name, "mimeType": audio_mime,
+                "bytes": audio_size, "kind": "music", "trackId": track_id,
+                "startSeconds": 0, "durationSeconds": audio_duration, "order": 0,
+            }],
+            "videoClipEdits": video_edits,
+            "renderProfile": {
+                "width": width, "height": height, "fps": fps,
+                "aspectRatio": ratio, "quality": "balanced", "encoder": "nvidia",
+            },
+        }
+        manifest = {
+            "format": "gridsplit-studio-project", "version": 1,
+            "projectId": project_id, "files": files,
+        }
+
+        with renderer.JOBS_LOCK:
+            current = renderer.JOBS.get(job_id)
+            if not current or current["cancel"].is_set():
+                raise RuntimeError("Drive render was cancelled before FFmpeg started.")
+            current["project"] = project
+            current["manifest"] = manifest
+            current["progress"] = 14
+            current["message"] = "Drive media is prepared. Starting the T4 FFmpeg renderer."
+        threading.Thread(target=renderer.execute_job, args=(job_id,), daemon=True).start()
+    except Exception as error:
+        with renderer.JOBS_LOCK:
+            current = renderer.JOBS.get(job_id)
+            if current:
+                current["status"] = "cancelled" if current["cancel"].is_set() else "failed"
+                current["error"] = str(error)
+                current["message"] = str(error)
+                current["finishedAt"] = time.time()
+        shutil.rmtree(root.parent, ignore_errors=True)
+
+
+def create_drive_job(payload: dict) -> dict:
+    if not Path("/content/drive").is_dir():
+        raise RuntimeError("Google Drive is not mounted in this Colab runtime. Run the Smart Sync + Live Renderer notebook first.")
+    with renderer.JOBS_LOCK:
+        renderer.prune_finished_jobs()
+        active = sum(item.get("status") in ("queued", "running") for item in renderer.JOBS.values())
+        if active >= renderer.MAX_ACTIVE_JOBS:
+            raise RuntimeError("The Colab renderer is already running two jobs.")
+        job_id = uuid.uuid4().hex
+        parent = Path(tempfile.mkdtemp(prefix="gridsplit-render-drive-"))
+        project_root = parent / "project"
+        project_root.mkdir(parents=True)
+        job = {
+            "id": job_id, "status": "queued", "progress": 0,
+            "message": "Queued. Colab will read source media directly from Drive.",
+            "error": None, "output": None,
+            "directory": str(project_root), "manifest": {}, "project": {},
+            "cancel": threading.Event(), "process": None, "createdAt": time.time(),
+        }
+        renderer.JOBS[job_id] = job
+    threading.Thread(target=prepare_drive_job, args=(job_id, payload), daemon=True).start()
+    return {key: job.get(key) for key in ("id", "status", "progress", "message")}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -228,6 +513,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         parts = urlsplit(self.path).path.strip("/").split("/")
         try:
+            if parts == ["v1", "drive", "render"]:
+                data = self.read_json(limit=10 * 1024 * 1024)
+                result = create_drive_job(data)
+                json_response(self, 202, result)
+                return
             if parts == ["v1", "uploads"]:
                 data = self.read_json()
                 size = int(data.get("size", 0))
