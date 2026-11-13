@@ -34,6 +34,6 @@ describe("Motion Studio Colab package", () => {
     expect(code).toContain("faster-whisper==1.2.1");
     expect(code).toContain("av==18.1.0");
     expect(code).toContain("if av_version >= (19, 0)");
-    expect(code).toContain("restart the Colab runtime");
+    expect(code).toContain("Restart the Colab runtime");
   });
 });
