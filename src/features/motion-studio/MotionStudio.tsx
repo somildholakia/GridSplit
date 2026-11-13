@@ -20,7 +20,7 @@ import { buildEvenImageTimeline, buildMotionPreviewSchedule, getMotionPreviewFra
 import { buildColabNotebook, buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
 import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
-import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings } from "./motionLayers";
+import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
 import { drawMotionFrame, drawParticlePreview } from "./motionCanvas";
 
 import "./motion-studio.css";
@@ -1442,11 +1442,9 @@ export default function MotionStudio() {
                 }
               }
             }}
-            onEnded={() => setPreviewPlaybackTime(audioDuration)}
-            onTimeUpdate={(event) => {
-              const time = event.currentTarget.currentTime;
-              previewUiTimeRef.current = time;
-              setPreviewPlaybackTime(time);
+            onEnded={() => {
+              previewUiTimeRef.current = audioDuration;
+              setPreviewPlaybackTime(audioDuration);
             }}
           />
           <div className="motion-video-controls">
