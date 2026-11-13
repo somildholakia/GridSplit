@@ -268,7 +268,6 @@ export default function MotionStudio() {
   const [particleIntensity, setParticleIntensity] = useState(55);
   const [parallaxStrength, setParallaxStrength] = useState(45);
   const [depthMapWorking, setDepthMapWorking] = useState(false);
-  const [colabExporting, setColabExporting] = useState(false);
   const [colabEndpoint, setColabEndpoint] = useState("");
   const [colabToken, setColabToken] = useState("");
   const [colabReady, setColabReady] = useState(false);
@@ -276,7 +275,7 @@ export default function MotionStudio() {
   const [colabProgress, setColabProgress] = useState<ColabProgress | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewMuted, setPreviewMuted] = useState(false);
-  const [previewTime, setPreviewTime] = useState(0);
+  const [previewPlaybackTime, setPreviewPlaybackTime] = useState(0);
   const [previewTransitionProgress, setPreviewTransitionProgress] = useState(0);
   const [previewIncomingVisible, setPreviewIncomingVisible] = useState(false);
   const [transition, setTransition] = useState<TransitionKind>("dissolve");
@@ -463,7 +462,7 @@ export default function MotionStudio() {
         setPreviewIncomingVisible(false);
         setPreviewTransitionProgress(0);
       }
-      setPreviewTime(time);
+      setPreviewPlaybackTime(time);
       if (!current.paused && !current.ended) {
         previewAnimationRef.current = requestAnimationFrame(draw);
       }
@@ -482,7 +481,7 @@ export default function MotionStudio() {
       setPreviewSelectedImage(false);
       audio.pause();
       audio.currentTime = 0;
-      setPreviewTime(0);
+      setPreviewPlaybackTime(0);
     }
   }, [previewOpen, audioUrl, soundtrackVolume]);
 
@@ -1396,7 +1395,7 @@ export default function MotionStudio() {
             </div>
             <div className="motion-colab-connection">
               <div className="motion-panel-heading"><div><span>GOOGLE COLAB · GPU RENDERING</span><h2>Render on Google Colab</h2><p>Use your running Colab T4 session with the same portable project archive and FFmpeg pipeline.</p></div><Cloud size={19} /></div>
-              <button type="button" className="motion-secondary-button" onClick={downloadColabNotebook} disabled={rendering || colabExporting}><Cloud size={13} /> Download Colab notebook (.ipynb)</button>
+              <button type="button" className="motion-secondary-button" onClick={downloadColabNotebook} disabled={rendering}><Cloud size={13} /> Download Colab notebook (.ipynb)</button>
               <label className="motion-field">Colab Quick Tunnel URL
                 <input value={colabEndpoint} disabled={rendering} placeholder="https://your-tunnel.trycloudflare.com" onChange={(event) => { setColabEndpoint(event.target.value); setColabReady(false); }} />
               </label>
@@ -1464,7 +1463,7 @@ export default function MotionStudio() {
               const remaining = audioDuration - elapsed;
               const fadeOut = audioFadeOut > 0 ? Math.min(1, Math.max(0, remaining / audioFadeOut)) : 1;
               audio.volume = Math.min(1, Math.max(0, soundtrackVolume * Math.min(fadeIn, fadeOut)));
-              setPreviewTime(elapsed);
+              setPreviewPlaybackTime(elapsed);
             }}
             onPlay={() => {
               if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
@@ -1482,7 +1481,7 @@ export default function MotionStudio() {
                   drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
                   setPreviewIncomingVisible(false);
                 }
-                setPreviewTime(time);
+                setPreviewPlaybackTime(time);
                 previewAnimationRef.current = requestAnimationFrame(tick);
               };
               previewAnimationRef.current = requestAnimationFrame(tick);
@@ -1496,23 +1495,23 @@ export default function MotionStudio() {
                 if (state?.kind === "clip") drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
               }
             }}
-            onEnded={() => setPreviewTime(audioDuration)}
-            onTimeUpdate={(event) => setPreviewTime(event.currentTarget.currentTime)}
+            onEnded={() => setPreviewPlaybackTime(audioDuration)}
+            onTimeUpdate={(event) => setPreviewPlaybackTime(event.currentTarget.currentTime)}
           />
           <div className="motion-video-controls">
-            <div className="motion-video-time"><span>{formatTime(previewTime)}</span><span>{formatTime(audioDuration)}</span></div>
+            <div className="motion-video-time"><span>{formatTime(previewPlaybackTime)}</span><span>{formatTime(audioDuration)}</span></div>
             <input
               aria-label="Seek video preview"
               type="range"
               min="0"
               max={Math.max(0, audioDuration)}
               step="0.01"
-              value={Math.min(previewTime, audioDuration)}
+              value={Math.min(previewPlaybackTime, audioDuration)}
               onChange={(event) => {
                 const audio = videoPreviewAudioRef.current;
                 if (audio) {
                   audio.currentTime = Number(event.target.value);
-                  setPreviewTime(audio.currentTime);
+                  setPreviewPlaybackTime(audio.currentTime);
                   const state = getMotionPreviewFrameState(audio.currentTime, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
                   if (state?.kind === "clip") drawAtTime(audio.currentTime, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
                 }
@@ -1527,7 +1526,7 @@ export default function MotionStudio() {
               }}>{videoPreviewAudioRef.current?.paused ? <Play size={18} /> : <Pause size={18} />}</button>
               <button type="button" aria-label="Restart preview" onClick={() => {
                 const audio = videoPreviewAudioRef.current;
-                if (audio) { audio.currentTime = 0; setPreviewTime(0); void audio.play(); }
+                if (audio) { audio.currentTime = 0; setPreviewPlaybackTime(0); void audio.play(); }
               }}><RefreshCw size={17} /></button>
               <button type="button" aria-label={previewMuted ? "Unmute" : "Mute"} onClick={() => setPreviewMuted((value) => !value)}>{previewMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
               <button type="button" aria-label="Close video preview" onClick={() => setPreviewOpen(false)}><X size={19} /></button>
