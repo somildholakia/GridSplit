@@ -2,8 +2,10 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from sync_analyzer import extract_images, make_text_windows, natural_key
+from sync_analyzer import extract_images, make_text_windows, natural_key, transcribe_audio
 
 
 class SyncAnalyzerTests(unittest.TestCase):
@@ -43,6 +45,11 @@ class SyncAnalyzerTests(unittest.TestCase):
         self.assertIn("atmosphere", windows[1]["text"])
         self.assertAlmostEqual(windows[0]["startSeconds"], 0.0)
         self.assertAlmostEqual(windows[-1]["endSeconds"], 12.0)
+
+    def test_transcribe_fails_fast_with_actionable_pyav_19_message(self):
+        with patch.dict("sys.modules", {"av": SimpleNamespace(__version__="19.0.0")}):
+            with self.assertRaisesRegex(RuntimeError, "av==18.1.0"):
+                transcribe_audio(Path("unused.wav"))
 
 
 if __name__ == "__main__":
