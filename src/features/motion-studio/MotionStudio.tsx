@@ -288,8 +288,7 @@ export default function MotionStudio() {
         foreground.onload = () => {
           const audio = videoPreviewAudioRef.current ?? audioRef.current;
           const currentTime = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime;
-          drawAtTime(currentTime);
-          if (videoPreviewCanvasRef.current) drawAtTime(currentTime, videoPreviewCanvasRef.current, index, localProgress);
+          drawAtTime(currentTime, targetCanvas, index, localProgress);
         };
         foreground.onerror = () => setNotice("Could not decode the transparent foreground layer for " + imageItem.asset.name + ".");
         imageCacheRef.current.set(depthKey, foreground);
