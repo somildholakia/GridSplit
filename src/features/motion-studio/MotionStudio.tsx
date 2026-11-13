@@ -1445,10 +1445,24 @@ export default function MotionStudio() {
             muted={previewMuted}
             onPlay={() => {
               if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
-              previewAnimationRef.current = requestAnimationFrame(() => {
+              const tick = () => {
                 const audio = videoPreviewAudioRef.current;
-                if (audio) drawAtTime(audio.currentTime, videoPreviewCanvasRef.current);
-              });
+                if (!audio || audio.paused || audio.ended) return;
+                const time = audio.currentTime;
+                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                if (state?.kind === "transition") {
+                  drawAtTime(time, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
+                  drawAtTime(time, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
+                  setPreviewTransitionProgress(state.progress);
+                  setPreviewIncomingVisible(true);
+                } else if (state?.kind === "clip") {
+                  drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+                  setPreviewIncomingVisible(false);
+                }
+                setPreviewTime(time);
+                previewAnimationRef.current = requestAnimationFrame(tick);
+              };
+              previewAnimationRef.current = requestAnimationFrame(tick);
             }}
             onPause={() => {
               if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
