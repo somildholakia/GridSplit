@@ -35,7 +35,6 @@ function proxyUrl(value: ColabConnection, path: string, range?: { offset: number
   const params = new URLSearchParams({
     endpoint: value.endpoint,
     path,
-    token: value.token,
   });
   if (range) {
     params.set("offset", String(range.offset));
