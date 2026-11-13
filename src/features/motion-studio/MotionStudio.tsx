@@ -265,8 +265,7 @@ export default function MotionStudio() {
       image.onload = () => {
         const audio = videoPreviewAudioRef.current ?? audioRef.current;
         const currentTime = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime;
-        drawAtTime(currentTime);
-        if (videoPreviewCanvasRef.current) drawAtTime(currentTime, videoPreviewCanvasRef.current, index, localProgress);
+        drawAtTime(currentTime, targetCanvas, index, localProgress);
       };
       image.onerror = () => setNotice("Could not decode " + imageItem.asset.name + " for the preview.");
       imageCacheRef.current.set(baseKey, image);
