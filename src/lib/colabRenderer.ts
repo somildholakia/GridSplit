@@ -86,8 +86,8 @@ function asJob(input: Record<string, unknown>): LocalRenderJob {
   }
   const rawOutput = input.output && typeof input.output === "object" && !Array.isArray(input.output)
     ? input.output as Record<string, unknown> : undefined;
-  if (rawOutput && (!Number.isSafeInteger(rawOutput.bytes) || Number(rawOutput.bytes) < 1
-    || Number(rawOutput.bytes) > MAX_RENDER_OUTPUT)) {
+  if (rawOutput && (typeof rawOutput.bytes !== "number" || !Number.isSafeInteger(rawOutput.bytes)
+    || rawOutput.bytes < 1 || rawOutput.bytes > MAX_RENDER_OUTPUT)) {
     throw new Error("Colab reported an invalid or oversized MP4 output.");
   }
   return {
