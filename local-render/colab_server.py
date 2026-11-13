@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import math
 import shutil
 import subprocess
 import tempfile
@@ -179,7 +180,11 @@ def prepare_drive_job(job_id: str, payload: dict) -> None:
         cursor = 0.0
         max_expanded = 0
 
+        if archive_path.stat().st_size > MAX_ARCHIVE:
+            raise ValueError("The Drive image ZIP exceeds the 3 GB compressed safety limit.")
         with zipfile.ZipFile(archive_path) as bundle:
+            if len(bundle.infolist()) > renderer.MAX_ENTRIES:
+                raise ValueError("The Drive image ZIP contains too many entries.")
             image_infos: dict[str, zipfile.ZipInfo] = {}
             for info in bundle.infolist():
                 if info.is_dir():
@@ -190,6 +195,13 @@ def prepare_drive_job(job_id: str, payload: dict) -> None:
                     raise ValueError("The image ZIP contains an unsafe path.")
                 suffix = relative.suffix.lower()
                 if suffix in (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"):
+                    unix_mode = (info.external_attr >> 16) & 0o170000
+                    if unix_mode == 0o120000:
+                        raise ValueError("The Drive image ZIP contains a symbolic link.")
+                    if info.file_size > 0 and info.compress_size == 0:
+                        raise ValueError("The Drive image ZIP contains an invalid compressed image.")
+                    if info.compress_size and info.file_size / info.compress_size > 1000:
+                        raise ValueError("The Drive image ZIP contains an excessive compression ratio.")
                     image_infos[relative.as_posix()] = info
             if len(image_infos) != len(sync_images):
                 raise ValueError("Image count mismatch: ZIP contains " + str(len(image_infos))
@@ -220,7 +232,7 @@ def prepare_drive_job(job_id: str, payload: dict) -> None:
                     end = float(item["endSeconds"])
                 except (KeyError, TypeError, ValueError):
                     raise ValueError("Invalid timing for image " + file_name)
-                if abs(start - cursor) > 0.08 or end <= start or end - start < 0.2:
+                if not (math.isfinite(start) and math.isfinite(end)) or abs(start - cursor) > 0.08 or end <= start or end - start < 0.2:
                     raise ValueError("The sync timeline contains a gap, overlap, or invalid hold near " + file_name)
                 if end > audio_duration + 0.5:
                     raise ValueError("Image timing extends beyond the audio duration.")
@@ -279,7 +291,7 @@ def prepare_drive_job(job_id: str, payload: dict) -> None:
 
         if seen_names != set(image_infos):
             raise ValueError("The sync JSON does not reference every image in the ZIP.")
-        if abs(cursor - audio_duration) > max(0.5, audio_duration * 0.0005):
+        if not math.isfinite(cursor) or abs(cursor - audio_duration) > max(0.5, audio_duration * 0.0005):
             raise ValueError("The synchronization timeline does not cover the complete audio. Re-run Smart Sync.")
 
         audio_size = audio_path.stat().st_size
