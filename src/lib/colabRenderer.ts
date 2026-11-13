@@ -1,4 +1,5 @@
 import type { StudioProject } from "./projectStore";
+import type { MotionSyncManifest } from "../features/motion-studio/syncManifest";
 import { DEFAULT_RENDER_PROFILE } from "../domain/production";
 import { exportPortableProject } from "./portableProject";
 import { getRenderReadiness, type LocalRenderJob } from "./localRenderer";
@@ -118,8 +119,8 @@ export async function renderProjectOnColab(
       renderProfile: { ...(project.renderProfile ?? DEFAULT_RENDER_PROFILE), encoder: "nvidia" },
     };
     const archive = await exportPortableProject(gpuProject);
-    if (!archive.size || archive.size > 1024 * 1024 * 1024) {
-      throw new Error("The portable project archive must be smaller than 1 GB.");
+    if (!archive.size || archive.size > 3 * 1024 * 1024 * 1024) {
+      throw new Error("The portable project archive must be smaller than 3 GB.");
     }
     const chunkCount = Math.ceil(archive.size / CHUNK_SIZE);
     const session = await jsonRequest(value, "POST", "/v1/uploads", {
@@ -228,6 +229,113 @@ export async function renderProjectOnColab(
     } else if (uploadId) {
       void jsonRequest(value, "DELETE", "/v1/uploads/" + uploadId).catch(() => undefined);
     }
+    if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
+    throw error;
+  }
+}
+
+
+export type DriveSourceRenderRequest = {
+  folderPath: string;
+  archiveName: string;
+  audioName: string;
+  manifest: MotionSyncManifest;
+  settings?: {
+    width?: number;
+    height?: number;
+    fps?: number;
+    aspectRatio?: "16:9" | "9:16" | "1:1";
+    transition?: "cut" | "dissolve" | "fade" | "wipe-left" | "wipe-right";
+    transitionDurationSeconds?: number;
+    effect?: "ken-burns" | "zoom-in" | "zoom-out" | "pan-left" | "pan-right" | "none";
+    zoom?: number;
+  };
+};
+
+/**
+ * Ask the already-mounted Colab runtime to read media directly from Google Drive.
+ * Only filenames, settings and the small synchronization manifest cross the tunnel;
+ * the source ZIP and WAV stay in Drive until Colab copies them into its render workspace.
+ */
+export async function renderDriveSourceOnColab(
+  endpoint: string,
+  request: DriveSourceRenderRequest,
+  onProgress: (progress: ColabProgress) => void,
+  signal?: AbortSignal,
+): Promise<{ blob: Blob; job: LocalRenderJob }> {
+  const value = connection(endpoint);
+  if (!request.folderPath.trim() || !request.archiveName.trim() || !request.audioName.trim()) {
+    throw new Error("Enter the mounted Google Drive folder, ZIP filename, and audio filename.");
+  }
+  if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
+
+  let jobId: string | null = null;
+  try {
+    onProgress({ stage: "rendering", progress: 0, message: "Sending the Smart Sync manifest to Colab…" });
+    const submitted = await jsonRequest(value, "POST", "/v1/drive/render", {
+      folderPath: request.folderPath,
+      archiveName: request.archiveName,
+      audioName: request.audioName,
+      syncManifest: request.manifest,
+      settings: request.settings ?? {},
+    }, signal);
+    let current = asJob(submitted);
+    jobId = current.id;
+    onProgress({
+      stage: "rendering",
+      progress: current.progress,
+      message: current.message || "Colab is reading source media from Google Drive.",
+      job: current,
+    });
+
+    while (current.status === "queued" || current.status === "running") {
+      if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
+      await new Promise((resolve) => window.setTimeout(resolve, 1200));
+      const snapshot = await jsonRequest(value, "GET", "/v1/jobs/" + current.id, undefined, signal);
+      current = asJob(snapshot);
+      onProgress({
+        stage: "rendering",
+        progress: current.progress,
+        message: current.message || "Rendering Drive media on Colab.",
+        job: current,
+      });
+    }
+    if (current.status !== "completed" || !current.output?.bytes) {
+      throw new Error(current.error || current.message || "The Drive-based Colab render did not complete.");
+    }
+
+    const totalBytes = current.output.bytes;
+    const chunks: BlobPart[] = [];
+    for (let offset = 0; offset < totalBytes; offset += CHUNK_SIZE) {
+      if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
+      const length = Math.min(CHUNK_SIZE, totalBytes - offset);
+      const response = await fetch(rendererUrl(value, "/v1/jobs/" + current.id + "/output"), {
+        method: "GET",
+        headers: { Range: "bytes=" + offset + "-" + (offset + length - 1) },
+        signal,
+        cache: "no-store",
+      });
+      if (response.status !== 206) {
+        const error = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(error?.error || "Colab did not return the requested MP4 byte range.");
+      }
+      const chunk = await response.blob();
+      if (chunk.size !== length) throw new Error("An MP4 download chunk was incomplete.");
+      chunks.push(chunk);
+      const percent = Math.round(((offset + length) / totalBytes) * 100);
+      onProgress({
+        stage: "downloading",
+        progress: percent,
+        message: "Downloading rendered MP4 from Colab · " + percent + "%",
+        job: current,
+      });
+    }
+    const blob = new Blob(chunks, { type: "video/mp4" });
+    if (!blob.size) throw new Error("Colab returned an empty MP4.");
+    onProgress({ stage: "downloading", progress: 100, message: "MP4 downloaded and ready.", job: current });
+    return { blob, job: current };
+  } catch (error) {
+    if (jobId) void jsonRequest(value, "DELETE", "/v1/jobs/" + jobId).catch(() => undefined);
     if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
     throw error;
   }

@@ -112,7 +112,6 @@
   .effect-controls, .render-profile { grid-template-columns: 1fr 1fr; }
   .render-actions { align-items: stretch; flex-direction: column; }
 }
-
 .colab-render-card { display:grid; gap:12px; padding:16px; border:1px solid #405078; border-radius:12px; background:linear-gradient(135deg,#1b2940,#171e2b 72%); }
 .colab-render-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .colab-render-heading h3 { margin:5px 0; font-size:16px; color:#f0f4ff; }

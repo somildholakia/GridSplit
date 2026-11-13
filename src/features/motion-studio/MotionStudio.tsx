@@ -16,12 +16,13 @@ import {
 import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
-import { buildEvenImageTimeline, buildMotionPreviewSchedule, getMotionPreviewFrameState, moveSequenceItem } from "./motionTiming";
-import { buildColabNotebook, buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
-import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
+import { buildMotionPreviewSchedule, getMotionPreviewFrameState, moveSequenceItem } from "./motionTiming";
+import { buildImageTimelineFromDurations, getTimelinePosition, normalizeMediaFilename, parseMotionSyncManifest, resolveMotionSyncManifest, type MotionSyncManifest } from "./syncManifest";
+import { buildColabNotebook, buildColabRenderPackage, buildDriveSyncNotebook, downloadMotionPackage } from "./colabExport";
+import { checkColabRenderer, renderProjectOnColab, renderDriveSourceOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
 import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
-import { drawMotionFrame, drawParticlePreview, getMotionDissolveFilterParameters } from "./motionCanvas";
+import { drawMotionFrame, drawParticlePreview } from "./motionCanvas";
 
 import "./motion-studio.css";
 
@@ -134,6 +135,13 @@ export default function MotionStudio() {
   const [audioUrl, setAudioUrl] = useState("");
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioError, setAudioError] = useState("");
+  const [syncDurationsByImageId, setSyncDurationsByImageId] = useState<Record<string, number>>({});
+  const [syncManifestName, setSyncManifestName] = useState("");
+  const [syncJsonText, setSyncJsonText] = useState("");
+  const [driveSyncManifest, setDriveSyncManifest] = useState<MotionSyncManifest | null>(null);
+  const [driveFolderPath, setDriveFolderPath] = useState("/content/drive/MyDrive/youtube video mars 1");
+  const [driveArchiveName, setDriveArchiveName] = useState("mars E1 zip.zip");
+  const [driveAudioName, setDriveAudioName] = useState("Mars-E1-complete-audio.wav");
   const [rendererUrl, setRendererUrl] = useState("http://127.0.0.1:8766");
   const [rendererReady, setRendererReady] = useState(false);
   const [rendererMessage, setRendererMessage] = useState("Local renderer not checked yet.");
@@ -187,11 +195,11 @@ export default function MotionStudio() {
   const animationRef = useRef<number | null>(null);
 
   const dimensions = useMemo(() => outputDimensions(aspectRatio, outputSize), [aspectRatio, outputSize]);
-  const dissolveFilter = getMotionDissolveFilterParameters(previewTransitionProgress);
   const secondsPerImage = images.length && audioDuration > 0 ? audioDuration / images.length : 0;
-  const currentIndex = secondsPerImage > 0
-    ? Math.min(images.length - 1, Math.floor(Math.min(playhead, Math.max(0, audioDuration - 0.001)) / secondsPerImage))
-    : 0;
+  const timelineDurations = useMemo(() => images.map((item) =>
+    syncDurationsByImageId[item.asset.id] ?? secondsPerImage
+  ), [images, syncDurationsByImageId, secondsPerImage]);
+  const currentIndex = getTimelinePosition(playhead, timelineDurations)?.index ?? 0;
   const canRender = images.length > 0 && Boolean(audioFile) && audioDuration > 0
     && Number.isFinite(audioDuration) && audioDuration <= 24 * 60 * 60;
   const selectedImage = images.find((item) => item.asset.id === selectedImageId) ?? images[currentIndex];
@@ -233,7 +241,7 @@ export default function MotionStudio() {
       if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     };
-  }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength, selectedImageId, previewSelectedImage]);
+  }, [images, audioDuration, timelineDurations, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength, selectedImageId, previewSelectedImage]);
 
   function drawAtTime(
     time: number,
@@ -249,9 +257,8 @@ export default function MotionStudio() {
       return;
     }
     const safeTime = Math.max(0, Math.min(time, Math.max(0, audioDuration - 0.001)));
-    const timelineIndex = secondsPerImage > 0
-      ? Math.min(images.length - 1, Math.floor(safeTime / secondsPerImage))
-      : 0;
+    const timelinePosition = getTimelinePosition(safeTime, timelineDurations);
+    const timelineIndex = timelinePosition?.index ?? 0;
     const selectedIndex = images.findIndex((item) => item.asset.id === selectedImageId);
     const useSelectedPreview = previewSelectedImage && selectedIndex >= 0;
     const index = typeof forcedIndex === "number" ? forcedIndex : useSelectedPreview ? selectedIndex : timelineIndex;
@@ -275,9 +282,8 @@ export default function MotionStudio() {
       return;
     }
     if (!image.complete || !image.naturalWidth) return;
-    const localProgress = typeof forcedProgress === "number" ? forcedProgress : useSelectedPreview || !secondsPerImage
-      ? 0.5
-      : Math.max(0, Math.min(1, (safeTime - index * secondsPerImage) / secondsPerImage));
+    const localProgress = typeof forcedProgress === "number" ? forcedProgress : useSelectedPreview
+      ? 0.5 : timelinePosition?.progress ?? 0.5;
     const keyframes = imageItem.keyframes.length
       ? imageItem.keyframes
       : createPresetKeyframes(effect, zoomStrength);
@@ -322,7 +328,7 @@ export default function MotionStudio() {
       return;
     }
     const schedule = buildMotionPreviewSchedule(
-      images.map(() => secondsPerImage),
+      timelineDurations,
       transition,
       transitionDuration,
     );
@@ -354,7 +360,7 @@ export default function MotionStudio() {
       if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
       previewAnimationRef.current = null;
     };
-  }, [previewOpen, images, audioDuration, secondsPerImage, transition, transitionDuration, effect, zoomStrength, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
+  }, [previewOpen, images, audioDuration, timelineDurations, transition, transitionDuration, effect, zoomStrength, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
 
   useEffect(() => {
     if (!previewOpen) return;
@@ -430,6 +436,8 @@ export default function MotionStudio() {
         setNotice(error instanceof Error ? error.message : "An image could not be decoded.");
       }
     }
+    setSyncDurationsByImageId({});
+    setSyncManifestName("");
     setImages((current) => [...current, ...sortNaturally(newImages)].map((item, order) => ({ ...item, asset: { ...item.asset, order, sequenceNumber: order + 1 } })));
     if (newImages.length) {
       setSelectedImageId((current) => current || newImages[0].asset.id);
@@ -614,6 +622,44 @@ export default function MotionStudio() {
     setNotice("The selected image is using the current camera-motion preset again.");
   };
 
+  const handleSyncManifestFile = async (file?: File) => {
+    if (!file || rendering) return;
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+      setNotice("Synchronization JSON must be smaller than 10 MB.");
+      return;
+    }
+    try {
+      const manifest = parseMotionSyncManifest(JSON.parse(await file.text()));
+      setDriveSyncManifest(manifest);
+      setSyncManifestName(file.name);
+      if (!audioFile || !audioDuration || !images.length) {
+        setNotice("Smart Sync JSON loaded. Colab can now read the matching ZIP and WAV directly from mounted Google Drive.");
+        return;
+      }
+      const imagesByName = new Map(images.map((item) => [normalizeMediaFilename(item.asset.name), item]));
+      const orderedImages = manifest.images.map((entry) => imagesByName.get(normalizeMediaFilename(entry.fileName)));
+      if (orderedImages.some((item) => !item)) {
+        throw new Error("The sync JSON is ready for Drive rendering, but one or more images are not loaded in this browser workspace.");
+      }
+      const validImages = orderedImages.filter((item): item is MotionImage => Boolean(item));
+      const durations = resolveMotionSyncManifest(
+        manifest, validImages.map((item) => item.asset.name), audioFile.name, audioDuration,
+      );
+      const durationMap = Object.fromEntries(validImages.map((item, index) => [item.asset.id, durations[index]]));
+      setImages(validImages.map((item, order) => ({
+        ...item,
+        asset: { ...item.asset, order, sequenceNumber: order + 1 },
+      })));
+      setSyncDurationsByImageId(durationMap);
+      setPlayhead(0);
+      setPreviewSelectedImage(false);
+      setNotice("Applied narration-aware timing to " + validImages.length + " images. Review the preview or render directly from Drive.");
+    } catch (error) {
+      setDriveSyncManifest(null);
+      setNotice(error instanceof Error ? error.message : "Could not import the synchronization JSON.");
+    }
+  };
+
   const handleAudioFile = (file?: File) => {
     if (!file || rendering) return;
     if (!file.type.startsWith("audio/") && !/\.(wav|mp3|m4a|aac|ogg|opus|flac)$/i.test(file.name)) {
@@ -632,6 +678,8 @@ export default function MotionStudio() {
     audioObjectUrlRef.current = url;
     setAudioFile(file);
     setAudioUrl(url);
+    setSyncDurationsByImageId({});
+    setSyncManifestName("");
     setAudioDuration(0);
     setPlayhead(0);
     setAudioError("");
@@ -659,6 +707,7 @@ export default function MotionStudio() {
       imageCacheRef.current.delete("base:" + id);
       imageCacheRef.current.delete(id);
     }
+    setSyncDurationsByImageId((current) => { const next = { ...current }; delete next[id]; return next; });
     setImages((current) => current.filter((item) => item.asset.id !== id).map((item, order) => ({ ...item, asset: { ...item.asset, order, sequenceNumber: order + 1 } })));
   };
 
@@ -717,8 +766,8 @@ export default function MotionStudio() {
     const trackId = crypto.randomUUID();
     const audioAssetId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const timelineClips: ProjectTimelineClip[] = buildEvenImageTimeline(
-      images.map((item) => item.asset.id), audioDuration, sceneId,
+    const timelineClips: ProjectTimelineClip[] = buildImageTimelineFromDurations(
+      images.map((item) => item.asset.id), audioDuration, sceneId, timelineDurations,
     );
     const mixTrack: AudioMixTrack = {
       id: trackId,
@@ -887,6 +936,11 @@ export default function MotionStudio() {
     setNotice("Colab notebook downloaded. Open it in Google Colab, select a T4 GPU, and run all cells.");
   };
 
+  const downloadDriveSyncNotebook = () => {
+    downloadMotionPackage(buildDriveSyncNotebook(), "GridSplit_Smart_Sync_Drive_Analyzer.ipynb");
+    setNotice("Smart Sync analyzer downloaded. Open it in Colab, choose a T4 GPU, mount Drive, and run the analysis cell.");
+  };
+
   const testColabConnection = async () => {
     setColabChecking(true);
     setColabReady(false);
@@ -942,10 +996,63 @@ export default function MotionStudio() {
     }
   };
 
+  const startDriveColabRender = async () => {
+    if (!colabReady || !driveSyncManifest || rendering) return;
+    if (normalizeMediaFilename(driveSyncManifest.audio.fileName) !== normalizeMediaFilename(driveAudioName)) {
+      setNotice("The Drive audio filename does not match the imported Smart Sync JSON.");
+      return;
+    }
+    setRendering(true);
+    setJob(null);
+    setColabProgress({ stage: "rendering", progress: 0, message: "Sending the sync manifest to Colab…" });
+    setNotice("Colab is preparing the images and soundtrack directly from mounted Google Drive…");
+    const controller = new AbortController();
+    renderControllerRef.current = controller;
+    try {
+      const result = await renderDriveSourceOnColab(
+        colabEndpoint,
+        {
+          folderPath: driveFolderPath,
+          archiveName: driveArchiveName,
+          audioName: driveAudioName,
+          manifest: driveSyncManifest,
+          settings: {
+            width: dimensions.width,
+            height: dimensions.height,
+            fps,
+            aspectRatio,
+            transition,
+            transitionDurationSeconds: transitionDuration,
+            effect,
+            zoom: zoomStrength,
+          },
+        },
+        (progress) => {
+          setColabProgress(progress);
+          if (progress.job) setJob(progress.job);
+          setNotice(progress.message);
+        },
+        controller.signal,
+      );
+      downloadRenderedVideo(result.blob, "gridsplit-drive-smart-sync");
+      setJob(result.job);
+      setNotice("Drive-based Colab render completed and the validated MP4 was downloaded.");
+    } catch (error) {
+      const cancelled = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
+      setNotice(cancelled ? "Drive render cancelled. Temporary Colab job data will be cleaned up." :
+        error instanceof Error ? error.message : "Drive-based Colab render failed.");
+    } finally {
+      if (renderControllerRef.current === controller) renderControllerRef.current = null;
+      setRendering(false);
+    }
+  };
+
   const cancelRender = () => renderControllerRef.current?.abort();
 
   const clearImages = () => {
     if (rendering) return;
+    setSyncDurationsByImageId({});
+    setSyncManifestName("");
     images.forEach((item) => {
       URL.revokeObjectURL(item.objectUrl);
       objectUrlsRef.current.delete(item.objectUrl);
@@ -1042,15 +1149,23 @@ export default function MotionStudio() {
                 onError={() => setAudioError("The browser could not read this audio file. Try WAV or MP3.")} />
               {audioError && <small className="motion-error">{audioError}</small>}
             </div>}
+            <div className="motion-sync-import">
+              <label className="motion-audio-button"><Layers3 size={14} /> Import sync JSON file
+                <input type="file" accept="application/json,.json" disabled={rendering} onChange={(event) => { void handleSyncManifestFile(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} />
+              </label>
+              <small>{syncManifestName ? "Narration-aware timing · " + syncManifestName : "Import a manifest file or paste the JSON below. Drive rendering does not require browser media uploads."}</small>
+              <textarea aria-label="Paste GridSplit Smart Sync JSON" className="motion-sync-json-input" rows={4} value={syncJsonText} disabled={rendering} onChange={(event) => setSyncJsonText(event.currentTarget.value)} placeholder='Paste the contents of gridsplit-sync.json here…' />
+              <button type="button" className="motion-secondary-button" disabled={rendering || !syncJsonText.trim()} onClick={() => void handleSyncManifestFile(new File([syncJsonText], "pasted-smart-sync.json", { type: "application/json" }))}>Apply pasted JSON</button>
+            </div>
             <div className="motion-sequence-summary">
               <div><b>{images.length}</b><span>images loaded</span></div>
-              <div><b>{audioDuration > 0 && images.length ? formatTime(secondsPerImage) : "—"}</b><span>equal hold per image</span></div>
+              <div><b>{audioDuration > 0 && images.length ? formatTime(timelineDurations[currentIndex] ?? secondsPerImage) : "—"}</b><span>{syncManifestName ? "current synced hold" : "average hold per image"}</span></div>
               <div><b>{audioDuration > 0 ? formatTime(audioDuration) : "—"}</b><span>complete video length</span></div>
             </div>
             {images.length > 0 && audioDuration > 0 && <div className="motion-visual-timeline">
               <div className="motion-visual-timeline-heading">
                 <b>SEQUENCE TIMELINE</b>
-                <span>Drag clips to reorder · equal duration per image</span>
+                <span>{syncManifestName ? "Narration-aware timings · drag clips to reorder" : "Drag clips to reorder · evenly distributed timing"}</span>
               </div>
               <div className="motion-visual-timeline-track">
                 {images.map((item, index) => <button
@@ -1323,6 +1438,24 @@ export default function MotionStudio() {
             <div className="motion-colab-connection">
               <div className="motion-panel-heading"><div><span>GOOGLE COLAB · GPU RENDERING</span><h2>Render on Google Colab</h2><p>Use your running Colab T4 session with the same portable project archive and FFmpeg pipeline.</p></div><Cloud size={19} /></div>
               <button type="button" className="motion-secondary-button" onClick={downloadColabNotebook} disabled={rendering}><Cloud size={13} /> Download Colab notebook (.ipynb)</button>
+              <button type="button" className="motion-secondary-button" onClick={downloadDriveSyncNotebook} disabled={rendering}><Sparkles size={13} /> Download Smart Sync + Live Colab notebook (.ipynb)</button>
+              <div className="motion-drive-render-fields">
+                <b><Layers3 size={14} /> DIRECT DRIVE RENDER · NO 1.28 GB BROWSER UPLOAD</b>
+                <label className="motion-field">Mounted Google Drive folder path
+                  <input value={driveFolderPath} disabled={rendering} onChange={(event) => setDriveFolderPath(event.target.value)} />
+                </label>
+                <label className="motion-field">Image ZIP filename
+                  <input value={driveArchiveName} disabled={rendering} onChange={(event) => setDriveArchiveName(event.target.value)} />
+                </label>
+                <label className="motion-field">Audio filename
+                  <input value={driveAudioName} disabled={rendering} onChange={(event) => setDriveAudioName(event.target.value)} />
+                </label>
+                <p>{driveSyncManifest ? "Smart Sync ready · " + driveSyncManifest.images.length + " images · " + formatTime(driveSyncManifest.audio.durationSeconds) : "Import gridsplit-sync.json above after running the Smart Sync notebook."}</p>
+                <button type="button" className="motion-colab-button" disabled={!colabReady || !driveSyncManifest || rendering} onClick={() => void startDriveColabRender()}>
+                  {rendering && colabProgress?.stage === "rendering" ? <Loader2 size={14} /> : <Cloud size={14} />}
+                  Render directly from Google Drive on Colab
+                </button>
+              </div>
               <button type="button" className="motion-secondary-button" onClick={() => void exportForColab()} disabled={!canRender || rendering || colabExporting}>
                 {colabExporting ? <Loader2 size={13} /> : <Cloud size={13} />}
                 {colabExporting ? "Preparing offline package…" : "Download offline Colab package (.zip)"}
@@ -1330,8 +1463,9 @@ export default function MotionStudio() {
               <label className="motion-field">Colab Quick Tunnel URL
                 <input value={colabEndpoint} disabled={rendering} placeholder="https://your-tunnel.trycloudflare.com" onChange={(event) => { setColabEndpoint(event.target.value); setColabReady(false); }} />
               </label>
-              <button type="button" className="motion-secondary-button" onClick={() => void testColabConnection()} disabled={colabChecking || rendering || !colabEndpoint.trim()}>
-                {colabChecking ? <Loader2 size={13} /> : <RefreshCw size={13} />} {colabChecking ? "Testing connection…" : "Test connection"}
+              <button type="button" className="motion-secondary-button" onClick={() => void testColabConnection()} disabled={colabChecking || rendering}>
+                {colabChecking ? <Loader2 size={13} /> : <RefreshCw size={13} />}
+                {colabChecking ? "Testing connection…" : "Test Connection"}
               </button>
             </div>
                         <div className="motion-renderer-connection">
@@ -1363,32 +1497,6 @@ export default function MotionStudio() {
       {previewOpen && <div className="motion-video-modal" role="dialog" aria-modal="true" aria-label="Fullscreen video preview" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") setPreviewOpen(false); }}>
         <div className="motion-video-modal-content">
           <div className="motion-video-stage" style={{ aspectRatio: dimensions.width + " / " + dimensions.height }}>
-            <svg aria-hidden="true" style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
-              <defs>
-                <filter id="motion-video-dissolve-filter" x="0%" y="0%" width="100%" height="100%">
-                  <feTurbulence
-                    type="fractalNoise"
-                    baseFrequency="0.9"
-                    numOctaves="1"
-                    seed="7"
-                    result="dissolve-noise"
-                  />
-                  <feColorMatrix
-                    in="dissolve-noise"
-                    type="matrix"
-                    values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0"
-                    result="dissolve-alpha"
-                  />
-                  <feComponentTransfer in="dissolve-alpha" result="dissolve-threshold">
-                    <feFuncA type="linear" slope={dissolveFilter.slope} intercept={dissolveFilter.intercept} />
-                  </feComponentTransfer>
-                  <feComponentTransfer in="dissolve-threshold" result="dissolve-mask">
-                    <feFuncA type="discrete" tableValues="0 1" />
-                  </feComponentTransfer>
-                  <feComposite in="SourceGraphic" in2="dissolve-mask" operator="in" />
-                </filter>
-              </defs>
-            </svg>
             <canvas
               ref={videoPreviewCanvasRef}
               width={dimensions.width > dimensions.height ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
@@ -1405,9 +1513,7 @@ export default function MotionStudio() {
                   ? { opacity: 1, clipPath: "inset(0 0 0 " + (100 - previewTransitionProgress * 100) + "%)" }
                   : transition === "wipe-right"
                     ? { opacity: 1, clipPath: "inset(0 " + (100 - previewTransitionProgress * 100) + "% 0 0)" }
-                    : transition === "dissolve"
-                      ? { opacity: previewTransitionProgress > 0 ? 1 : 0, filter: "url(#motion-video-dissolve-filter)" }
-                      : { opacity: previewTransitionProgress }
+                    : { opacity: previewTransitionProgress }
                 : { opacity: 0 }}
             />
           </div>
@@ -1431,7 +1537,7 @@ export default function MotionStudio() {
                 const audio = videoPreviewAudioRef.current;
                 if (!audio || audio.paused || audio.ended) return;
                 const time = audio.currentTime;
-                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(timelineDurations, transition, transitionDuration));
                 if (state?.kind === "transition") {
                   drawAtTime(time, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
                   drawAtTime(time, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
@@ -1454,7 +1560,7 @@ export default function MotionStudio() {
               previewAnimationRef.current = null;
               if (videoPreviewAudioRef.current) {
                 const time = videoPreviewAudioRef.current.currentTime;
-                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(timelineDurations, transition, transitionDuration));
                 if (state?.kind === "clip") {
                   drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
                   setPreviewIncomingVisible(false);
@@ -1486,7 +1592,7 @@ export default function MotionStudio() {
                   audio.currentTime = Number(event.target.value);
                   previewUiTimeRef.current = audio.currentTime;
                   setPreviewPlaybackTime(audio.currentTime);
-                  const state = getMotionPreviewFrameState(audio.currentTime, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                  const state = getMotionPreviewFrameState(audio.currentTime, buildMotionPreviewSchedule(timelineDurations, transition, transitionDuration));
                   if (state?.kind === "clip") {
                     drawAtTime(audio.currentTime, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
                     setPreviewIncomingVisible(false);
