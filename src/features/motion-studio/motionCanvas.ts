@@ -1,5 +1,5 @@
-import type { ImageEffectKind, MotionKeyframe } from "../../domain/production";
-import { sampleMotionKeyframes, type ParticlePreset } from "./motionLayers";
+import type { ImageEffectKind, MotionKeyframe, ParticlePreset } from "../../domain/production";
+import { sampleMotionKeyframes } from "./motionLayers";
 
 export function drawMotionFrame(
   canvas: HTMLCanvasElement,
