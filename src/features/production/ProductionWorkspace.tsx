@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, Download, ImagePlus, Maximize2, Pause, Play, RefreshCw, Scissors, SlidersHorizontal, Sparkles, Square, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, Download, ImagePlus, Maximize2, Pause, Play, RefreshCw, Scissors, SlidersHorizontal, Sparkles, Square, Trash2, Upload, ZoomIn, ZoomOut } from "lucide-react";
 import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import ProductionTools from "./ProductionTools";
 import ImageAnimationStudio from "./ImageAnimationStudio";
 import { measureWavBlob } from "../../lib/mediaTimeline";
+import { normalizeMediaFilename, parseMotionSyncManifest, resolveMotionSyncManifest } from "../motion-studio/syncManifest";
 import { analyseSequence, buildEvenTimeline, extractSequenceNumber, imageClipAtTime, normalizeMappings, orderMappingsByAssetOrder, sortSequence, timelineDurationSeconds, distributeImagesAcrossScenes, resizeImageClipKeepingTimelineDuration, setAllImageClipDurationsAcrossTimeline, splitImageClipAtTime, type SceneImageMapping, type SequenceAsset, type TimelineClip } from "./productionModel";
 import "./production-workspace.css";
 
@@ -67,6 +68,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const [playheadSeconds,setPlayheadSeconds]=useState(0); const [isPlaying,setIsPlaying]=useState(false);
   const [timelineZoom,setTimelineZoom]=useState(24);
   const [bulkImageDuration,setBulkImageDuration]=useState("5.00");
+  const [syncJson,setSyncJson]=useState("");
   const [selectedImageClipId,setSelectedImageClipId]=useState<string|null>(null);
   const timelineScrollRef=useRef<HTMLDivElement>(null);
   const audioContextRef=useRef<AudioContext|null>(null);
@@ -265,6 +267,27 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     patchProject(onUpdate,{timelineClips:next});
     setMessage("Applied "+value.toFixed(2)+"s to every image across the full soundtrack. The final image fills the remaining audio tail, so there are no gaps.");
   };
+  const applySyncManifest=()=>{
+    try{
+      const manifest=parseMotionSyncManifest(JSON.parse(syncJson));
+      const audioClips=clips.filter(clip=>clip.track==="audio").sort((a,b)=>a.startSeconds-b.startSeconds);
+      const audioDuration=timelineDurationSeconds(audioClips);
+      if(!audioClips.length||audioDuration<=0)throw new Error("Build the audio timeline first, then import the synchronization JSON.");
+      const orderedAssets=[...assets].sort((a,b)=>a.order-b.order);
+      const durations=resolveMotionSyncManifest(manifest,orderedAssets.map(asset=>asset.name),manifest.audio.fileName,audioDuration);
+      const byName=new Map(manifest.images.map(item=>[normalizeMediaFilename(item.fileName),item]));
+      const imageClips=orderedAssets.map((asset,index)=>{
+        const timing=byName.get(normalizeMediaFilename(asset.name));
+        if(!timing)throw new Error("Missing synchronization timing for "+asset.name+".");
+        const midpoint=(timing.startSeconds+timing.endSeconds)/2;
+        const scene=audioClips.find(clip=>midpoint>=clip.startSeconds&&midpoint<clip.startSeconds+clip.durationSeconds)||audioClips[audioClips.length-1];
+        return {id:crypto.randomUUID(),track:"images" as const,sceneId:scene.sceneId,assetId:asset.id,startSeconds:timing.startSeconds,durationSeconds:durations[index],order:index};
+      });
+      patchProject(onUpdate,{timelineClips:[...audioClips,...imageClips]});
+      setPlayheadSeconds(0);setSelectedImageClipId(imageClips[0]?.id||null);setIsPlaying(false);
+      setMessage("Applied Smart Sync JSON: "+imageClips.length+" images now use their analyzed start/end times across "+seconds(audioDuration)+" of audio.");
+    }catch(error){setMessage(error instanceof Error?error.message:"Could not apply this synchronization JSON.");}
+  };
   const fitTimeline=()=>{
     const available=Math.max(260,(timelineScrollRef.current?.clientWidth??960)-150);
     setTimelineZoom(Math.min(160,Math.max(0.1,available/Math.max(1,timelineDuration))));
@@ -414,6 +437,15 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     </div>}
     {activeTab==="timeline"&&<div className="production-section">
       <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Re-sync images to full audio"}</button><span>{clips.filter(clip=>clip.track==="images").length} images · {clips.filter(clip=>clip.track==="images").length?(timelineDuration/clips.filter(clip=>clip.track==="images").length).toFixed(2)+"s average":"—"} · {seconds(timelineDuration)} total</span></div>
+      <section className="production-sync-import" aria-label="Import synchronization JSON">
+        <div><b>SMART SYNC JSON</b><p>Paste or upload a gridsplit-sync.json manifest to apply analyzed image timings to this timeline.</p></div>
+        <div className="production-sync-controls">
+          <label className="production-button"><Upload size={14}/> Choose JSON<input type="file" accept=".json,application/json" onChange={event=>{const file=event.currentTarget.files?.[0];if(file)void file.text().then(setSyncJson).catch(()=>setMessage("Could not read the selected JSON file."));event.currentTarget.value="";}}/></label>
+          <button className="production-button primary" type="button" disabled={!syncJson.trim()||busy||!assets.length} onClick={applySyncManifest}>Apply sync JSON</button>
+        </div>
+        <textarea aria-label="Synchronization JSON content" value={syncJson} onChange={event=>setSyncJson(event.target.value)} placeholder="Paste the complete gridsplit-sync.json content here…" spellCheck={false}/>
+        <small>Checks image filenames, image count, continuous timing, and total audio duration before changing the timeline. Your audio clips are preserved.</small>
+      </section>
       {!clips.length?<div className="production-empty">Map images to scenes and generate WAV audio, then build the initial schedule.</div>:<>
         <div className="production-playback-controls">
           <button className="production-button" type="button" disabled={audioDownloadBusy||!(project.audioSegments??[]).some(segment=>segment.status==="ready")} onClick={()=>void downloadCompleteAudio()}><Download size={14}/>{audioDownloadBusy?"Preparing audio…":"Download complete audio"}</button>
