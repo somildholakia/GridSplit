@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""Authenticated chunked FFmpeg render gateway for a temporary Colab Quick Tunnel.
+"""Direct chunked FFmpeg render gateway for a temporary Colab Quick Tunnel.
 
-The local renderer remains loopback-only. This separate gateway is used only in a
-Colab runtime and requires a high-entropy bearer token for every API request.
+The renderer remains bound to loopback inside Colab. The temporary Quick Tunnel provides direct browser access from the GridSplit origins listed below.
 """
 from __future__ import annotations
 
 import argparse
-import hmac
 import json
-import os
 import shutil
 import subprocess
 import tempfile
@@ -29,7 +26,12 @@ MAX_UPLOADS = 2
 UPLOADS: dict[str, dict] = {}
 UPLOADS_LOCK = threading.RLock()
 UPLOAD_TTL_SECONDS = 30 * 60
-AUTH_TOKEN = ""
+ALLOWED_ORIGINS = {
+    "https://gridsplit-studio.vercel.app",
+    "https://gridsplit-kappa.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+}
 
 
 def prune_uploads(now: float | None = None) -> None:
@@ -52,12 +54,23 @@ def upload_cleanup_loop() -> None:
         time.sleep(300)
 
 
+def add_cors_headers(handler: BaseHTTPRequestHandler) -> None:
+    origin = handler.headers.get("Origin")
+    if origin in ALLOWED_ORIGINS:
+        handler.send_header("Access-Control-Allow-Origin", origin)
+        handler.send_header("Vary", "Origin")
+        handler.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        handler.send_header("Access-Control-Allow-Headers", "Content-Type, Range")
+        handler.send_header("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length")
+
+
 def json_response(handler: BaseHTTPRequestHandler, status: int, value: dict) -> None:
     body = json.dumps(value).encode("utf-8")
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Cache-Control", "no-store")
     handler.send_header("Content-Length", str(len(body)))
+    add_cors_headers(handler)
     handler.end_headers()
     handler.wfile.write(body)
 
@@ -93,28 +106,32 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "GridSplitColabRenderer/1.0"
 
     def log_message(self, fmt: str, *args) -> None:
-        # Never log request headers, query strings, or authentication material.
+        # Never log request headers or query strings.
         message = fmt % args
         if "?" in message:
             message = message.split("?", 1)[0]
         print("[GridSplit Colab] " + message, flush=True)
 
-    def authorized(self) -> bool:
-        supplied = self.headers.get("X-GridSplit-Token", "")
-        return bool(AUTH_TOKEN) and hmac.compare_digest(supplied, AUTH_TOKEN)
-
     def guard(self) -> bool:
-        if not self.authorized():
-            json_response(self, 401, {"error": "Invalid or missing GridSplit Colab connection token."})
+        origin = self.headers.get("Origin")
+        if origin and origin not in ALLOWED_ORIGINS:
+            json_response(self, 403, {"error": "This browser origin is not allowed to access the GridSplit Colab renderer."})
             return False
-        # The browser sends credentials in a header only; reject query strings
-        # so tokens cannot accidentally migrate into URL or access logs.
         if urlsplit(self.path).query:
             json_response(self, 400, {"error": "Query strings are not accepted by the Colab renderer."})
             return False
         prune_uploads()
         renderer.prune_finished_jobs()
         return True
+
+    def do_OPTIONS(self) -> None:
+        origin = self.headers.get("Origin")
+        if origin not in ALLOWED_ORIGINS:
+            json_response(self, 403, {"error": "This browser origin is not allowed."})
+            return
+        self.send_response(204)
+        add_cors_headers(self)
+        self.end_headers()
 
     def read_json(self, limit: int = 64 * 1024) -> dict:
         length = int(self.headers.get("Content-Length", "0"))
@@ -144,7 +161,7 @@ class Handler(BaseHTTPRequestHandler):
                 "ready": bool(shutil.which("ffmpeg") and shutil.which("ffprobe")),
                 "ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe"),
                 "gpuAvailable": gpu, "gpuName": gpu_name,
-                "message": "Authenticated Colab FFmpeg renderer is ready.",
+                "message": "Direct Colab FFmpeg renderer is ready.",
             })
             return
         if len(parts) == 3 and parts[:2] == ["v1", "jobs"]:
@@ -199,6 +216,7 @@ class Handler(BaseHTTPRequestHandler):
         if status == 206:
             self.send_header("Content-Range", "bytes " + str(start) + "-" + str(end) + "/" + str(total))
         self.send_header("Cache-Control", "no-store")
+        add_cors_headers(self)
         self.end_headers()
         with output.open("rb") as handle:
             handle.seek(start)
@@ -343,23 +361,17 @@ class _LimitedReader:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Authenticated GridSplit Colab FFmpeg renderer")
+    parser = argparse.ArgumentParser(description="GridSplit direct Colab FFmpeg renderer")
     parser.add_argument("--host", default="127.0.0.1", choices=["127.0.0.1"],
-                        help="The authenticated renderer is loopback-only; expose it only through the notebook's Quick Tunnel.")
+                        help="Bind to loopback and expose through the temporary Colab Quick Tunnel.")
     parser.add_argument("--port", type=int, default=8766)
-    parser.add_argument("--token", default=os.environ.get("GRID_SPLIT_COLAB_TOKEN", ""),
-                        help="Optional token override; prefer GRID_SPLIT_COLAB_TOKEN environment variable.")
     args = parser.parse_args()
     if not (1024 <= args.port <= 65535):
         parser.error("Port must be between 1024 and 65535.")
-    if len(args.token) < 32:
-        parser.error("A high-entropy token of at least 32 characters is required in GRID_SPLIT_COLAB_TOKEN or --token.")
-    global AUTH_TOKEN
-    AUTH_TOKEN = args.token
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.daemon_threads = True
     print("GridSplit Colab renderer listening on 127.0.0.1:" + str(args.port), flush=True)
-    print("Authenticated API ready. Keep this runtime and its Quick Tunnel active.", flush=True)
+    print("Direct Colab API ready. Keep this runtime and its Quick Tunnel active.", flush=True)
     threading.Thread(target=upload_cleanup_loop, daemon=True).start()
     try:
         httpd.serve_forever()

@@ -13,11 +13,11 @@ export type ColabProgress = {
   job?: LocalRenderJob;
 };
 
-type ColabConnection = { endpoint: string; token: string };
+type ColabConnection = { endpoint: string };
 
-function connection(value: ColabConnection): ColabConnection {
+function connection(endpoint: string): ColabConnection {
   let url: URL;
-  try { url = new URL(value.endpoint.trim()); }
+  try { url = new URL(endpoint.trim()); }
   catch { throw new Error("Enter the HTTPS Cloudflare Quick Tunnel URL printed by the Colab notebook."); }
   const host = url.hostname.toLowerCase();
   if (url.protocol !== "https:" || !host.endsWith(".trycloudflare.com")
@@ -25,23 +25,11 @@ function connection(value: ColabConnection): ColabConnection {
     || url.search || url.hash || url.username || url.password) {
     throw new Error("The Colab endpoint must be a root HTTPS *.trycloudflare.com URL.");
   }
-  const token = value.token.trim();
-  if (!/^[A-Za-z0-9_-]{32,128}$/.test(token)) {
-    throw new Error("Paste the complete connection token printed by the Colab notebook.");
-  }
-  return { endpoint: url.origin, token };
+  return { endpoint: url.origin };
 }
 
-function proxyUrl(value: ColabConnection, path: string, range?: { offset: number; length: number }): string {
-  const params = new URLSearchParams({
-    endpoint: value.endpoint,
-    path,
-  });
-  if (range) {
-    params.set("offset", String(range.offset));
-    params.set("length", String(range.length));
-  }
-  return "/api/render-proxy?" + params.toString();
+function rendererUrl(value: ColabConnection, path: string): string {
+  return value.endpoint + path;
 }
 
 async function readResponse(response: Response): Promise<Record<string, unknown>> {
@@ -65,13 +53,12 @@ async function jsonRequest(
   payload?: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
-  const response = await fetch(proxyUrl(value, path), {
+  const response = await fetch(rendererUrl(value, path), {
     method,
     headers: {
-      "X-GridSplit-Token": value.token,
       ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
     },
-    body: method === "POST" ? JSON.stringify({ payload: payload ?? {} }) : undefined,
+    body: method === "POST" ? JSON.stringify(payload ?? {}) : undefined,
     signal,
     cache: "no-store",
   });
@@ -100,8 +87,8 @@ function asJob(input: Record<string, unknown>): LocalRenderJob {
   };
 }
 
-export async function checkColabRenderer(endpoint: string, token: string): Promise<string> {
-  const value = connection({ endpoint, token });
+export async function checkColabRenderer(endpoint: string): Promise<string> {
+  const value = connection(endpoint);
   const result = await jsonRequest(value, "GET", "/v1/health", undefined, AbortSignal.timeout(20_000));
   if (result.ready !== true) throw new Error("Colab is reachable, but FFmpeg/ffprobe are not ready.");
   const gpu = result.gpuAvailable === true && typeof result.gpuName === "string"
@@ -113,11 +100,10 @@ export async function checkColabRenderer(endpoint: string, token: string): Promi
 export async function renderProjectOnColab(
   project: StudioProject,
   endpoint: string,
-  token: string,
   onProgress: (progress: ColabProgress) => void,
   signal?: AbortSignal,
 ): Promise<{ blob: Blob; job: LocalRenderJob }> {
-  const value = connection({ endpoint, token });
+  const value = connection(endpoint);
   const errors = getRenderReadiness(project).filter((item) => item.severity === "error");
   if (errors.length) throw new Error(errors.map((item) => item.message).join(" "));
   if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
@@ -153,10 +139,9 @@ export async function renderProjectOnColab(
       for (let attempt = 0; attempt < 3 && !uploaded; attempt += 1) {
         if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
         try {
-          const response = await fetch(proxyUrl(value, chunkPath), {
+          const response = await fetch(rendererUrl(value, chunkPath), {
             method: "PUT",
             headers: {
-              "X-GridSplit-Token": value.token,
               "Content-Type": "application/octet-stream",
             },
             body: chunk,
@@ -212,9 +197,9 @@ export async function renderProjectOnColab(
     for (let offset = 0; offset < totalBytes; offset += CHUNK_SIZE) {
       if (signal?.aborted) throw new DOMException("Render cancelled.", "AbortError");
       const length = Math.min(CHUNK_SIZE, totalBytes - offset);
-      const response = await fetch(proxyUrl(value, "/v1/jobs/" + current.id + "/output", { offset, length }), {
+      const response = await fetch(rendererUrl(value, "/v1/jobs/" + current.id + "/output"), {
         method: "GET",
-        headers: { "X-GridSplit-Token": value.token },
+        headers: { Range: "bytes=" + offset + "-" + (offset + length - 1) },
         signal,
         cache: "no-store",
       });
