@@ -1,31 +1,37 @@
-# Smart Sync — Google Drive analysis for Motion Studio
+# Smart Sync — Google Drive analysis and direct Colab rendering
 
-Smart Sync creates a narration-aware image timeline from an image ZIP and a soundtrack without uploading either source file to ChatGPT.
+Smart Sync creates a narration-aware image timeline from an image ZIP and soundtrack without uploading the source media through the browser or ChatGPT.
 
-## Colab workflow
+## One-notebook workflow
 
-1. Open Motion Studio and download **Drive Smart Sync analyzer (.ipynb)**.
-2. Open the notebook in Google Colab and select a T4 GPU when available.
-3. Run the cell and approve Google Drive mounting.
-4. Set `FOLDER_PATH`, `IMAGE_ZIP_NAME`, and `AUDIO_FILE_NAME` to the source files in the mounted Drive. The notebook defaults to the sample folder and filenames used for the Mars E1 source.
-5. Wait for audio transcription and visual/text matching. The notebook downloads `gridsplit-sync.json` and also saves it beside the source files in Drive.
-6. In Motion Studio, load the images and the exact audio file, then choose **Import sync JSON**. The importer validates the audio filename, duration, image set, and contiguous timeline before applying the schedule.
+1. In Motion Studio, download **Smart Sync + Live Colab notebook (.ipynb)**.
+2. Open it in Google Colab and choose **Runtime → Change runtime type → T4 GPU** when available.
+3. Run the notebook and approve the Google Drive mount.
+4. Confirm `FOLDER_PATH`, `IMAGE_ZIP_NAME`, and `AUDIO_FILE_NAME`. The defaults target the Mars E1 folder and files supplied for this task.
+5. The notebook transcribes the WAV with faster-whisper, extracts the images in natural filename order, compares image content with timestamped narration windows using CLIP, and generates `gridsplit-sync.json` in the Drive folder. It also starts the direct Colab rendering gateway and prints a temporary Cloudflare Quick Tunnel URL.
+6. Import the generated JSON in Motion Studio using **Import sync JSON**. The website does not need the 1.28 GB ZIP or 233 MB WAV loaded locally.
+7. Paste the tunnel URL into **Colab Quick Tunnel URL**, select **Test Connection**, and click **Render directly from Google Drive on Colab**.
 
-## Analysis
+## What gets matched
 
-- Images are extracted from the Drive ZIP in natural filename order.
-- faster-whisper transcribes speech into timestamped segments.
-- The CLIP vision/text model scores image content against short narration windows.
-- A monotonic dynamic-programming pass keeps image order chronological while selecting the best matching speech windows.
-- Timeline boundaries are smoothed toward the soundtrack duration and cover the full audio without gaps.
-- If transcription contains no speech, the analyzer emits a clearly labeled even-timing fallback rather than claiming semantic alignment.
+- faster-whisper generates timestamped narration segments.
+- Transcript windows are compared with CLIP image embeddings.
+- A monotonic dynamic-programming pass keeps the ordered images in their original sequence while selecting the best-fitting narration windows.
+- Smoothed image boundaries cover the complete soundtrack without timeline gaps.
+- If transcription contains no speech, the analyzer labels the output as an even-timing fallback rather than claiming semantic alignment.
 
-The JSON includes `format: "gridsplit-motion-sync"`, `version: 1`, audio filename/duration, per-image start/end seconds, matched narration text, and similarity-derived confidence. The confidence is a model similarity indicator, not a calibrated probability.
+The JSON format is `gridsplit-motion-sync`, version 1. Each image entry includes its relative ZIP filename, start/end seconds, matched transcript excerpt and similarity-derived confidence. Similarity is a ranking signal, not a calibrated probability.
 
-## Current integration boundary
+## Direct Drive render
 
-The notebook reads the media directly from Drive and generates the timing manifest. Motion Studio's JSON importer applies those timings to media already loaded into the browser workspace; it currently does not mount or browse Google Drive from the website. The source media remains in Drive throughout analysis. The app's separate Colab renderer still receives the portable project archive from Motion Studio.
+The browser sends only the mounted Drive folder path, ZIP/audio filenames, sync JSON, and render settings to Colab. Colab validates the media, extracts the selected images to a temporary runtime workspace, copies the soundtrack, builds a standard GridSplit project and runs the existing FFmpeg renderer. The validated MP4 is returned to the website in retryable byte ranges.
 
-## Large media and Colab
+Source media remains in Google Drive. Temporary extracted copies and rendered output are stored in the Colab runtime and cleaned with the normal renderer job lifecycle. Keep the Colab runtime and its tunnel running until the MP4 has downloaded. The tunnel URL is a temporary bearer link; do not share it publicly.
 
-The Colab gateway now accepts project archives up to 3 GB in retryable 3 MB chunks. Extracted media is limited to 8 GB and 10,000 archive entries. Colab runtime disk capacity and session/GPU limits remain controlled by Google. NVENC is used only when available and verified; otherwise FFmpeg falls back to CPU libx264.
+## Capacity and limitations
+
+- Colab gateway project uploads support up to 3 GB, while direct Drive rendering avoids sending the source ZIP through the browser entirely.
+- Extracted media is limited to 8 GB and the ZIP to 10,000 entries.
+- The free Colab T4 is not guaranteed. The renderer probes NVENC and falls back to CPU libx264 if GPU encoding is unavailable or fails.
+- The website can apply the manifest to already imported media for timeline preview; direct Drive render does not require browser media import.
+- Image matching quality depends on how well CLIP similarity represents the narration. Review the JSON and timeline before final publication.
