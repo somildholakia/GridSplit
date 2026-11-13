@@ -320,7 +320,6 @@ export default function MotionStudio() {
       videoPreviewAudioRef.current?.pause();
       return;
     }
-    const audio = videoPreviewAudioRef.current;
     const schedule = buildMotionPreviewSchedule(
       images.map(() => secondsPerImage),
       transition,
