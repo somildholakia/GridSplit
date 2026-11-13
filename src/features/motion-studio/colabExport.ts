@@ -3,6 +3,7 @@ import type { StudioProject } from "../../lib/projectStore";
 import { exportPortableProject } from "../../lib/portableProject";
 import rendererSource from "../../../local-render/server.py?raw";
 import gatewaySource from "../../../local-render/colab_server.py?raw";
+import syncAnalyzerSource from "../../../local-render/sync_analyzer.py?raw";
 
 
 const offlineNotebookCode = String.raw`!apt-get -qq update && apt-get -qq install -y ffmpeg
@@ -114,8 +115,7 @@ export async function buildColabRenderPackage(project: StudioProject): Promise<B
     "",
     "Live workflow:",
     "1. Open GridSplit_Live_Colab_Renderer.ipynb in Colab.",
-    "2. Select a T4 GPU and run all cells.",
-    "3. Copy the displayed Quick Tunnel URL into GridSplit → Production Studio → Export & restore.",
+    "2. Select a T4 GPU, run all cells, then copy the Quick Tunnel URL into Production Studio.",
     "",
     "GPU availability and session limits are controlled by Google. No paid API key or AI model is required."
   ].join("\n"));
@@ -161,7 +161,7 @@ export function buildColabNotebook(): Blob {
   ].join("\n");
 
   const startCode = [
-    "import base64, json, os, pathlib, re, subprocess, sys, threading, time, urllib.request",
+    "import base64, json, os, pathlib, re, secrets, subprocess, sys, threading, time, urllib.request",
     "from IPython.display import Markdown, display",
     "",
     "BUNDLE_ROOT = pathlib.Path('/content/gridsplit-colab')",
@@ -172,14 +172,14 @@ export function buildColabNotebook(): Blob {
     "(RENDER_ROOT / 'server.py').write_bytes(base64.b64decode(RENDERER_SOURCE_B64))",
     "(RENDER_ROOT / 'colab_server.py').write_bytes(base64.b64decode(GATEWAY_SOURCE_B64))",
     "",
-    "# Prepare the bundled renderer and gateway for this Colab runtime.",
+    "# Generated for this runtime only. It is not embedded in the notebook or repository.",
     "PORT = 8766",
     "SERVER_PROCESS = subprocess.Popen(",
     "    [sys.executable, str(RENDER_ROOT / 'colab_server.py'), '--host', '127.0.0.1', '--port', str(PORT)],",
     "    cwd=str(RENDER_ROOT), env=os.environ.copy(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,",
     ")",
     "",
-    "# Wait until the direct Colab API is healthy before tunnelling it.",
+    "# Wait until the direct Colab API is actually healthy before tunnelling it.",
     "health_request = urllib.request.Request(",
     "    f'http://127.0.0.1:{PORT}/v1/health',",
     ")",
@@ -240,7 +240,7 @@ export function buildColabNotebook(): Blob {
         "3. Copy the displayed Quick Tunnel URL into GridSplit → Production Studio → Export & restore.",
         "4. Connect, then start a render. GridSplit uploads the portable project archive in retryable chunks and downloads the validated MP4 in byte ranges.",
         "",
-        "The renderer binds to loopback and accepts direct browser requests from GridSplit. No token or authentication step is required.",
+        "The renderer binds to loopback and accepts direct browser requests from GridSplit. No GridSplit login or connection token is required.",
         "",
         "**Keep the runtime and this tunnel process alive until the MP4 has downloaded.** Colab session limits and GPU availability are controlled by Google."
       ].join("\n")),
@@ -249,6 +249,79 @@ export function buildColabNotebook(): Blob {
     ],
     metadata: {
       colab: { name: "GridSplit_Live_Colab_Renderer.ipynb", provenance: [] },
+      kernelspec: { display_name: "Python 3", name: "python3" },
+      language_info: { name: "python" },
+    },
+    nbformat: 4,
+    nbformat_minor: 5,
+  };
+  return new Blob([JSON.stringify(notebook, null, 2)], {
+    type: "application/x-ipynb+json;charset=utf-8",
+  });
+}
+
+
+export function buildDriveSyncNotebook(): Blob {
+  const analyzerBase64 = encodeBase64(syncAnalyzerSource);
+  const setupCode = [
+    "!apt-get -qq update && apt-get -qq install -y ffmpeg",
+    "!pip -q install faster-whisper transformers accelerate pillow numpy",
+    "from google.colab import drive, files",
+    "from pathlib import Path",
+    "import base64, importlib.util, json",
+    "drive.mount('/content/drive')",
+    "",
+    "# Edit these three values if your Drive folder or filenames are different.",
+    "FOLDER_PATH = '/content/drive/MyDrive/youtube video mars 1'",
+    "IMAGE_ZIP_NAME = 'mars E1 zip.zip'",
+    "AUDIO_FILE_NAME = 'Mars-E1-complete-audio.wav'",
+    "OUTPUT_JSON_NAME = 'gridsplit-sync.json'",
+    "WHISPER_MODEL = 'small'  # T4: small is a good speed/quality balance.",
+    "",
+    "ANALYZER_SOURCE = base64.b64decode(" + JSON.stringify(analyzerBase64) + ")",
+    "ANALYZER_PATH = Path('/content/gridsplit_sync_analyzer.py')",
+    "ANALYZER_PATH.write_bytes(ANALYZER_SOURCE)",
+    "spec = importlib.util.spec_from_file_location('gridsplit_sync_analyzer', ANALYZER_PATH)",
+    "analyzer = importlib.util.module_from_spec(spec)",
+    "spec.loader.exec_module(analyzer)",
+    "result = analyzer.analyze_drive_folder(",
+    "    folder_path=FOLDER_PATH,",
+    "    archive_name=IMAGE_ZIP_NAME,",
+    "    audio_name=AUDIO_FILE_NAME,",
+    "    output_json=OUTPUT_JSON_NAME,",
+    "    model_size=WHISPER_MODEL,",
+    ")",
+    "print(json.dumps({",
+    "    'images': result['imageCount'],",
+    "    'audioDurationSeconds': round(result['audioDurationSeconds'], 2),",
+    "    'method': result['analysisMethod'],",
+    "    'visionDevice': result['clipDevice'],",
+    "    'jsonPath': result['outputPath'],",
+    "}, indent=2))",
+    "files.download(result['outputPath'])",
+  ].join("\n");
+  const notebook = {
+    cells: [
+      notebookCell("markdown", [
+        "# GridSplit Smart Sync · Google Drive Analyzer",
+        "",
+        "This notebook reads the image ZIP and soundtrack directly from your mounted Google Drive. It does not ask you to upload the 1.28 GB ZIP into ChatGPT.",
+        "",
+        "### Before running",
+        "1. Choose Runtime → Change runtime type → T4 GPU when available.",
+        "2. Run the cell below and approve Google Drive mounting.",
+        "3. Confirm FOLDER_PATH, IMAGE_ZIP_NAME, and AUDIO_FILE_NAME match your Drive files.",
+        "4. Wait for Whisper transcription and CLIP image-to-text alignment.",
+        "5. Download the generated gridsplit-sync.json and import it in Motion Studio after loading the same images and audio.",
+        "",
+        "The analyzer preserves natural filename order, transcribes speech with faster-whisper, compares image frames to timestamped narration windows with CLIP, and constrains matches to chronological order. If no speech is detected, it falls back to even timing and labels that fallback in the JSON.",
+        "",
+        "The JSON stores relative image filenames, start/end seconds, transcript excerpts, and similarity-based confidence values. It does not upload your source files to GridSplit's hosted services."
+      ].join("\n")),
+      notebookCell("code", setupCode),
+    ],
+    metadata: {
+      colab: { name: "GridSplit_Smart_Sync_Drive_Analyzer.ipynb", provenance: [] },
       kernelspec: { display_name: "Python 3", name: "python3" },
       language_info: { name: "python" },
     },
