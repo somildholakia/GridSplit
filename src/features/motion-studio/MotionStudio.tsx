@@ -18,7 +18,7 @@ import {
 } from "../../lib/projectMediaStore";
 import { buildMotionPreviewSchedule, getMotionPreviewFrameState, moveSequenceItem } from "./motionTiming";
 import { buildImageTimelineFromDurations, getTimelinePosition, normalizeMediaFilename, parseMotionSyncManifest, resolveMotionSyncManifest } from "./syncManifest";
-import { buildColabNotebook, buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
+import { buildColabNotebook, buildColabRenderPackage, buildDriveSyncNotebook, downloadMotionPackage } from "./colabExport";
 import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
 import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
@@ -929,6 +929,11 @@ export default function MotionStudio() {
     setNotice("Colab notebook downloaded. Open it in Google Colab, select a T4 GPU, and run all cells.");
   };
 
+  const downloadDriveSyncNotebook = () => {
+    downloadMotionPackage(buildDriveSyncNotebook(), "GridSplit_Smart_Sync_Drive_Analyzer.ipynb");
+    setNotice("Smart Sync analyzer downloaded. Open it in Colab, choose a T4 GPU, mount Drive, and run the analysis cell.");
+  };
+
   const testColabConnection = async () => {
     setColabChecking(true);
     setColabReady(false);
@@ -1373,6 +1378,7 @@ export default function MotionStudio() {
             <div className="motion-colab-connection">
               <div className="motion-panel-heading"><div><span>GOOGLE COLAB · GPU RENDERING</span><h2>Render on Google Colab</h2><p>Use your running Colab T4 session with the same portable project archive and FFmpeg pipeline.</p></div><Cloud size={19} /></div>
               <button type="button" className="motion-secondary-button" onClick={downloadColabNotebook} disabled={rendering}><Cloud size={13} /> Download Colab notebook (.ipynb)</button>
+              <button type="button" className="motion-secondary-button" onClick={downloadDriveSyncNotebook} disabled={rendering}><Sparkles size={13} /> Download Drive Smart Sync analyzer (.ipynb)</button>
               <button type="button" className="motion-secondary-button" onClick={() => void exportForColab()} disabled={!canRender || rendering || colabExporting}>
                 {colabExporting ? <Loader2 size={13} /> : <Cloud size={13} />}
                 {colabExporting ? "Preparing offline package…" : "Download offline Colab package (.zip)"}
