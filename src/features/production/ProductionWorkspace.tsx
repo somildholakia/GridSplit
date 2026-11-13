@@ -273,9 +273,9 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
       const audioClips=clips.filter(clip=>clip.track==="audio").sort((a,b)=>a.startSeconds-b.startSeconds);
       const audioDuration=timelineDurationSeconds(audioClips);
       if(!audioClips.length||audioDuration<=0)throw new Error("Build the audio timeline first, then import the synchronization JSON.");
-      const durations=resolveMotionSyncManifest(manifest,assets.map(asset=>asset.name),manifest.audio.fileName,audioDuration);
-      const byName=new Map(manifest.images.map(item=>[normalizeMediaFilename(item.fileName),item]));
       const orderedAssets=[...assets].sort((a,b)=>a.order-b.order);
+      const durations=resolveMotionSyncManifest(manifest,orderedAssets.map(asset=>asset.name),manifest.audio.fileName,audioDuration);
+      const byName=new Map(manifest.images.map(item=>[normalizeMediaFilename(item.fileName),item]));
       const imageClips=orderedAssets.map((asset,index)=>{
         const timing=byName.get(normalizeMediaFilename(asset.name));
         if(!timing)throw new Error("Missing synchronization timing for "+asset.name+".");
