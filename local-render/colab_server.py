@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Direct chunked FFmpeg render gateway for a temporary Colab Quick Tunnel.
 
-The renderer remains bound to loopback inside Colab. The temporary Quick Tunnel provides direct browser access from the GridSplit origins listed below.
+The renderer remains bound to loopback inside Colab. The temporary Quick Tunnel
+provides direct browser access from the GridSplit origins listed below.
 """
 from __future__ import annotations
 
@@ -161,7 +162,7 @@ class Handler(BaseHTTPRequestHandler):
                 "ready": bool(shutil.which("ffmpeg") and shutil.which("ffprobe")),
                 "ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe"),
                 "gpuAvailable": gpu, "gpuName": gpu_name,
-                "message": "Direct Colab FFmpeg renderer is ready.",
+                "message": "Authenticated Colab FFmpeg renderer is ready.",
             })
             return
         if len(parts) == 3 and parts[:2] == ["v1", "jobs"]:
@@ -234,8 +235,8 @@ class Handler(BaseHTTPRequestHandler):
                 count = int(data.get("chunkCount", 0))
                 project_id = str(data.get("projectId", ""))
                 if size <= 0 or size > MAX_ARCHIVE or chunk_size != MAX_CHUNK:
-                    raise ValueError("Archive size or chunk size is invalid (maximum compressed archive is 1 GB).")
-                if count != (size + chunk_size - 1) // chunk_size or count > 400:
+                    raise ValueError("Archive size or chunk size is invalid (maximum compressed archive is 3 GB).")
+                if count != (size + chunk_size - 1) // chunk_size or count > 1024:
                     raise ValueError("Chunk count does not match the archive size.")
                 with UPLOADS_LOCK:
                     if len(UPLOADS) >= MAX_UPLOADS:
