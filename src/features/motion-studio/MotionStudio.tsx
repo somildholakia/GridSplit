@@ -378,18 +378,16 @@ export default function MotionStudio() {
     if (!imageItem) return;
     const baseKey = "base:" + imageItem.asset.id;
     const depthKey = imageItem.foreground ? "depth:" + imageItem.foreground.asset.id : "";
-    imageCacheRef.current.forEach((cached, key) => {
-      if (key !== baseKey && key !== depthKey) {
-        cached.src = "";
-        imageCacheRef.current.delete(key);
-      }
-    });
+    // Keep decoded frames cached: continuous transitions draw two source images
+    // at once, and evicting the outgoing image each frame would cause reload flicker.
     let image = imageCacheRef.current.get(baseKey);
     if (!image) {
       image = new Image();
       image.onload = () => {
-        const audio = audioRef.current;
-        drawAtTime(audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime);
+        const audio = videoPreviewAudioRef.current ?? audioRef.current;
+        const currentTime = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime;
+        drawAtTime(currentTime);
+        if (videoPreviewCanvasRef.current) drawAtTime(currentTime, videoPreviewCanvasRef.current, index, localProgress);
       };
       image.onerror = () => setNotice("Could not decode " + imageItem.asset.name + " for the preview.");
       imageCacheRef.current.set(baseKey, image);
@@ -410,8 +408,10 @@ export default function MotionStudio() {
       if (!foreground) {
         foreground = new Image();
         foreground.onload = () => {
-          const audio = audioRef.current;
-          drawAtTime(audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime);
+          const audio = videoPreviewAudioRef.current ?? audioRef.current;
+          const currentTime = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime;
+          drawAtTime(currentTime);
+          if (videoPreviewCanvasRef.current) drawAtTime(currentTime, videoPreviewCanvasRef.current, index, localProgress);
         };
         foreground.onerror = () => setNotice("Could not decode the transparent foreground layer for " + imageItem.asset.name + ".");
         imageCacheRef.current.set(depthKey, foreground);
@@ -484,7 +484,7 @@ export default function MotionStudio() {
       audio.currentTime = 0;
       setPreviewTime(0);
     }
-  }, [previewOpen, audioUrl]);
+  }, [previewOpen, audioUrl, soundtrackVolume]);
 
   useEffect(() => () => {
     renderControllerRef.current?.abort();
@@ -1435,7 +1435,7 @@ export default function MotionStudio() {
           </section>
         </aside>
       </div>
-      {previewOpen && <div className="motion-video-modal" role="dialog" aria-modal="true" aria-label="Fullscreen video preview" onKeyDown={(event) => { if (event.key === "Escape") setPreviewOpen(false); }}>
+      {previewOpen && <div className="motion-video-modal" role="dialog" aria-modal="true" aria-label="Fullscreen video preview" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") setPreviewOpen(false); }}>
         <div className="motion-video-modal-content">
           <div className="motion-video-stage" style={{ aspectRatio: dimensions.width + " / " + dimensions.height }}>
             <canvas
@@ -1457,6 +1457,15 @@ export default function MotionStudio() {
             src={audioUrl || undefined}
             preload="auto"
             muted={previewMuted}
+            onTimeUpdate={(event) => {
+              const audio = event.currentTarget;
+              const elapsed = audio.currentTime;
+              const fadeIn = audioFadeIn > 0 ? Math.min(1, elapsed / audioFadeIn) : 1;
+              const remaining = audioDuration - elapsed;
+              const fadeOut = audioFadeOut > 0 ? Math.min(1, Math.max(0, remaining / audioFadeOut)) : 1;
+              audio.volume = Math.min(1, Math.max(0, soundtrackVolume * Math.min(fadeIn, fadeOut)));
+              setPreviewTime(elapsed);
+            }}
             onPlay={() => {
               if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
               const tick = () => {
