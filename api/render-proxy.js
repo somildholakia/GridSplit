@@ -27,7 +27,7 @@ function isAllowedOrigin(origin) {
   try {
     const url = new URL(origin);
     const host = url.hostname.toLowerCase();
-    return (url.protocol === "https: && (
+    return (url.protocol === "https:" && (
       host === "gridsplit-studio.vercel.app" ||
       host === "gridsplit-kappa.vercel.app" ||
       /^gridsplit-[a-z0-9-]+\\.vercel\\.app$/.test(host)
