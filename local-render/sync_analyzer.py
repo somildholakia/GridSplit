@@ -82,7 +82,7 @@ def transcribe_audio(audio_path: Path, model_size: str = "small") -> tuple[list[
     import av
 
     av_version = tuple(
-        int(part) for part in re.findall(r"\\d+", str(getattr(av, "__version__", "0")))
+        int(part) for part in str(getattr(av, "__version__", "0")).split(".")[:2]
     )
     if av_version >= (19, 0):
         raise RuntimeError(
