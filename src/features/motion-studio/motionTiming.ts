@@ -52,3 +52,101 @@ export function moveSequenceItem<T>(items: T[], fromIndex: number, toIndex: numb
   next.splice(toIndex, 0, moving);
   return next;
 }
+
+
+export type MotionPreviewClipTiming = {
+  index: number;
+  startSeconds: number;
+  durationSeconds: number;
+  transitionDurationSeconds: number;
+};
+
+export type MotionPreviewFrameState =
+  | { kind: "clip"; currentIndex: number; progress: number }
+  | {
+      kind: "transition";
+      outgoingIndex: number;
+      incomingIndex: number;
+      outgoingProgress: number;
+      incomingProgress: number;
+      progress: number;
+    };
+
+function clampPreview(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+/**
+ * Mirrors the sequential xfade offsets used by local-render/server.py.
+ * Transition time is taken from the rendered sequence rather than added to it,
+ * and the renderer pads the final frame so total duration remains unchanged.
+ */
+export function buildMotionPreviewSchedule(
+  durations: number[],
+  transition: "cut" | "fade" | "dissolve" | "wipe-left" | "wipe-right",
+  requestedTransitionSeconds: number,
+): MotionPreviewClipTiming[] {
+  if (!durations.length) return [];
+  if (durations.some((duration) => !Number.isFinite(duration) || duration <= 0)) {
+    throw new Error("Every preview clip must have a finite duration greater than zero.");
+  }
+  let runningDuration = durations[0];
+  const schedule: MotionPreviewClipTiming[] = [{
+    index: 0,
+    startSeconds: 0,
+    durationSeconds: durations[0],
+    transitionDurationSeconds: 0,
+  }];
+  for (let index = 1; index < durations.length; index += 1) {
+    const duration = durations[index];
+    const fade = transition === "cut"
+      ? 0
+      : clampPreview(requestedTransitionSeconds, 0.05, Math.min(5, duration / 2, runningDuration / 2));
+    const startSeconds = Math.max(0, runningDuration - fade);
+    schedule.push({
+      index,
+      startSeconds,
+      durationSeconds: duration,
+      transitionDurationSeconds: fade,
+    });
+    runningDuration += duration - fade;
+  }
+  return schedule;
+}
+
+/** Returns the clip(s) that should be composited for a given soundtrack time. */
+export function getMotionPreviewFrameState(
+  timeSeconds: number,
+  schedule: MotionPreviewClipTiming[],
+): MotionPreviewFrameState | null {
+  if (!schedule.length) return null;
+  const time = Math.max(0, Number.isFinite(timeSeconds) ? timeSeconds : 0);
+  for (let index = schedule.length - 1; index > 0; index -= 1) {
+    const incoming = schedule[index];
+    const fade = incoming.transitionDurationSeconds;
+    if (fade > 0 && time >= incoming.startSeconds && time < incoming.startSeconds + fade) {
+      const outgoing = schedule[index - 1];
+      return {
+        kind: "transition",
+        outgoingIndex: outgoing.index,
+        incomingIndex: incoming.index,
+        outgoingProgress: clampPreview((time - outgoing.startSeconds) / outgoing.durationSeconds, 0, 1),
+        incomingProgress: clampPreview((time - incoming.startSeconds) / incoming.durationSeconds, 0, 1),
+        progress: clampPreview((time - incoming.startSeconds) / fade, 0, 1),
+      };
+    }
+  }
+
+  let current = schedule[0];
+  for (let index = 1; index < schedule.length; index += 1) {
+    const candidate = schedule[index];
+    const settledAt = candidate.startSeconds + candidate.transitionDurationSeconds;
+    if (time >= settledAt) current = candidate;
+    else break;
+  }
+  return {
+    kind: "clip",
+    currentIndex: current.index,
+    progress: clampPreview((time - current.startSeconds) / current.durationSeconds, 0, 1),
+  };
+}
