@@ -86,6 +86,18 @@ describe("Motion Studio continuous preview timing", () => {
     expect(schedule[1].startSeconds).toBeCloseTo(0.25);
   });
 
+  it("evaluates wipe-right with the same render-aligned overlap boundaries", () => {
+    const schedule = buildMotionPreviewSchedule([5, 5], "wipe-right", 1);
+    expect(schedule[1].startSeconds).toBe(4);
+    const state = getMotionPreviewFrameState(4.5, schedule);
+    expect(state).toMatchObject({
+      kind: "transition",
+      outgoingIndex: 0,
+      incomingIndex: 1,
+      progress: 0.5,
+    });
+  });
+
   it("rejects invalid clip durations", () => {
     expect(() => buildMotionPreviewSchedule([2, 0], "cut", 0)).toThrow(/duration/i);
   });

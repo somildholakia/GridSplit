@@ -21,7 +21,7 @@ import { buildColabNotebook, buildColabRenderPackage, downloadMotionPackage } fr
 import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
 import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
-import { drawMotionFrame, drawParticlePreview } from "./motionCanvas";
+import { drawMotionFrame, drawParticlePreview, getMotionDissolveFilterParameters } from "./motionCanvas";
 
 import "./motion-studio.css";
 
@@ -188,6 +188,7 @@ export default function MotionStudio() {
   const animationRef = useRef<number | null>(null);
 
   const dimensions = useMemo(() => outputDimensions(aspectRatio, outputSize), [aspectRatio, outputSize]);
+  const dissolveFilter = getMotionDissolveFilterParameters(previewTransitionProgress);
   const secondsPerImage = images.length && audioDuration > 0 ? audioDuration / images.length : 0;
   const currentIndex = secondsPerImage > 0
     ? Math.min(images.length - 1, Math.floor(Math.min(playhead, Math.max(0, audioDuration - 0.001)) / secondsPerImage))
@@ -1367,6 +1368,32 @@ export default function MotionStudio() {
       {previewOpen && <div className="motion-video-modal" role="dialog" aria-modal="true" aria-label="Fullscreen video preview" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") setPreviewOpen(false); }}>
         <div className="motion-video-modal-content">
           <div className="motion-video-stage" style={{ aspectRatio: dimensions.width + " / " + dimensions.height }}>
+            <svg aria-hidden="true" style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+              <defs>
+                <filter id="motion-video-dissolve-filter" x="0%" y="0%" width="100%" height="100%">
+                  <feTurbulence
+                    type="fractalNoise"
+                    baseFrequency="0.9"
+                    numOctaves="1"
+                    seed="7"
+                    result="dissolve-noise"
+                  />
+                  <feColorMatrix
+                    in="dissolve-noise"
+                    type="matrix"
+                    values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0"
+                    result="dissolve-alpha"
+                  />
+                  <feComponentTransfer in="dissolve-alpha" result="dissolve-threshold">
+                    <feFuncA type="linear" slope={dissolveFilter.slope} intercept={dissolveFilter.intercept} />
+                  </feComponentTransfer>
+                  <feComponentTransfer in="dissolve-threshold" result="dissolve-mask">
+                    <feFuncA type="discrete" tableValues="0 1" />
+                  </feComponentTransfer>
+                  <feComposite in="SourceGraphic" in2="dissolve-mask" operator="in" />
+                </filter>
+              </defs>
+            </svg>
             <canvas
               ref={videoPreviewCanvasRef}
               width={dimensions.width > dimensions.height ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
@@ -1383,7 +1410,9 @@ export default function MotionStudio() {
                   ? { opacity: 1, clipPath: "inset(0 0 0 " + (100 - previewTransitionProgress * 100) + "%)" }
                   : transition === "wipe-right"
                     ? { opacity: 1, clipPath: "inset(0 " + (100 - previewTransitionProgress * 100) + "% 0 0)" }
-                    : { opacity: previewTransitionProgress }
+                    : transition === "dissolve"
+                      ? { opacity: previewTransitionProgress > 0 ? 1 : 0, filter: "url(#motion-video-dissolve-filter)" }
+                      : { opacity: previewTransitionProgress }
                 : { opacity: 0 }}
             />
           </div>
