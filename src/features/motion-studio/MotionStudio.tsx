@@ -1138,7 +1138,7 @@ export default function MotionStudio() {
               </div>
               <div className="motion-preview-footer"><span>{previewImage ? "FRAME " + (currentIndex + 1) + " / " + images.length + " · " + previewImage.asset.name : "NO FRAME SELECTED"}</span><span>{previewTime}</span></div>
               <button type="button" className="motion-secondary-button motion-open-preview" disabled={!canRender} onClick={() => setPreviewOpen(true)}><Maximize2 size={14} /> Open Video Preview</button>
-              <p className="motion-note">The browser preview reuses the editor's camera, keyframe, foreground and particle drawing utilities and follows the FFmpeg transition schedule. FFmpeg-only grayscale depth displacement is not reproduced pixel-for-pixel in real time; the final MP4 remains authoritative for that warp.</p>
+              <p className="motion-note">The browser preview reuses the editor's camera, keyframe, foreground and particle drawing utilities and follows the FFmpeg transition schedule. FFmpeg-only grayscale depth displacement and exact particle/compositing rasterization are approximated in real time; the final MP4 remains authoritative for those passes.</p>
             </div>
           </section>
 
