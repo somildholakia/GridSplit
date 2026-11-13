@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, ImagePlus, Maximize2, Pause, Play, RefreshCw, Scissors, SlidersHorizontal, Sparkles, Square, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, Download, ImagePlus, Maximize2, Pause, Play, RefreshCw, Scissors, SlidersHorizontal, Sparkles, Square, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import ProductionTools from "./ProductionTools";
@@ -63,7 +63,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
   const assets=data.imageAssets??[], mappings=data.imageMappings??[], clips=data.timelineClips??[];
   const [thumbs,setThumbs]=useState<Record<string,string>>({});
   const [audioUrls,setAudioUrls]=useState<Record<string,string>>({});
-  const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
+  const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false); const [audioDownloadBusy,setAudioDownloadBusy]=useState(false);
   const [playheadSeconds,setPlayheadSeconds]=useState(0); const [isPlaying,setIsPlaying]=useState(false);
   const [timelineZoom,setTimelineZoom]=useState(24);
   const [bulkImageDuration,setBulkImageDuration]=useState("5.00");
@@ -283,6 +283,50 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
     if(playbackOriginRef.current!==null)setPlayheadSeconds(Math.min(timelineDuration,Math.max(0,performance.now()/1000-playbackOriginRef.current)));
     playbackOriginRef.current=null;stopScheduledAudio();setIsPlaying(false);
   };
+  const downloadCompleteAudio=async()=>{
+    const sceneOrder=new Map(project.scenes.map((scene,index)=>[scene.id,index]));
+    const ready=[...(project.audioSegments??[])].filter(segment=>segment.status==="ready").sort((left,right)=>{
+      const difference=(sceneOrder.get(left.sceneId)??Number.MAX_SAFE_INTEGER)-(sceneOrder.get(right.sceneId)??Number.MAX_SAFE_INTEGER);
+      if(difference!==0)return difference;
+      const scene=project.scenes.find(item=>item.id===left.sceneId);
+      return (scene?.blocks.findIndex(block=>block.id===left.blockId)??0)-(scene?.blocks.findIndex(block=>block.id===right.blockId)??0);
+    });
+    if(!ready.length){setMessage("There is no generated audio to download yet.");return;}
+    setAudioDownloadBusy(true);setMessage("Combining all generated WAV segments into one complete audio file…");
+    const context=new AudioContext();
+    try{
+      const buffers:AudioBuffer[]=[];
+      for(const segment of ready){
+        const blob=await readGeneratedAudio(project.id,segment.id);
+        if(!blob)throw new Error("A generated audio segment is missing ("+segment.id+"). Regenerate that segment before downloading the complete audio.");
+        buffers.push(await context.decodeAudioData(await blob.arrayBuffer()));
+      }
+      const sampleRate=context.sampleRate,channels=Math.min(2,Math.max(...buffers.map(buffer=>buffer.numberOfChannels)));
+      const totalFrames=buffers.reduce((sum,buffer)=>sum+Math.ceil(buffer.duration*sampleRate),0),dataBytes=totalFrames*channels*2;
+      if(dataBytes+44>0xffffffff)throw new Error("The combined WAV would exceed the 4 GB WAV file limit.");
+      const output=new ArrayBuffer(44+dataBytes),view=new DataView(output);
+      const writeText=(offset:number,value:string)=>{for(let index=0;index<value.length;index++)view.setUint8(offset+index,value.charCodeAt(index));};
+      writeText(0,"RIFF");view.setUint32(4,36+dataBytes,true);writeText(8,"WAVE");writeText(12,"fmt ");
+      view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,channels,true);
+      view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*channels*2,true);
+      view.setUint16(32,channels*2,true);view.setUint16(34,16,true);writeText(36,"data");view.setUint32(40,dataBytes,true);
+      let frameOffset=0;
+      for(const buffer of buffers){
+        const frames=Math.ceil(buffer.duration*sampleRate);
+        const channelData=Array.from({length:channels},(_,channel)=>buffer.getChannelData(Math.min(channel,buffer.numberOfChannels-1)));
+        for(let frame=0;frame<frames;frame++)for(let channel=0;channel<channels;channel++){
+          const sample=channelData[channel][Math.min(frame,channelData[channel].length-1)]??0,value=Math.max(-1,Math.min(1,sample));
+          view.setInt16(44+((frameOffset+frame)*channels+channel)*2,value<0?value*0x8000:value*0x7fff,true);
+        }
+        frameOffset+=frames;
+      }
+      const url=URL.createObjectURL(new Blob([output],{type:"audio/wav"})),anchor=document.createElement("a");
+      anchor.href=url;anchor.download=(project.title||"gridsplit-project").replace(/[^a-z0-9-_]+/gi,"-")+"-complete-audio.wav";
+      document.body.appendChild(anchor);anchor.click();anchor.remove();window.setTimeout(()=>URL.revokeObjectURL(url),60_000);
+      setMessage("Downloaded the complete soundtrack as one WAV file ("+ready.length+" audio segments).");
+    }catch(error){setMessage(error instanceof Error?error.message:"Could not combine the generated audio.");}
+    finally{await context.close().catch(()=>undefined);setAudioDownloadBusy(false);}
+  };
   const playTimeline=async()=>{
     if(isPlaying){pauseTimeline();return;}
     if(!clips.length||timelineDuration<=0){setMessage("Build a timeline before starting playback.");return;}
@@ -372,6 +416,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
       <div className="production-actions"><button className="production-button primary" disabled={busy||!assets.length||!project.scenes.length} onClick={()=>void createSchedule()}><RefreshCw size={14}/>{busy?"Measuring…":"Re-sync images to full audio"}</button><span>{clips.filter(clip=>clip.track==="images").length} images · {clips.filter(clip=>clip.track==="images").length?(timelineDuration/clips.filter(clip=>clip.track==="images").length).toFixed(2)+"s average":"—"} · {seconds(timelineDuration)} total</span></div>
       {!clips.length?<div className="production-empty">Map images to scenes and generate WAV audio, then build the initial schedule.</div>:<>
         <div className="production-playback-controls">
+          <button className="production-button" type="button" disabled={audioDownloadBusy||!(project.audioSegments??[]).some(segment=>segment.status==="ready")} onClick={()=>void downloadCompleteAudio()}><Download size={14}/>{audioDownloadBusy?"Preparing audio…":"Download complete audio"}</button>
           <button className="production-button primary" onClick={()=>void playTimeline()}>{isPlaying?<Pause size={14}/>:<Play size={14}/>} {isPlaying?"Pause":"Play timeline"}</button>
           <button className="production-button" onClick={()=>{if(isPlaying)pauseTimeline();setPlayheadSeconds(0);}}><Square size={13}/> Stop</button>
           <button className="production-button" disabled={!selectedImageClip} onClick={splitSelectedImage} title="Split selected image at the playhead"><Scissors size={14}/> Split at playhead</button>
