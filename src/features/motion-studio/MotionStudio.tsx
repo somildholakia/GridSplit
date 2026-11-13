@@ -378,7 +378,16 @@ export default function MotionStudio() {
 
   useEffect(() => () => {
     renderControllerRef.current?.abort();
+    if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+    videoPreviewAudioRef.current?.pause();
+    imageCacheRef.current.forEach((image) => {
+      image.onload = null;
+      image.onerror = null;
+      image.src = "";
+    });
+    imageCacheRef.current.clear();
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current.clear();
     if (audioObjectUrlRef.current) URL.revokeObjectURL(audioObjectUrlRef.current);
   }, []);
 
