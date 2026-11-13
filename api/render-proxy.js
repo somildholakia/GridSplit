@@ -30,7 +30,7 @@ function isAllowedOrigin(origin) {
     return (url.protocol === "https:" && (
       host === "gridsplit-studio.vercel.app" ||
       host === "gridsplit-kappa.vercel.app" ||
-      /^gridsplit-[a-z0-9-]+\\.vercel\\.app$/.test(host)
+      (host.startsWith("gridsplit-") && host.endsWith(".vercel.app"))
     )) || (url.protocol === "http:" && (
       host === "localhost" || host === "127.0.0.1"
     ) && url.port === "5173");
