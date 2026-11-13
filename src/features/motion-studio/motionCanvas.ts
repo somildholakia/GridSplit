@@ -122,3 +122,19 @@ export function drawParticlePreview(
   context.shadowBlur = 0;
 }
 
+
+
+/**
+ * Parameters for an SVG noise threshold that mirrors FFmpeg xfade=dissolve:
+ * incoming pixels are revealed when their stable noise value is below progress.
+ * The linear stage maps the transition threshold to 0.5; a following discrete
+ * transfer converts that into a hard per-pixel reveal mask.
+ */
+export function getMotionDissolveFilterParameters(progress: number): { slope: number; intercept: number } {
+  const safeProgress = Math.min(0.99999, Math.max(0, Number.isFinite(progress) ? progress : 0));
+  const inverseRemaining = 1 / (1 - safeProgress);
+  return {
+    slope: -0.5 * inverseRemaining,
+    intercept: 0.5 * inverseRemaining,
+  };
+}
