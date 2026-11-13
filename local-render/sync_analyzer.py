@@ -166,7 +166,15 @@ def _clip_features(image_paths: list[Path], windows: list[dict[str, Any]], batch
         inputs = processor(images=batch_images, return_tensors="pt")
         inputs = {key: value.to(device) for key, value in inputs.items()}
         with torch.inference_mode():
-            features = model.get_image_features(**inputs)
+            output = model.get_image_features(**inputs)
+            if torch.is_tensor(output):
+                features = output
+            elif getattr(output, "pooler_output", None) is not None:
+                features = output.pooler_output
+            elif isinstance(output, (tuple, list)) and output and torch.is_tensor(output[0]):
+                features = output[0]
+            else:
+                raise TypeError("Unsupported CLIP image output: " + type(output).__name__)
             features = torch.nn.functional.normalize(features, dim=-1)
         image_vectors.append(features.cpu())
         del inputs, features, batch_images
@@ -180,7 +188,15 @@ def _clip_features(image_paths: list[Path], windows: list[dict[str, Any]], batch
                            padding=True, truncation=True, max_length=77)
         inputs = {key: value.to(device) for key, value in inputs.items()}
         with torch.inference_mode():
-            features = model.get_text_features(**inputs)
+            output = model.get_text_features(**inputs)
+            if torch.is_tensor(output):
+                features = output
+            elif getattr(output, "pooler_output", None) is not None:
+                features = output.pooler_output
+            elif isinstance(output, (tuple, list)) and output and torch.is_tensor(output[0]):
+                features = output[0]
+            else:
+                raise TypeError("Unsupported CLIP text output: " + type(output).__name__)
             features = torch.nn.functional.normalize(features, dim=-1)
         text_vectors.append(features.cpu())
         del inputs, features
