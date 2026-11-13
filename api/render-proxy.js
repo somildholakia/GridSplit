@@ -27,10 +27,10 @@ function isAllowedOrigin(origin) {
   try {
     const url = new URL(origin);
     const host = url.hostname.toLowerCase();
-    return (url.protocol === "https:" && (
-      host.startsWith("gridsplit-studio") ||
-      host === "gridsplit.vercel.app" ||
-      host.startsWith("gridsplit-")
+    return (url.protocol === "https: && (
+      host === "gridsplit-studio.vercel.app" ||
+      host === "gridsplit-kappa.vercel.app" ||
+      /^gridsplit-[a-z0-9-]+\\.vercel\\.app$/.test(host)
     )) || (url.protocol === "http:" && (
       host === "localhost" || host === "127.0.0.1"
     ) && url.port === "5173");
@@ -83,26 +83,19 @@ export default async function handler(req, res) {
 
   let endpoint;
   let path = String(queryValue(req.query && req.query.path) || "");
-  let token = String(queryValue(req.query && req.query.token) || "");
+  const tokenHeader = req.headers && req.headers["x-gridsplit-token"];
+  const token = String(Array.isArray(tokenHeader) ? tokenHeader[0] : tokenHeader || "");
   try {
     endpoint = validateEndpoint(queryValue(req.query && req.query.endpoint));
     if (method === "POST") {
       const body = await readBody(req, 64 * 1024);
       const input = JSON.parse(body.toString("utf8"));
-      endpoint = validateEndpoint(input.endpoint);
-      path = String(input.path || "");
-      token = String(input.token || "");
+      if (!input || typeof input !== "object" || Array.isArray(input)) {
+        throw new Error("Invalid render proxy JSON payload.");
+      }
       req.renderPayload = input.payload ?? {};
     } else if (method === "PUT") {
       req.renderBody = await readBody(req, MAX_CHUNK);
-    } else if (method === "DELETE") {
-      const body = await readBody(req, 64 * 1024);
-      if (body.length) {
-        const input = JSON.parse(body.toString("utf8"));
-        endpoint = validateEndpoint(input.endpoint);
-        path = String(input.path || path);
-        token = String(input.token || token);
-      }
     }
   } catch (error) {
     return sendJson(res, 400, { error: error instanceof Error ? error.message : "Invalid render proxy request." });
@@ -142,7 +135,7 @@ export default async function handler(req, res) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), method === "POST" ? 120_000 : 60_000);
   try {
-    const upstream = await fetch(endpoint + path, { ...options, signal: controller.signal });
+    const upstream = await fetch(endpoint + path, { ...options, signal: controller.signal, redirect: "manual" });
     const contentType = upstream.headers.get("content-type") || "application/octet-stream";
     const body = Buffer.from(await upstream.arrayBuffer());
     res.statusCode = upstream.status;
