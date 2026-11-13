@@ -383,7 +383,7 @@ export function buildDriveSyncNotebook(): Blob {
         "",
         "The analyzer preserves natural filename order, transcribes speech with faster-whisper, compares image frames to timestamped narration windows with CLIP, and constrains matches to chronological order. If no speech is detected, it falls back to even timing and labels that fallback in the JSON.",
         "",
-        "The JSON stores relative image filenames, start/end seconds, transcript excerpts, and similarity-based confidence values. It does not upload your source files to GridSplit's hosted services."
+        "The JSON stores relative image filenames, start/end seconds, transcript excerpts, and similarity-based confidence values. The notebook starts a direct Colab renderer; the website sends only the JSON manifest and settings while Colab reads the original ZIP and WAV from mounted Drive."
       ].join("\n")),
       notebookCell("code", setupCode),
     ],
