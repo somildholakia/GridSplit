@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown, ArrowUp, AudioLines, CheckCircle2, Clapperboard, FileAudio,
   ImagePlus, Loader2, RefreshCw, ShieldCheck, Sparkles, Square,
-  Trash2, Upload, WandSparkles, KeyRound, Layers3, Flame, Cloud, CloudSnow, CloudRain, Sparkles as SparklesIcon,
+  Trash2, Upload, WandSparkles, KeyRound, Layers3, Flame, Cloud, CloudSnow, CloudRain,
+  Sparkles as SparklesIcon, Play, Pause, Volume2, VolumeX, Maximize2, X,
 } from "lucide-react";
 import type { StudioProject, ProjectImageAsset, ProjectTimelineClip } from "../../lib/projectStore";
 import type {
@@ -15,10 +16,13 @@ import {
 import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
-import { buildEvenImageTimeline, moveSequenceItem } from "./motionTiming";
+import { buildEvenImageTimeline, buildMotionPreviewSchedule, getMotionPreviewFrameState, moveSequenceItem } from "./motionTiming";
+import { buildColabNotebook, buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
+import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
 import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
-import { buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
+import { drawMotionFrame, drawParticlePreview } from "./motionCanvas";
+
 import "./motion-studio.css";
 
 type MotionForeground = { asset: ProjectImageAsset; file: File; objectUrl: string };
@@ -98,127 +102,6 @@ function imageDimensionsFromElement(objectUrl: string): Promise<{ width: number;
   });
 }
 
-function drawMotionFrame(
-  canvas: HTMLCanvasElement,
-  image: HTMLImageElement,
-  effect: ImageEffectKind,
-  progress: number,
-  zoomStrength: number,
-  keyframes?: MotionKeyframe[],
-): void {
-  const context = canvas.getContext("2d");
-  if (!context || !image.complete || !image.naturalWidth || !image.naturalHeight) return;
-  const width = canvas.width;
-  const height = canvas.height;
-  const strength = Math.max(0, Math.min(1, (zoomStrength - 1) / 0.5));
-  const cover = Math.max(width / image.naturalWidth, height / image.naturalHeight);
-  let zoom = effect === "none" ? 1 : 1.04 + strength * 0.08;
-  let offsetX = 0;
-  let offsetY = 0;
-  if (effect === "ken-burns" || effect === "zoom-in") zoom = 1.04 + strength * 0.08 + progress * (0.09 + strength * 0.08);
-  if (effect === "zoom-out") zoom = 1.16 + strength * 0.12 - progress * (0.09 + strength * 0.08);
-  if (effect === "pan-left") {
-    zoom = 1.08 + strength * 0.06;
-    offsetX = (0.5 - progress) * width * 0.11;
-  }
-  if (effect === "pan-right") {
-    zoom = 1.08 + strength * 0.06;
-    offsetX = (progress - 0.5) * width * 0.11;
-  }
-  let rotation = 0;
-  if (keyframes?.length) {
-    const transform = sampleMotionKeyframes(keyframes, progress);
-    zoom = transform.scale;
-    offsetX = (0.5 - transform.panX) * width * 0.14;
-    offsetY = (0.5 - transform.panY) * height * 0.14;
-    rotation = transform.rotation * Math.PI / 180;
-  }
-  const drawWidth = image.naturalWidth * cover * zoom;
-  const drawHeight = image.naturalHeight * cover * zoom;
-  context.fillStyle = "#070a10";
-  context.fillRect(0, 0, width, height);
-  context.save();
-  context.translate(width / 2 + offsetX, height / 2 + offsetY);
-  context.rotate(rotation);
-  context.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-  context.restore();
-}
-
-function drawParticlePreview(
-  canvas: HTMLCanvasElement,
-  preset: ParticlePreset,
-  progress: number,
-  intensity: number,
-): void {
-  if (preset === "none" || intensity <= 0) return;
-  const context = canvas.getContext("2d");
-  if (!context) return;
-  const count = Math.max(5, Math.round(7 + intensity * 0.2));
-  const width = canvas.width;
-  const height = canvas.height;
-  context.save();
-  for (let index = 0; index < count; index += 1) {
-    const seedX = ((index * 37 + 13) % 97) / 97;
-    const seedY = ((index * 53 + 19) % 97) / 97;
-    const phase = index * 1.71;
-    let x = seedX * width;
-    let y = seedY * height;
-    const size = 2 + (index % 4) * 0.9;
-    const alpha = (0.28 + ((index * 7) % 10) / 20) * (intensity / 100);
-    if (preset === "embers") {
-      x += Math.sin(progress * Math.PI * 2 + phase) * width * 0.025;
-      y = ((seedY - progress * (0.35 + (index % 5) * 0.05) + 1) % 1) * height;
-      context.fillStyle = "rgba(255," + (105 + (index % 4) * 30) + ",24," + alpha + ")";
-      context.shadowColor = "rgba(255,100,15,.7)";
-      context.shadowBlur = 9;
-      context.beginPath();
-      context.arc(x, y, size, 0, Math.PI * 2);
-      context.fill();
-    } else if (preset === "snow") {
-      x += Math.sin(progress * Math.PI * 4 + phase) * width * 0.025;
-      y = ((seedY + progress * (0.35 + (index % 5) * 0.06)) % 1) * height;
-      context.fillStyle = "rgba(236,246,255," + alpha + ")";
-      context.beginPath();
-      context.arc(x, y, size * 0.8, 0, Math.PI * 2);
-      context.fill();
-    } else if (preset === "rain") {
-      x += Math.sin(progress * Math.PI * 2 + phase) * width * 0.008;
-      y = ((seedY + progress * (1.2 + (index % 5) * 0.25)) % 1) * height;
-      context.strokeStyle = "rgba(133,184,255," + alpha + ")";
-      context.lineWidth = Math.max(1, size * 0.55);
-      context.beginPath();
-      context.moveTo(x, y);
-      context.lineTo(x - 3, y + 14 + size * 2);
-      context.stroke();
-    } else if (preset === "confetti") {
-      x = ((seedX + progress * (0.45 + (index % 3) * 0.1)) % 1) * width;
-      y = ((seedY + progress * (0.55 + (index % 4) * 0.08)) % 1) * height;
-      const palette = ["#ff5468", "#ffd166", "#73e2c2", "#7ba7ff", "#c88cff"];
-      context.fillStyle = palette[index % palette.length];
-      context.globalAlpha = alpha + 0.2;
-      context.translate(x, y);
-      context.rotate(progress * Math.PI * 2 + phase);
-      context.fillRect(-size, -size * 0.6, size * 2.2, size * 1.2);
-      context.setTransform(1, 0, 0, 1, 0, 0);
-    } else if (preset === "magic") {
-      x += Math.sin(progress * Math.PI * 3 + phase) * width * 0.055;
-      y += Math.cos(progress * Math.PI * 2 + phase) * height * 0.04;
-      context.fillStyle = "rgba(190,132,255," + alpha + ")";
-      context.shadowColor = "rgba(180,90,255,.85)";
-      context.shadowBlur = 12;
-      context.beginPath();
-      context.arc(x, y, size * 1.1, 0, Math.PI * 2);
-      context.fill();
-      context.fillStyle = "rgba(255,255,255,.85)";
-      context.fillRect(x - 1, y - 4, 2, 8);
-      context.fillRect(x - 4, y - 1, 8, 2);
-    }
-  }
-  context.restore();
-  context.globalAlpha = 1;
-  context.shadowBlur = 0;
-}
-
 function outputDimensions(ratio: AspectRatio, size: OutputSize): { width: number; height: number } {
   if (size === "720p") {
     if (ratio === "9:16") return { width: 720, height: 1280 };
@@ -265,7 +148,17 @@ export default function MotionStudio() {
   const [particleIntensity, setParticleIntensity] = useState(55);
   const [parallaxStrength, setParallaxStrength] = useState(45);
   const [depthMapWorking, setDepthMapWorking] = useState(false);
+  const [colabEndpoint, setColabEndpoint] = useState("");
+  const [colabToken, setColabToken] = useState("");
+  const [colabReady, setColabReady] = useState(false);
   const [colabExporting, setColabExporting] = useState(false);
+  const [colabChecking, setColabChecking] = useState(false);
+  const [colabProgress, setColabProgress] = useState<ColabProgress | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewMuted, setPreviewMuted] = useState(false);
+  const [previewPlaybackTime, setPreviewPlaybackTime] = useState(0);
+  const [previewTransitionProgress, setPreviewTransitionProgress] = useState(0);
+  const [previewIncomingVisible, setPreviewIncomingVisible] = useState(false);
   const [transition, setTransition] = useState<TransitionKind>("dissolve");
   const [transitionDuration, setTransitionDuration] = useState(0.6);
   const [zoomStrength, setZoomStrength] = useState(1.16);
@@ -283,6 +176,11 @@ export default function MotionStudio() {
   const [audioFadeOut, setAudioFadeOut] = useState(1.5);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoPreviewIncomingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previewAnimationRef = useRef<number | null>(null);
+  const previewUiTimeRef = useRef(0);
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const objectUrlsRef = useRef<Set<string>>(new Set());
   const audioObjectUrlRef = useRef("");
@@ -337,8 +235,13 @@ export default function MotionStudio() {
     };
   }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength, selectedImageId, previewSelectedImage]);
 
-  function drawAtTime(time: number): void {
-    const canvas = canvasRef.current;
+  function drawAtTime(
+    time: number,
+    targetCanvas: HTMLCanvasElement | null = canvasRef.current,
+    forcedIndex?: number,
+    forcedProgress?: number,
+  ): void {
+    const canvas = targetCanvas;
     if (!canvas) return;
     if (!images.length) {
       const context = canvas.getContext("2d");
@@ -351,23 +254,20 @@ export default function MotionStudio() {
       : 0;
     const selectedIndex = images.findIndex((item) => item.asset.id === selectedImageId);
     const useSelectedPreview = previewSelectedImage && selectedIndex >= 0;
-    const index = useSelectedPreview ? selectedIndex : timelineIndex;
+    const index = typeof forcedIndex === "number" ? forcedIndex : useSelectedPreview ? selectedIndex : timelineIndex;
     const imageItem = images[index];
     if (!imageItem) return;
     const baseKey = "base:" + imageItem.asset.id;
     const depthKey = imageItem.foreground ? "depth:" + imageItem.foreground.asset.id : "";
-    imageCacheRef.current.forEach((cached, key) => {
-      if (key !== baseKey && key !== depthKey) {
-        cached.src = "";
-        imageCacheRef.current.delete(key);
-      }
-    });
+    // Keep decoded frames cached: continuous transitions draw two source images
+    // at once, and evicting the outgoing image each frame would cause reload flicker.
     let image = imageCacheRef.current.get(baseKey);
     if (!image) {
       image = new Image();
       image.onload = () => {
-        const audio = audioRef.current;
-        drawAtTime(audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime);
+        const audio = videoPreviewAudioRef.current ?? audioRef.current;
+        const currentTime = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime;
+        drawAtTime(currentTime, targetCanvas, index, localProgress);
       };
       image.onerror = () => setNotice("Could not decode " + imageItem.asset.name + " for the preview.");
       imageCacheRef.current.set(baseKey, image);
@@ -375,7 +275,7 @@ export default function MotionStudio() {
       return;
     }
     if (!image.complete || !image.naturalWidth) return;
-    const localProgress = useSelectedPreview || !secondsPerImage
+    const localProgress = typeof forcedProgress === "number" ? forcedProgress : useSelectedPreview || !secondsPerImage
       ? 0.5
       : Math.max(0, Math.min(1, (safeTime - index * secondsPerImage) / secondsPerImage));
     const keyframes = imageItem.keyframes.length
@@ -388,8 +288,9 @@ export default function MotionStudio() {
       if (!foreground) {
         foreground = new Image();
         foreground.onload = () => {
-          const audio = audioRef.current;
-          drawAtTime(audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime);
+          const audio = videoPreviewAudioRef.current ?? audioRef.current;
+          const currentTime = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : safeTime;
+          drawAtTime(currentTime, targetCanvas, index, localProgress);
         };
         foreground.onerror = () => setNotice("Could not decode the transparent foreground layer for " + imageItem.asset.name + ".");
         imageCacheRef.current.set(depthKey, foreground);
@@ -413,9 +314,82 @@ export default function MotionStudio() {
     drawParticlePreview(canvas, particles.preset, localProgress, particles.intensity);
   }
 
+  useEffect(() => {
+    if (!previewOpen) {
+      if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+      previewAnimationRef.current = null;
+      videoPreviewAudioRef.current?.pause();
+      return;
+    }
+    const schedule = buildMotionPreviewSchedule(
+      images.map(() => secondsPerImage),
+      transition,
+      transitionDuration,
+    );
+    const draw = () => {
+      const current = videoPreviewAudioRef.current;
+      if (!current) return;
+      const time = Math.min(current.currentTime, Math.max(0, audioDuration - 0.001));
+      const state = getMotionPreviewFrameState(time, schedule);
+      if (state?.kind === "transition") {
+        drawAtTime(time, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
+        drawAtTime(time, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
+        setPreviewTransitionProgress(state.progress);
+        setPreviewIncomingVisible(true);
+      } else if (state?.kind === "clip") {
+        drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+        setPreviewIncomingVisible(false);
+        setPreviewTransitionProgress(0);
+      }
+      if (Math.abs(time - previewUiTimeRef.current) >= 0.2 || time === 0) {
+        previewUiTimeRef.current = time;
+        setPreviewPlaybackTime(time);
+      }
+      if (!current.paused && !current.ended) {
+        previewAnimationRef.current = requestAnimationFrame(draw);
+      }
+    };
+    draw();
+    return () => {
+      if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+      previewAnimationRef.current = null;
+    };
+  }, [previewOpen, images, audioDuration, secondsPerImage, transition, transitionDuration, effect, zoomStrength, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    const handlePreviewKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewOpen(false);
+    };
+    window.addEventListener("keydown", handlePreviewKeyDown);
+    return () => window.removeEventListener("keydown", handlePreviewKeyDown);
+  }, [previewOpen]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    const audio = videoPreviewAudioRef.current;
+    if (audio) {
+      audioRef.current?.pause();
+      setPreviewSelectedImage(false);
+      previewUiTimeRef.current = 0;
+      audio.pause();
+      audio.currentTime = 0;
+      setPreviewPlaybackTime(0);
+    }
+  }, [previewOpen, audioUrl, soundtrackVolume]);
+
   useEffect(() => () => {
     renderControllerRef.current?.abort();
+    if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+    videoPreviewAudioRef.current?.pause();
+    imageCacheRef.current.forEach((image) => {
+      image.onload = null;
+      image.onerror = null;
+      image.src = "";
+    });
+    imageCacheRef.current.clear();
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current.clear();
     if (audioObjectUrlRef.current) URL.revokeObjectURL(audioObjectUrlRef.current);
   }, []);
 
@@ -888,15 +862,15 @@ export default function MotionStudio() {
   const exportForColab = async () => {
     if (!canRender || colabExporting || rendering) return;
     setColabExporting(true);
-    setNotice("Preparing a portable Colab package with the project media and local renderer…");
+    setNotice("Preparing the offline Colab package with your project archive and FFmpeg renderer…");
     let temporaryProject: StudioProject | null = null;
     try {
       temporaryProject = await buildRenderProject();
       const packageBlob = await buildColabRenderPackage(temporaryProject);
-      downloadMotionPackage(packageBlob, "gridsplit-motion-studio-colab-t4.zip");
-      setNotice("Colab package created. Upload the ZIP in the included notebook; NVENC is used when the selected runtime exposes it.");
+      downloadMotionPackage(packageBlob, "gridsplit-motion-studio-colab-package.zip");
+      setNotice("Offline Colab package downloaded. The live Quick Tunnel workflow is available separately above.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not prepare the Colab package.");
+      setNotice(error instanceof Error ? error.message : "Could not prepare the offline Colab package.");
     } finally {
       if (temporaryProject) {
         await Promise.all([
@@ -905,6 +879,65 @@ export default function MotionStudio() {
         ]);
       }
       setColabExporting(false);
+    }
+  };
+
+  const downloadColabNotebook = () => {
+    downloadMotionPackage(buildColabNotebook(), "GridSplit_Live_Colab_Renderer.ipynb");
+    setNotice("Colab notebook downloaded. Open it in Google Colab, select a T4 GPU, and run all cells.");
+  };
+
+  const testColabConnection = async () => {
+    setColabChecking(true);
+    setColabReady(false);
+    setColabProgress(null);
+    try {
+      const message = await checkColabRenderer(colabEndpoint, colabToken);
+      setColabReady(true);
+      setNotice(message);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not connect to the Colab renderer.");
+    } finally {
+      setColabChecking(false);
+    }
+  };
+
+  const startColabRender = async () => {
+    if (!canRender || rendering || !colabReady) return;
+    setRendering(true);
+    setJob(null);
+    setColabProgress({ stage: "uploading", progress: 0, message: "Preparing the portable project archive…" });
+    setNotice("Preparing the project for authenticated upload to Google Colab…");
+    const controller = new AbortController();
+    renderControllerRef.current = controller;
+    let temporaryProject: StudioProject | null = null;
+    try {
+      temporaryProject = await buildRenderProject();
+      const result = await renderProjectOnColab(
+        temporaryProject, colabEndpoint, colabToken,
+        (progress) => {
+          setColabProgress(progress);
+          if (progress.job) setJob(progress.job);
+          setNotice(progress.message);
+        },
+        controller.signal,
+      );
+      downloadRenderedVideo(result.blob, "gridsplit-motion-studio-colab");
+      setJob(result.job);
+      setNotice("Colab FFmpeg render completed and the validated MP4 was downloaded.");
+    } catch (error) {
+      const cancelled = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
+      setNotice(cancelled ? "Colab render cancelled. Temporary upload/job data will be cleaned up." :
+        error instanceof Error ? error.message : "Colab render failed.");
+    } finally {
+      if (temporaryProject) {
+        await Promise.all([
+          ...(temporaryProject.imageAssets ?? []).map((asset) => deleteProjectImageBlob(asset.id).catch(() => undefined)),
+          ...(temporaryProject.mixAssets ?? []).map((asset) => deleteProjectMedia(temporaryProject!.id, asset.id).catch(() => undefined)),
+        ]);
+      }
+      if (renderControllerRef.current === controller) renderControllerRef.current = null;
+      setRendering(false);
     }
   };
 
@@ -1104,6 +1137,8 @@ export default function MotionStudio() {
                 {!images.length && <div className="motion-preview-empty"><Clapperboard size={25} /><b>Your animated preview appears here</b><span>Import images and audio to preview the sequence.</span></div>}
               </div>
               <div className="motion-preview-footer"><span>{previewImage ? "FRAME " + (currentIndex + 1) + " / " + images.length + " · " + previewImage.asset.name : "NO FRAME SELECTED"}</span><span>{previewTime}</span></div>
+              <button type="button" className="motion-secondary-button motion-open-preview" disabled={!canRender} onClick={() => setPreviewOpen(true)}><Maximize2 size={14} /> Open Video Preview</button>
+              <p className="motion-note">The browser preview reuses the editor's camera, keyframe, foreground and particle drawing utilities and follows the FFmpeg transition schedule. FFmpeg-only grayscale depth displacement and exact particle/compositing rasterization are approximated in real time; the final MP4 remains authoritative for those passes.</p>
             </div>
           </section>
 
@@ -1284,22 +1319,40 @@ export default function MotionStudio() {
               <label>Fade in <span>{audioFadeIn.toFixed(1)}s</span><input type="range" min="0" max="5" step="0.1" disabled={rendering} value={audioFadeIn} onChange={(event) => setAudioFadeIn(Number(event.target.value))} /></label>
               <label>Fade out <span>{audioFadeOut.toFixed(1)}s</span><input type="range" min="0" max="10" step="0.1" disabled={rendering} value={audioFadeOut} onChange={(event) => setAudioFadeOut(Number(event.target.value))} /></label>
             </div>
-            <div className="motion-renderer-connection">
+            <div className="motion-colab-connection">
+              <div className="motion-panel-heading"><div><span>GOOGLE COLAB · GPU RENDERING</span><h2>Render on Google Colab</h2><p>Use your running Colab T4 session with the same portable project archive and FFmpeg pipeline.</p></div><Cloud size={19} /></div>
+              <button type="button" className="motion-secondary-button" onClick={downloadColabNotebook} disabled={rendering}><Cloud size={13} /> Download Colab notebook (.ipynb)</button>
+              <button type="button" className="motion-secondary-button" onClick={() => void exportForColab()} disabled={!canRender || rendering || colabExporting}>
+                {colabExporting ? <Loader2 size={13} /> : <Cloud size={13} />}
+                {colabExporting ? "Preparing offline package…" : "Download offline Colab package (.zip)"}
+              </button>
+              <label className="motion-field">Colab Quick Tunnel URL
+                <input value={colabEndpoint} disabled={rendering} placeholder="https://your-tunnel.trycloudflare.com" onChange={(event) => { setColabEndpoint(event.target.value); setColabReady(false); }} />
+              </label>
+              <label className="motion-field">Secure connection token
+                <input type="password" autoComplete="off" value={colabToken} disabled={rendering} placeholder="Paste token from the running Colab notebook" onChange={(event) => { setColabToken(event.target.value); setColabReady(false); }} />
+              </label>
+              <button type="button" className="motion-secondary-button" onClick={() => void testColabConnection()} disabled={colabChecking || rendering || !colabEndpoint.trim() || !colabToken.trim()}>
+                {colabChecking ? <Loader2 size={13} /> : <RefreshCw size={13} />} {colabChecking ? "Testing connection…" : "Test Connection"}
+              </button>
+              <p className={colabReady ? "motion-renderer-status ready" : "motion-renderer-status"}>{colabReady ? <CheckCircle2 size={13} /> : <span className="motion-status-dot" />}{colabReady ? "Connected to authenticated Colab renderer." : "Not connected. Run the notebook in Colab and paste its URL and token."}</p>
+              <p className="motion-colab-caption">The renderer binds to loopback in Colab and is reachable only through the authenticated Quick Tunnel. The token is sent in request headers, not URL parameters.</p>
+            </div>
+                        <div className="motion-renderer-connection">
               <b><ShieldCheck size={14} /> LOCAL RENDERER</b>
               <input aria-label="Local renderer URL" value={rendererUrl} disabled={rendering} onChange={(event) => { setRendererUrl(event.target.value); setRendererReady(false); }} />
               <button type="button" className="motion-secondary-button" onClick={() => void checkRenderer()} disabled={checkingRenderer || rendering}><RefreshCw size={13} /> {checkingRenderer ? "Checking…" : "Check connection"}</button>
               <p className={rendererReady ? "motion-renderer-status ready" : "motion-renderer-status"}>{rendererReady ? <CheckCircle2 size={13} /> : <span className="motion-status-dot" />}{rendererMessage}</p>
               {!rendererReady && <div className="motion-install-note"><b>Start the local engine</b><code>python local-render/server.py --allow-origin http://localhost:5173</code><small>For the deployed site, allow its exact HTTPS origin instead. Keep the sidecar running while rendering.</small></div>}
             </div>
-            <button type="button" className="motion-colab-button" disabled={!canRender || colabExporting || rendering} onClick={() => void exportForColab()}>
-              {colabExporting ? <Loader2 size={14} /> : <Cloud size={14} />}
-              {colabExporting ? "Preparing Colab package…" : "Export Colab / T4 package"}
+            <button type="button" className="motion-colab-button" disabled={!canRender || !colabReady || rendering} onClick={() => void startColabRender()}>
+              {rendering && colabProgress ? <Loader2 size={14} /> : <Cloud size={14} />}
+              Render on Google Colab
             </button>
-            <p className="motion-colab-caption">Creates a ZIP containing the project, renderer and Colab notebook. GPU acceleration is used only when Google provides a compatible T4/NVENC runtime.</p>
             {rendering ? <div className="motion-job-status">
-              <div><Loader2 size={15} /><b>{job?.status === "running" ? "Rendering locally" : "Preparing render"}</b><span>{Math.round(job?.progress ?? 0)}%</span></div>
-              <div className="motion-progress"><span style={{ width: (job?.progress ?? 0) + "%" }} /></div>
-              <p>{job?.message || "Packaging source files locally…"}</p>
+              <div><Loader2 size={15} /><b>{colabProgress ? colabProgress.stage === "uploading" ? "Uploading to Colab" : colabProgress.stage === "downloading" ? "Downloading MP4" : job?.status === "queued" ? "Queued on Colab" : "Rendering on Colab" : job?.status === "running" ? "Rendering locally" : "Preparing render"}</b><span>{Math.round(colabProgress?.progress ?? job?.progress ?? 0)}%</span></div>
+              <div className="motion-progress"><span style={{ width: (colabProgress?.progress ?? job?.progress ?? 0) + "%" }} /></div>
+              <p>{colabProgress?.message || job?.message || "Preparing source files…"}</p>
               <button type="button" className="motion-cancel-button" onClick={cancelRender}><Square size={13} /> Cancel render</button>
             </div> : <button type="button" className="motion-render-button" disabled={!canRender || !rendererReady} onClick={() => void startRender()}><Clapperboard size={16} /> Render MP4 locally</button>}
             {notice && <p className="motion-notice" role="status">{notice}</p>}
@@ -1311,6 +1364,134 @@ export default function MotionStudio() {
           </section>
         </aside>
       </div>
+      {previewOpen && <div className="motion-video-modal" role="dialog" aria-modal="true" aria-label="Fullscreen video preview" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") setPreviewOpen(false); }}>
+        <div className="motion-video-modal-content">
+          <div className="motion-video-stage" style={{ aspectRatio: dimensions.width + " / " + dimensions.height }}>
+            <canvas
+              ref={videoPreviewCanvasRef}
+              width={dimensions.width > dimensions.height ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
+              height={dimensions.height > dimensions.width ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
+              className="motion-video-preview-layer"
+            />
+            <canvas
+              ref={videoPreviewIncomingCanvasRef}
+              width={dimensions.width > dimensions.height ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
+              height={dimensions.height > dimensions.width ? 1280 : dimensions.width === dimensions.height ? 900 : 720}
+              className="motion-video-preview-layer motion-video-preview-incoming"
+              style={previewIncomingVisible
+                ? transition === "wipe-left"
+                  ? { opacity: 1, clipPath: "inset(0 0 0 " + (100 - previewTransitionProgress * 100) + "%)" }
+                  : transition === "wipe-right"
+                    ? { opacity: 1, clipPath: "inset(0 " + (100 - previewTransitionProgress * 100) + "% 0 0)" }
+                    : { opacity: previewTransitionProgress }
+                : { opacity: 0 }}
+            />
+          </div>
+          <audio
+            ref={videoPreviewAudioRef}
+            src={audioUrl || undefined}
+            preload="auto"
+            muted={previewMuted}
+            onTimeUpdate={(event) => {
+              const audio = event.currentTarget;
+              const elapsed = audio.currentTime;
+              const fadeIn = audioFadeIn > 0 ? Math.min(1, elapsed / audioFadeIn) : 1;
+              const remaining = audioDuration - elapsed;
+              const fadeOut = audioFadeOut > 0 ? Math.min(1, Math.max(0, remaining / audioFadeOut)) : 1;
+              audio.volume = Math.min(1, Math.max(0, soundtrackVolume * Math.min(fadeIn, fadeOut)));
+              setPreviewPlaybackTime(elapsed);
+            }}
+            onPlay={() => {
+              if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+              const tick = () => {
+                const audio = videoPreviewAudioRef.current;
+                if (!audio || audio.paused || audio.ended) return;
+                const time = audio.currentTime;
+                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                if (state?.kind === "transition") {
+                  drawAtTime(time, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
+                  drawAtTime(time, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
+                  setPreviewTransitionProgress(state.progress);
+                  setPreviewIncomingVisible(true);
+                } else if (state?.kind === "clip") {
+                  drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+                  setPreviewIncomingVisible(false);
+                }
+                if (Math.abs(time - previewUiTimeRef.current) >= 0.2 || time === 0) {
+                  previewUiTimeRef.current = time;
+                  setPreviewPlaybackTime(time);
+                }
+                previewAnimationRef.current = requestAnimationFrame(tick);
+              };
+              previewAnimationRef.current = requestAnimationFrame(tick);
+            }}
+            onPause={() => {
+              if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+              previewAnimationRef.current = null;
+              if (videoPreviewAudioRef.current) {
+                const time = videoPreviewAudioRef.current.currentTime;
+                const state = getMotionPreviewFrameState(time, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                if (state?.kind === "clip") {
+                  drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+                  setPreviewIncomingVisible(false);
+                } else if (state?.kind === "transition") {
+                  drawAtTime(time, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
+                  drawAtTime(time, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
+                  setPreviewTransitionProgress(state.progress);
+                  setPreviewIncomingVisible(true);
+                }
+              }
+            }}
+            onEnded={() => {
+              previewUiTimeRef.current = audioDuration;
+              setPreviewPlaybackTime(audioDuration);
+            }}
+          />
+          <div className="motion-video-controls">
+            <div className="motion-video-time"><span>{formatTime(previewPlaybackTime)}</span><span>{formatTime(audioDuration)}</span></div>
+            <input
+              aria-label="Seek video preview"
+              type="range"
+              min="0"
+              max={Math.max(0, audioDuration)}
+              step="0.01"
+              value={Math.min(previewPlaybackTime, audioDuration)}
+              onChange={(event) => {
+                const audio = videoPreviewAudioRef.current;
+                if (audio) {
+                  audio.currentTime = Number(event.target.value);
+                  previewUiTimeRef.current = audio.currentTime;
+                  setPreviewPlaybackTime(audio.currentTime);
+                  const state = getMotionPreviewFrameState(audio.currentTime, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
+                  if (state?.kind === "clip") {
+                    drawAtTime(audio.currentTime, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
+                    setPreviewIncomingVisible(false);
+                  } else if (state?.kind === "transition") {
+                    drawAtTime(audio.currentTime, videoPreviewCanvasRef.current, state.outgoingIndex, state.outgoingProgress);
+                    drawAtTime(audio.currentTime, videoPreviewIncomingCanvasRef.current, state.incomingIndex, state.incomingProgress);
+                    setPreviewTransitionProgress(state.progress);
+                    setPreviewIncomingVisible(true);
+                  }
+                }
+              }}
+            />
+            <div className="motion-video-control-buttons">
+              <button type="button" aria-label={videoPreviewAudioRef.current?.paused ? "Play" : "Pause"} onClick={() => {
+                const audio = videoPreviewAudioRef.current;
+                if (!audio) return;
+                if (audio.paused) void audio.play();
+                else audio.pause();
+              }}>{videoPreviewAudioRef.current?.paused ? <Play size={18} /> : <Pause size={18} />}</button>
+              <button type="button" aria-label="Restart preview" onClick={() => {
+                const audio = videoPreviewAudioRef.current;
+                if (audio) { audio.currentTime = 0; previewUiTimeRef.current = 0; setPreviewPlaybackTime(0); void audio.play(); }
+              }}><RefreshCw size={17} /></button>
+              <button type="button" aria-label={previewMuted ? "Unmute" : "Mute"} onClick={() => setPreviewMuted((value) => !value)}>{previewMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
+              <button type="button" aria-label="Close video preview" onClick={() => setPreviewOpen(false)}><X size={19} /></button>
+            </div>
+          </div>
+        </div>
+      </div>}
     </section>
   );
 }
