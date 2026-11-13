@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown, ArrowUp, AudioLines, CheckCircle2, Clapperboard, FileAudio,
   ImagePlus, Loader2, RefreshCw, ShieldCheck, Sparkles, Square,
-  Trash2, Upload, WandSparkles, KeyRound, Layers3, Flame, Cloud, CloudSnow, CloudRain, Sparkles as SparklesIcon,
+  Trash2, Upload, WandSparkles, KeyRound, Layers3, Flame, Cloud, CloudSnow, CloudRain,
+  Sparkles as SparklesIcon, Play, Pause, Volume2, VolumeX, Maximize2, X,
 } from "lucide-react";
 import type { StudioProject, ProjectImageAsset, ProjectTimelineClip } from "../../lib/projectStore";
 import type {
