@@ -17,7 +17,7 @@ import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
 import { buildEvenImageTimeline, buildMotionPreviewSchedule, getMotionPreviewFrameState, moveSequenceItem } from "./motionTiming";
-import { buildColabNotebook, downloadMotionPackage } from "./colabExport";
+import { buildColabNotebook, buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
 import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
 import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings } from "./motionLayers";
@@ -151,6 +151,7 @@ export default function MotionStudio() {
   const [colabEndpoint, setColabEndpoint] = useState("");
   const [colabToken, setColabToken] = useState("");
   const [colabReady, setColabReady] = useState(false);
+  const [colabExporting, setColabExporting] = useState(false);
   const [colabChecking, setColabChecking] = useState(false);
   const [colabProgress, setColabProgress] = useState<ColabProgress | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -858,6 +859,29 @@ export default function MotionStudio() {
     }
   };
 
+  const exportForColab = async () => {
+    if (!canRender || colabExporting || rendering) return;
+    setColabExporting(true);
+    setNotice("Preparing the offline Colab package with your project archive and FFmpeg renderer…");
+    let temporaryProject: StudioProject | null = null;
+    try {
+      temporaryProject = await buildRenderProject();
+      const packageBlob = await buildColabRenderPackage(temporaryProject);
+      downloadMotionPackage(packageBlob, "gridsplit-motion-studio-colab-package.zip");
+      setNotice("Offline Colab package downloaded. The live Quick Tunnel workflow is available separately above.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not prepare the offline Colab package.");
+    } finally {
+      if (temporaryProject) {
+        await Promise.all([
+          ...(temporaryProject.imageAssets ?? []).map((asset) => deleteProjectImageBlob(asset.id).catch(() => undefined)),
+          ...(temporaryProject.mixAssets ?? []).map((asset) => deleteProjectMedia(temporaryProject!.id, asset.id).catch(() => undefined)),
+        ]);
+      }
+      setColabExporting(false);
+    }
+  };
+
   const downloadColabNotebook = () => {
     downloadMotionPackage(buildColabNotebook(), "GridSplit_Live_Colab_Renderer.ipynb");
     setNotice("Colab notebook downloaded. Open it in Google Colab, select a T4 GPU, and run all cells.");
@@ -1298,6 +1322,10 @@ export default function MotionStudio() {
             <div className="motion-colab-connection">
               <div className="motion-panel-heading"><div><span>GOOGLE COLAB · GPU RENDERING</span><h2>Render on Google Colab</h2><p>Use your running Colab T4 session with the same portable project archive and FFmpeg pipeline.</p></div><Cloud size={19} /></div>
               <button type="button" className="motion-secondary-button" onClick={downloadColabNotebook} disabled={rendering}><Cloud size={13} /> Download Colab notebook (.ipynb)</button>
+              <button type="button" className="motion-secondary-button" onClick={() => void exportForColab()} disabled={!canRender || rendering || colabExporting}>
+                {colabExporting ? <Loader2 size={13} /> : <Cloud size={13} />}
+                {colabExporting ? "Preparing offline package…" : "Download offline Colab package (.zip)"}
+              </button>
               <label className="motion-field">Colab Quick Tunnel URL
                 <input value={colabEndpoint} disabled={rendering} placeholder="https://your-tunnel.trycloudflare.com" onChange={(event) => { setColabEndpoint(event.target.value); setColabReady(false); }} />
               </label>
