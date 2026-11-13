@@ -76,6 +76,22 @@ def extract_images(archive_path: Path, destination: Path) -> list[Path]:
 
 
 def transcribe_audio(audio_path: Path, model_size: str = "small") -> tuple[list[dict[str, Any]], str]:
+    # faster-whisper 1.2.1 calls av.open(..., metadata_errors="ignore").
+    # PyAV 19 removed that keyword, so fail with a useful setup message rather
+    # than retrying the same incompatible decoder on CPU.
+    import av
+
+    av_version = tuple(
+        int(part) for part in re.findall(r"\\d+", str(getattr(av, "__version__", "0")))
+    )
+    if av_version >= (19, 0):
+        raise RuntimeError(
+            f"PyAV {getattr(av, '__version__', 'unknown')} is incompatible with "
+            "faster-whisper 1.2.1. In Colab run "
+            "`!pip -q install --force-reinstall --no-deps av==18.1.0`, "
+            "then restart the runtime and rerun the notebook."
+        )
+
     from faster_whisper import WhisperModel
 
     def collect(device: str, selected_model: str, compute_type: str):
