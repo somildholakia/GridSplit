@@ -17,9 +17,11 @@ import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
 import { buildEvenImageTimeline, moveSequenceItem } from "./motionTiming";
+import { buildColabNotebook, downloadMotionPackage } from "./colabExport";
+import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
 import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
-import { buildColabRenderPackage, downloadMotionPackage } from "./colabExport";
+
 import "./motion-studio.css";
 
 type MotionForeground = { asset: ProjectImageAsset; file: File; objectUrl: string };
@@ -267,6 +269,14 @@ export default function MotionStudio() {
   const [parallaxStrength, setParallaxStrength] = useState(45);
   const [depthMapWorking, setDepthMapWorking] = useState(false);
   const [colabExporting, setColabExporting] = useState(false);
+  const [colabEndpoint, setColabEndpoint] = useState("");
+  const [colabToken, setColabToken] = useState("");
+  const [colabReady, setColabReady] = useState(false);
+  const [colabChecking, setColabChecking] = useState(false);
+  const [colabProgress, setColabProgress] = useState<ColabProgress | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewMuted, setPreviewMuted] = useState(false);
+  const [previewTime, setPreviewTime] = useState(0);
   const [transition, setTransition] = useState<TransitionKind>("dissolve");
   const [transitionDuration, setTransitionDuration] = useState(0.6);
   const [zoomStrength, setZoomStrength] = useState(1.16);
@@ -284,6 +294,9 @@ export default function MotionStudio() {
   const [audioFadeOut, setAudioFadeOut] = useState(1.5);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previewAnimationRef = useRef<number | null>(null);
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const objectUrlsRef = useRef<Set<string>>(new Set());
   const audioObjectUrlRef = useRef("");
@@ -338,8 +351,8 @@ export default function MotionStudio() {
     };
   }, [images, audioDuration, effect, zoomStrength, playhead, playing, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength, selectedImageId, previewSelectedImage]);
 
-  function drawAtTime(time: number): void {
-    const canvas = canvasRef.current;
+  function drawAtTime(time: number, targetCanvas: HTMLCanvasElement | null = canvasRef.current): void {
+    const canvas = targetCanvas;
     if (!canvas) return;
     if (!images.length) {
       const context = canvas.getContext("2d");
@@ -413,6 +426,41 @@ export default function MotionStudio() {
     const particles = resolveParticleSettings(imageItem.particlePreset, imageItem.particleIntensity, particlePreset, particleIntensity);
     drawParticlePreview(canvas, particles.preset, localProgress, particles.intensity);
   }
+
+  useEffect(() => {
+    if (!previewOpen) {
+      if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+      previewAnimationRef.current = null;
+      videoPreviewAudioRef.current?.pause();
+      return;
+    }
+    const audio = videoPreviewAudioRef.current;
+    const draw = () => {
+      const current = videoPreviewAudioRef.current;
+      if (!current) return;
+      const time = Math.min(current.currentTime, Math.max(0, audioDuration - 0.001));
+      drawAtTime(time, videoPreviewCanvasRef.current);
+      setPreviewTime(time);
+      if (!current.paused && !current.ended) {
+        previewAnimationRef.current = requestAnimationFrame(draw);
+      }
+    };
+    draw();
+    return () => {
+      if (previewAnimationRef.current !== null) cancelAnimationFrame(previewAnimationRef.current);
+      previewAnimationRef.current = null;
+    };
+  }, [previewOpen, images, audioDuration, effect, zoomStrength, aspectRatio, outputSize, particlePreset, particleIntensity, parallaxStrength]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    const audio = videoPreviewAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      setPreviewTime(0);
+    }
+  }, [previewOpen, audioUrl]);
 
   useEffect(() => () => {
     renderControllerRef.current?.abort();
@@ -886,18 +934,53 @@ export default function MotionStudio() {
     }
   };
 
-  const exportForColab = async () => {
-    if (!canRender || colabExporting || rendering) return;
-    setColabExporting(true);
-    setNotice("Preparing a portable Colab package with the project media and local renderer…");
+  const downloadColabNotebook = () => {
+    downloadMotionPackage(buildColabNotebook(), "GridSplit_Live_Colab_Renderer.ipynb");
+    setNotice("Colab notebook downloaded. Open it in Google Colab, select a T4 GPU, and run all cells.");
+  };
+
+  const testColabConnection = async () => {
+    setColabChecking(true);
+    setColabReady(false);
+    setColabProgress(null);
+    try {
+      const message = await checkColabRenderer(colabEndpoint, colabToken);
+      setColabReady(true);
+      setNotice(message);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not connect to the Colab renderer.");
+    } finally {
+      setColabChecking(false);
+    }
+  };
+
+  const startColabRender = async () => {
+    if (!canRender || rendering || !colabReady) return;
+    setRendering(true);
+    setJob(null);
+    setColabProgress({ stage: "uploading", progress: 0, message: "Preparing the portable project archive…" });
+    setNotice("Preparing the project for authenticated upload to Google Colab…");
+    const controller = new AbortController();
+    renderControllerRef.current = controller;
     let temporaryProject: StudioProject | null = null;
     try {
       temporaryProject = await buildRenderProject();
-      const packageBlob = await buildColabRenderPackage(temporaryProject);
-      downloadMotionPackage(packageBlob, "gridsplit-motion-studio-colab-t4.zip");
-      setNotice("Colab package created. Upload the ZIP in the included notebook; NVENC is used when the selected runtime exposes it.");
+      const result = await renderProjectOnColab(
+        temporaryProject, colabEndpoint, colabToken,
+        (progress) => {
+          setColabProgress(progress);
+          if (progress.job) setJob(progress.job);
+          setNotice(progress.message);
+        },
+        controller.signal,
+      );
+      downloadRenderedVideo(result.blob, "gridsplit-motion-studio-colab");
+      setJob(result.job);
+      setNotice("Colab FFmpeg render completed and the validated MP4 was downloaded.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not prepare the Colab package.");
+      const cancelled = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
+      setNotice(cancelled ? "Colab render cancelled. Temporary upload/job data will be cleaned up." :
+        error instanceof Error ? error.message : "Colab render failed.");
     } finally {
       if (temporaryProject) {
         await Promise.all([
@@ -905,7 +988,8 @@ export default function MotionStudio() {
           ...(temporaryProject.mixAssets ?? []).map((asset) => deleteProjectMedia(temporaryProject!.id, asset.id).catch(() => undefined)),
         ]);
       }
-      setColabExporting(false);
+      if (renderControllerRef.current === controller) renderControllerRef.current = null;
+      setRendering(false);
     }
   };
 
