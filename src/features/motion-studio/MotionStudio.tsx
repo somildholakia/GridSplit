@@ -17,9 +17,9 @@ import {
   deleteProjectImageBlob, deleteProjectMedia, saveProjectImageBlob, saveProjectMedia,
 } from "../../lib/projectMediaStore";
 import { buildMotionPreviewSchedule, getMotionPreviewFrameState, moveSequenceItem } from "./motionTiming";
-import { buildImageTimelineFromDurations, getTimelinePosition, normalizeMediaFilename, parseMotionSyncManifest, resolveMotionSyncManifest } from "./syncManifest";
+import { buildImageTimelineFromDurations, getTimelinePosition, normalizeMediaFilename, parseMotionSyncManifest, resolveMotionSyncManifest, type MotionSyncManifest } from "./syncManifest";
 import { buildColabNotebook, buildColabRenderPackage, buildDriveSyncNotebook, downloadMotionPackage } from "./colabExport";
-import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
+import { checkColabRenderer, renderProjectOnColab, renderDriveSourceOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import { createCompositionDepthMap, depthMapToImageData } from "./depthEstimation";
 import { createPresetKeyframes, insertMotionKeyframe, resolveParticleSettings, sampleMotionKeyframes } from "./motionLayers";
 import { drawMotionFrame, drawParticlePreview } from "./motionCanvas";
@@ -137,6 +137,10 @@ export default function MotionStudio() {
   const [audioError, setAudioError] = useState("");
   const [syncDurationsByImageId, setSyncDurationsByImageId] = useState<Record<string, number>>({});
   const [syncManifestName, setSyncManifestName] = useState("");
+  const [driveSyncManifest, setDriveSyncManifest] = useState<MotionSyncManifest | null>(null);
+  const [driveFolderPath, setDriveFolderPath] = useState("/content/drive/MyDrive/youtube video mars 1");
+  const [driveArchiveName, setDriveArchiveName] = useState("mars E1 zip.zip");
+  const [driveAudioName, setDriveAudioName] = useState("Mars-E1-complete-audio.wav");
   const [rendererUrl, setRendererUrl] = useState("http://127.0.0.1:8766");
   const [rendererReady, setRendererReady] = useState(false);
   const [rendererMessage, setRendererMessage] = useState("Local renderer not checked yet.");
@@ -619,20 +623,22 @@ export default function MotionStudio() {
 
   const handleSyncManifestFile = async (file?: File) => {
     if (!file || rendering) return;
-    if (!audioFile || !audioDuration || !images.length) {
-      setNotice("Import all images and the matching soundtrack before applying synchronization JSON.");
-      return;
-    }
     if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
       setNotice("Synchronization JSON must be smaller than 10 MB.");
       return;
     }
     try {
       const manifest = parseMotionSyncManifest(JSON.parse(await file.text()));
+      setDriveSyncManifest(manifest);
+      setSyncManifestName(file.name);
+      if (!audioFile || !audioDuration || !images.length) {
+        setNotice("Smart Sync JSON loaded. Colab can now read the matching ZIP and WAV directly from mounted Google Drive.");
+        return;
+      }
       const imagesByName = new Map(images.map((item) => [normalizeMediaFilename(item.asset.name), item]));
       const orderedImages = manifest.images.map((entry) => imagesByName.get(normalizeMediaFilename(entry.fileName)));
       if (orderedImages.some((item) => !item)) {
-        throw new Error("The sync manifest references images that are not loaded. Check the image filenames and try again.");
+        throw new Error("The sync JSON is ready for Drive rendering, but one or more images are not loaded in this browser workspace.");
       }
       const validImages = orderedImages.filter((item): item is MotionImage => Boolean(item));
       const durations = resolveMotionSyncManifest(
@@ -644,11 +650,11 @@ export default function MotionStudio() {
         asset: { ...item.asset, order, sequenceNumber: order + 1 },
       })));
       setSyncDurationsByImageId(durationMap);
-      setSyncManifestName(file.name);
       setPlayhead(0);
       setPreviewSelectedImage(false);
-      setNotice("Applied narration-aware timing to " + validImages.length + " images. Review the preview before rendering.");
+      setNotice("Applied narration-aware timing to " + validImages.length + " images. Review the preview or render directly from Drive.");
     } catch (error) {
+      setDriveSyncManifest(null);
       setNotice(error instanceof Error ? error.message : "Could not import the synchronization JSON.");
     }
   };
@@ -989,6 +995,57 @@ export default function MotionStudio() {
     }
   };
 
+  const startDriveColabRender = async () => {
+    if (!colabReady || !driveSyncManifest || rendering) return;
+    if (normalizeMediaFilename(driveSyncManifest.audio.fileName) !== normalizeMediaFilename(driveAudioName)) {
+      setNotice("The Drive audio filename does not match the imported Smart Sync JSON.");
+      return;
+    }
+    setRendering(true);
+    setJob(null);
+    setColabProgress({ stage: "rendering", progress: 0, message: "Sending the sync manifest to Colab…" });
+    setNotice("Colab is preparing the images and soundtrack directly from mounted Google Drive…");
+    const controller = new AbortController();
+    renderControllerRef.current = controller;
+    try {
+      const result = await renderDriveSourceOnColab(
+        colabEndpoint,
+        {
+          folderPath: driveFolderPath,
+          archiveName: driveArchiveName,
+          audioName: driveAudioName,
+          manifest: driveSyncManifest,
+          settings: {
+            width: dimensions.width,
+            height: dimensions.height,
+            fps,
+            aspectRatio,
+            transition,
+            transitionDurationSeconds: transitionDuration,
+            effect,
+            zoom: zoomStrength,
+          },
+        },
+        (progress) => {
+          setColabProgress(progress);
+          if (progress.job) setJob(progress.job);
+          setNotice(progress.message);
+        },
+        controller.signal,
+      );
+      downloadRenderedVideo(result.blob, "gridsplit-drive-smart-sync");
+      setJob(result.job);
+      setNotice("Drive-based Colab render completed and the validated MP4 was downloaded.");
+    } catch (error) {
+      const cancelled = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
+      setNotice(cancelled ? "Drive render cancelled. Temporary Colab job data will be cleaned up." :
+        error instanceof Error ? error.message : "Drive-based Colab render failed.");
+    } finally {
+      if (renderControllerRef.current === controller) renderControllerRef.current = null;
+      setRendering(false);
+    }
+  };
+
   const cancelRender = () => renderControllerRef.current?.abort();
 
   const clearImages = () => {
@@ -1093,7 +1150,7 @@ export default function MotionStudio() {
             </div>}
             <div className="motion-sync-import">
               <label className="motion-audio-button"><Layers3 size={14} /> Import sync JSON
-                <input type="file" accept="application/json,.json" disabled={rendering || !images.length || !audioFile || !audioDuration} onChange={(event) => { void handleSyncManifestFile(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} />
+                <input type="file" accept="application/json,.json" disabled={rendering} onChange={(event) => { void handleSyncManifestFile(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} />
               </label>
               <small>{syncManifestName ? "Narration-aware timing · " + syncManifestName : "Load images and audio, then apply the Smart Sync JSON generated by Colab."}</small>
             </div>
@@ -1379,6 +1436,23 @@ export default function MotionStudio() {
               <div className="motion-panel-heading"><div><span>GOOGLE COLAB · GPU RENDERING</span><h2>Render on Google Colab</h2><p>Use your running Colab T4 session with the same portable project archive and FFmpeg pipeline.</p></div><Cloud size={19} /></div>
               <button type="button" className="motion-secondary-button" onClick={downloadColabNotebook} disabled={rendering}><Cloud size={13} /> Download Colab notebook (.ipynb)</button>
               <button type="button" className="motion-secondary-button" onClick={downloadDriveSyncNotebook} disabled={rendering}><Sparkles size={13} /> Download Drive Smart Sync analyzer (.ipynb)</button>
+              <div className="motion-drive-render-fields">
+                <b><Layers3 size={14} /> DIRECT DRIVE RENDER · NO 1.28 GB BROWSER UPLOAD</b>
+                <label className="motion-field">Mounted Google Drive folder path
+                  <input value={driveFolderPath} disabled={rendering} onChange={(event) => setDriveFolderPath(event.target.value)} />
+                </label>
+                <label className="motion-field">Image ZIP filename
+                  <input value={driveArchiveName} disabled={rendering} onChange={(event) => setDriveArchiveName(event.target.value)} />
+                </label>
+                <label className="motion-field">Audio filename
+                  <input value={driveAudioName} disabled={rendering} onChange={(event) => setDriveAudioName(event.target.value)} />
+                </label>
+                <p>{driveSyncManifest ? "Smart Sync ready · " + driveSyncManifest.images.length + " images · " + formatTime(driveSyncManifest.audio.durationSeconds) : "Import gridsplit-sync.json above after running the Smart Sync notebook."}</p>
+                <button type="button" className="motion-colab-button" disabled={!colabReady || !driveSyncManifest || rendering} onClick={() => void startDriveColabRender()}>
+                  {rendering && colabProgress?.stage === "rendering" ? <Loader2 size={14} /> : <Cloud size={14} />}
+                  Render directly from Google Drive on Colab
+                </button>
+              </div>
               <button type="button" className="motion-secondary-button" onClick={() => void exportForColab()} disabled={!canRender || rendering || colabExporting}>
                 {colabExporting ? <Loader2 size={13} /> : <Cloud size={13} />}
                 {colabExporting ? "Preparing offline package…" : "Download offline Colab package (.zip)"}
@@ -1386,8 +1460,9 @@ export default function MotionStudio() {
               <label className="motion-field">Colab Quick Tunnel URL
                 <input value={colabEndpoint} disabled={rendering} placeholder="https://your-tunnel.trycloudflare.com" onChange={(event) => { setColabEndpoint(event.target.value); setColabReady(false); }} />
               </label>
-              </label>
-                {colabChecking ? <Loader2 size={13} /> : <RefreshCw size={13} />} {colabChecking ? "Testing connection…" : "Test Connection"}
+              <button type="button" className="motion-secondary-button" onClick={() => void testColabConnection()} disabled={colabChecking || rendering}>
+                {colabChecking ? <Loader2 size={13} /> : <RefreshCw size={13} />}
+                {colabChecking ? "Testing connection…" : "Test Connection"}
               </button>
             </div>
                         <div className="motion-renderer-connection">
