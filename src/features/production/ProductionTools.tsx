@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Film, Music2, Pause, Play, Plus, SlidersHorizontal, Upload, WandSparkles } from "lucide-react";
+import { Cloud, Download, Film, Loader2, Music2, Pause, Play, Plus, RefreshCw, SlidersHorizontal, Upload, WandSparkles } from "lucide-react";
 import type { StudioProject } from "../../lib/projectStore";
 import {
   DEFAULT_RENDER_PROFILE,
@@ -17,6 +17,8 @@ import { readGeneratedAudio } from "../../audio/audioStore";
 import { readProjectMedia, saveProjectMedia, deleteProjectMedia } from "../../lib/projectMediaStore";
 import { downloadPortableProject, exportPortableProject, importPortableProject } from "../../lib/portableProject";
 import { downloadRenderedVideo, getRenderReadiness, renderProjectLocally, type LocalRenderJob } from "../../lib/localRenderer";
+import { buildColabNotebook, downloadMotionPackage } from "../motion-studio/colabExport";
+import { checkColabRenderer, renderProjectOnColab, type ColabProgress } from "../../lib/colabRenderer";
 import "./production-tools.css";
 
 type ExtendedProject = StudioProject & {
@@ -67,6 +69,11 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
   const [tab, setTab] = useState<"mix" | "effects" | "render">("mix");
   const [selectedTrack, setSelectedTrack] = useState<"music" | "sfx">("music");
   const [endpoint, setEndpoint] = useState("http://127.0.0.1:8766");
+  const [colabEndpoint, setColabEndpoint] = useState("");
+  const [colabConnected, setColabConnected] = useState(false);
+  const [colabChecking, setColabChecking] = useState(false);
+  const [colabBusy, setColabBusy] = useState(false);
+  const [colabProgress, setColabProgress] = useState<ColabProgress | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<LocalRenderJob | null>(null);
@@ -74,6 +81,7 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
   const previewContext = useRef<AudioContext | null>(null);
   const previewSources = useRef<AudioBufferSourceNode[]>([]);
   const previewAbort = useRef<AbortController | null>(null);
+  const colabAbort = useRef<AbortController | null>(null);
 
   const updateTracks = useCallback((next: AudioMixTrack[]) => onUpdate({ audioMixTracks: next } as Partial<StudioProject>), [onUpdate]);
   const updateAssets = (next: MixAudioAsset[]) => onUpdate({ mixAssets: next } as Partial<StudioProject>);
@@ -114,6 +122,7 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
     previewSources.current.forEach((source) => { try { source.stop(); } catch { /* already ended */ } });
     void previewContext.current?.close();
     previewAbort.current?.abort();
+    colabAbort.current?.abort();
   }, []);
 
   const updateTrack = (id: string, patch: Partial<AudioMixTrack>) => {
@@ -315,7 +324,28 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
     }
   };
 
-  const cancelRender = () => previewAbort.current?.abort();
+  const downloadColabNotebook = () => {
+    downloadMotionPackage(buildColabNotebook(), "GridSplit_Live_Colab_Renderer.ipynb");
+    setNotice("Colab renderer notebook downloaded. Open it in Google Colab and run all cells.");
+  };
+
+  const connectColab = async () => {
+    setColabChecking(true); setColabConnected(false); setNotice("Connecting directly to the Colab runtime…");
+    try { const status = await checkColabRenderer(colabEndpoint); setColabConnected(true); setNotice(status); }
+    catch (error) { setNotice(error instanceof Error ? error.message : "Could not connect to Colab."); }
+    finally { setColabChecking(false); }
+  };
+
+  const startColabRender = async () => {
+    const controller = new AbortController(); colabAbort.current = controller;
+    setColabBusy(true); setColabProgress({ stage: "uploading", progress: 0, message: "Preparing project media for Colab…" });
+    try {
+      const result = await renderProjectOnColab(project, colabEndpoint, (progress) => { setColabProgress(progress); setNotice(progress.message); }, controller.signal);
+      downloadRenderedVideo(result.blob, project.name); setNotice("Colab MP4 rendered and downloaded successfully.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Colab rendering failed."); }
+    finally { colabAbort.current = null; setColabBusy(false); }
+  };
+  const cancelColabRender = () => colabAbort.current?.abort();
   const renderErrors = readyIssues.filter((issue) => issue.severity === "error");
   const renderWarnings = readyIssues.filter((issue) => issue.severity === "warning");
 
@@ -380,6 +410,14 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
       {renderWarnings.length > 0 && <div className="render-checks warnings"><b>Review these warnings</b>{renderWarnings.map((issue) => <p key={issue.code}>{issue.message}</p>)}</div>}
       {job && <div className="render-progress"><div><b>{job.status}</b><span>{job.progress}%</span></div><progress max="100" value={job.progress}/><small>{job.message || job.error}</small></div>}
       <div className="render-actions"><button className="production-tool-button" disabled={busy} onClick={() => void exportArchive()}><Download size={14}/> Export project ZIP</button><button className="production-tool-button primary" disabled={busy || renderErrors.length > 0} onClick={() => void startRender()}><Film size={14}/> Render MP4 locally</button>{busy && job && (job.status === "queued" || job.status === "running") && <button className="production-tool-button danger" onClick={cancelRender}>Cancel render</button>}</div>
+      <section className="colab-render-card">
+        <div className="colab-render-heading"><div><span className="colab-render-eyebrow"><Cloud size={13}/> GOOGLE COLAB · GPU RENDERING</span><h3>Render with Google Colab</h3><p>Use a Colab GPU to render this complete project, then bring the MP4 straight back here.</p></div><span className={colabConnected ? "colab-connection-pill connected" : "colab-connection-pill"}>{colabConnected ? "CONNECTED" : "NOT CONNECTED"}</span></div>
+        <button className="production-tool-button" type="button" disabled={colabBusy} onClick={downloadColabNotebook}><Cloud size={14}/> Download Colab notebook (.ipynb)</button>
+        <label className="render-endpoint">Colab Quick Tunnel URL<input value={colabEndpoint} disabled={colabBusy} spellCheck={false} placeholder="https://your-session.trycloudflare.com" onChange={(event) => { setColabEndpoint(event.target.value); setColabConnected(false); setColabProgress(null); }}/></label>
+        <div className="colab-render-actions"><button className="production-tool-button" type="button" disabled={colabChecking || colabBusy || !colabEndpoint.trim()} onClick={() => void connectColab()}>{colabChecking ? <Loader2 size={14}/> : <RefreshCw size={14}/>} {colabChecking ? "Connecting…" : "Connect to Colab"}</button><button className="production-tool-button primary" type="button" disabled={!colabConnected || colabBusy || renderErrors.length > 0} onClick={() => void startColabRender()}><Cloud size={14}/> Render MP4 on Colab</button>{colabBusy && <button className="production-tool-button danger" type="button" onClick={cancelColabRender}>Cancel</button>}</div>
+        {colabProgress && <div className="colab-render-progress"><div><b>{colabProgress.stage === "uploading" ? "Uploading project" : colabProgress.stage === "rendering" ? "Rendering on Colab" : "Downloading MP4"}</b><span>{colabProgress.progress}%</span></div><progress max="100" value={colabProgress.progress}/><small>{colabProgress.message}</small></div>}
+        <p className="colab-render-footnote">Direct browser-to-Colab connection. No GridSplit account, token, or authentication step. Keep the Colab tab running until the MP4 downloads. Google controls GPU availability and session limits.</p>
+      </section>
       <div className="restore-archive-row"><label className="production-tool-button"><Upload size={14}/> Restore project archive<input type="file" accept=".zip,.gridsplit.zip,application/zip" disabled={busy} onChange={(event) => { void restoreArchive(event.target.files?.[0]); event.currentTarget.value = ""; }}/></label><small>Restores as a new project. Existing projects and their media are kept.</small></div>
       <p className="production-tools-footnote">The renderer validates the finished MP4 with ffprobe before returning it. FFmpeg and ffprobe must be installed on this computer; nothing is downloaded or bundled by GridSplit.</p>
       <details className="renderer-install"><summary>Set up the optional local renderer</summary><ol><li>Install FFmpeg and ensure both <code>ffmpeg</code> and <code>ffprobe</code> are available in your PATH.</li><li>For local Vite development, run <code>python local-render/server.py --allow-origin http://localhost:5173</code> from the repository root.</li><li>To use this public website, run <code>python local-render/server.py --allow-origin https://gridsplit-kappa.vercel.app</code>. To allow both origins, pass both <code>--allow-origin</code> flags on the same command.</li><li>The renderer must run on this same computer and remain bound to <code>127.0.0.1</code>. Keep the endpoint above set to <code>http://127.0.0.1:8766</code>; never expose the renderer on a LAN or point GridSplit at a remote render server.</li></ol></details>
