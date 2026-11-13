@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, Download, ImagePlus, Maximize2, Pause, Play, RefreshCw, Scissors, SlidersHorizontal, Sparkles, Square, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Clapperboard, Download, ImagePlus, Maximize2, Pause, Play, RefreshCw, Scissors, SlidersHorizontal, Sparkles, Square, Trash2, Upload, ZoomIn, ZoomOut } from "lucide-react";
 import { PROJECT_STORAGE_KEY, type StudioProject } from "../../lib/projectStore";
 import { readGeneratedAudio } from "../../audio/audioStore";
 import ProductionTools from "./ProductionTools";
@@ -281,7 +281,7 @@ export default function ProductionWorkspace({project,onUpdate,onRestoreProject}:
         if(!timing)throw new Error("Missing synchronization timing for "+asset.name+".");
         const midpoint=(timing.startSeconds+timing.endSeconds)/2;
         const scene=audioClips.find(clip=>midpoint>=clip.startSeconds&&midpoint<clip.startSeconds+clip.durationSeconds)||audioClips[audioClips.length-1];
-        return {id:crypto.randomUUID(),track:"images",sceneId:scene.sceneId,assetId:asset.id,startSeconds:timing.startSeconds,durationSeconds:durations[index],order:index};
+        return {id:crypto.randomUUID(),track:"images" as const,sceneId:scene.sceneId,assetId:asset.id,startSeconds:timing.startSeconds,durationSeconds:durations[index],order:index};
       });
       patchProject(onUpdate,{timelineClips:[...audioClips,...imageClips]});
       setPlayheadSeconds(0);setSelectedImageClipId(imageClips[0]?.id||null);setIsPlaying(false);
