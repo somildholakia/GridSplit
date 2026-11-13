@@ -24,6 +24,8 @@ export interface LocalRenderJob {
     fps: number;
     videoCodec: string;
     audioCodec: string;
+    /** Actual encoder reported by the FFmpeg renderer (h264_nvenc or libx264). */
+    encoder?: string;
   };
   error?: string;
 }
