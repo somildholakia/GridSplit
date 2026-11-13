@@ -28,7 +28,28 @@ MAX_CHUNK = 3 * 1024 * 1024
 MAX_UPLOADS = 2
 UPLOADS: dict[str, dict] = {}
 UPLOADS_LOCK = threading.RLock()
+UPLOAD_TTL_SECONDS = 30 * 60
 AUTH_TOKEN = ""
+
+
+def prune_uploads(now: float | None = None) -> None:
+    """Remove abandoned chunk uploads, including when a notebook is left idle."""
+    current = time.time() if now is None else now
+    expired: list[Path] = []
+    with UPLOADS_LOCK:
+        for upload_id, upload in list(UPLOADS.items()):
+            updated = float(upload.get("updatedAt", upload.get("createdAt", current)))
+            if current - updated > UPLOAD_TTL_SECONDS:
+                UPLOADS.pop(upload_id, None)
+                expired.append(upload["directory"])
+    for directory in expired:
+        shutil.rmtree(directory, ignore_errors=True)
+
+
+def upload_cleanup_loop() -> None:
+    while True:
+        prune_uploads()
+        time.sleep(300)
 
 
 def json_response(handler: BaseHTTPRequestHandler, status: int, value: dict) -> None:
@@ -72,7 +93,11 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "GridSplitColabRenderer/1.0"
 
     def log_message(self, fmt: str, *args) -> None:
-        print("[GridSplit Colab] " + fmt % args, flush=True)
+        # Never log request headers, query strings, or authentication material.
+        message = fmt % args
+        if "?" in message:
+            message = message.split("?", 1)[0]
+        print("[GridSplit Colab] " + message, flush=True)
 
     def authorized(self) -> bool:
         supplied = self.headers.get("X-GridSplit-Token", "")
@@ -82,6 +107,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():
             json_response(self, 401, {"error": "Invalid or missing GridSplit Colab connection token."})
             return False
+        # The browser sends credentials in a header only; reject query strings
+        # so tokens cannot accidentally migrate into URL or access logs.
+        if urlsplit(self.path).query:
+            json_response(self, 400, {"error": "Query strings are not accepted by the Colab renderer."})
+            return False
+        prune_uploads()
+        renderer.prune_finished_jobs()
         return True
 
     def read_json(self, limit: int = 64 * 1024) -> dict:
@@ -195,7 +227,7 @@ class Handler(BaseHTTPRequestHandler):
                     UPLOADS[upload_id] = {
                         "directory": directory, "size": size, "chunkSize": chunk_size,
                         "chunkCount": count, "projectId": project_id, "received": set(),
-                        "createdAt": time.time(),
+                        "createdAt": time.time(), "updatedAt": time.time(),
                     }
                 json_response(self, 201, {"uploadId": upload_id, "chunkSize": chunk_size, "chunkCount": count})
                 return
@@ -217,7 +249,12 @@ class Handler(BaseHTTPRequestHandler):
                                 shutil.copyfileobj(part, target)
                     if archive.stat().st_size != upload["size"]:
                         raise ValueError("Assembled archive size does not match the upload declaration.")
-                    result = make_job(archive, upload["projectId"])
+                    try:
+                        result = make_job(archive, upload["projectId"])
+                    except Exception:
+                        UPLOADS.pop(upload_id, None)
+                        shutil.rmtree(directory, ignore_errors=True)
+                        raise
                     UPLOADS.pop(upload_id, None)
                 shutil.rmtree(directory, ignore_errors=True)
                 json_response(self, 202, result)
@@ -257,6 +294,7 @@ class Handler(BaseHTTPRequestHandler):
                 with target.open("wb") as handle:
                     handle.write(payload)
                 upload["received"].add(index)
+                upload["updatedAt"] = time.time()
                 received = len(upload["received"])
             json_response(self, 200, {"received": received, "total": upload["chunkCount"]})
         except Exception as error:
@@ -306,20 +344,27 @@ class _LimitedReader:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Authenticated GridSplit Colab FFmpeg renderer")
+    parser.add_argument("--host", default="127.0.0.1", choices=["127.0.0.1"],
+                        help="The authenticated renderer is loopback-only; expose it only through the notebook's Quick Tunnel.")
     parser.add_argument("--port", type=int, default=8766)
-    parser.add_argument("--token", required=True, help="High-entropy token required for every API request.")
+    parser.add_argument("--token", default=os.environ.get("GRID_SPLIT_COLAB_TOKEN", ""),
+                        help="Optional token override; prefer GRID_SPLIT_COLAB_TOKEN environment variable.")
     args = parser.parse_args()
     if not (1024 <= args.port <= 65535):
         parser.error("Port must be between 1024 and 65535.")
     if len(args.token) < 32:
-        parser.error("Token must be at least 32 characters.")
+        parser.error("A high-entropy token of at least 32 characters is required in GRID_SPLIT_COLAB_TOKEN or --token.")
     global AUTH_TOKEN
     AUTH_TOKEN = args.token
-    httpd = ThreadingHTTPServer(("0.0.0.0", args.port), Handler)
+    httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     httpd.daemon_threads = True
-    print("GridSplit Colab renderer listening on port " + str(args.port), flush=True)
+    print("GridSplit Colab renderer listening on 127.0.0.1:" + str(args.port), flush=True)
     print("Authenticated API ready. Keep this runtime and its Quick Tunnel active.", flush=True)
-    httpd.serve_forever()
+    threading.Thread(target=upload_cleanup_loop, daemon=True).start()
+    try:
+        httpd.serve_forever()
+    finally:
+        httpd.server_close()
 
 
 if __name__ == "__main__":
