@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Authenticated chunked FFmpeg render gateway for a temporary Colab Quick Tunnel.
+"""Direct chunked FFmpeg render gateway for a temporary Colab Quick Tunnel.
 
-The local renderer remains loopback-only. This separate gateway is used only in a
-Colab runtime and requires a high-entropy bearer token for every API request.
+The renderer remains bound to loopback inside Colab. The temporary Quick Tunnel
+provides direct browser access from the GridSplit origins listed below.
 """
 from __future__ import annotations
 
@@ -107,7 +107,7 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "GridSplitColabRenderer/1.0"
 
     def log_message(self, fmt: str, *args) -> None:
-        # Never log request headers, query strings, or authentication material.
+        # Never log request headers or query strings.
         message = fmt % args
         if "?" in message:
             message = message.split("?", 1)[0]
