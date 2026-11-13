@@ -657,6 +657,11 @@ def _run_render_process(job_id: str, command: list[str], duration: float, messag
 def execute_job(job_id: str) -> None:
     with JOBS_LOCK:
         job = JOBS[job_id]
+        if job["cancel"].is_set():
+            job["status"] = "cancelled"
+            job["message"] = "Render was cancelled before FFmpeg started."
+            job["finishedAt"] = time.time()
+            return
         job["status"] = "running"
         job["progress"] = 2
         job["message"] = "Validating the render environment and project media."
