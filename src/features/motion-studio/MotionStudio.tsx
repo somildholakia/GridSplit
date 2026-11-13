@@ -179,6 +179,7 @@ export default function MotionStudio() {
   const videoPreviewIncomingCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const previewAnimationRef = useRef<number | null>(null);
+  const previewUiTimeRef = useRef(0);
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const objectUrlsRef = useRef<Set<string>>(new Set());
   const audioObjectUrlRef = useRef("");
@@ -340,7 +341,10 @@ export default function MotionStudio() {
         setPreviewIncomingVisible(false);
         setPreviewTransitionProgress(0);
       }
-      setPreviewPlaybackTime(time);
+      if (Math.abs(time - previewUiTimeRef.current) >= 0.2 || time === 0) {
+        previewUiTimeRef.current = time;
+        setPreviewPlaybackTime(time);
+      }
       if (!current.paused && !current.ended) {
         previewAnimationRef.current = requestAnimationFrame(draw);
       }
@@ -1359,7 +1363,10 @@ export default function MotionStudio() {
                   drawAtTime(time, videoPreviewCanvasRef.current, state.currentIndex, state.progress);
                   setPreviewIncomingVisible(false);
                 }
-                setPreviewPlaybackTime(time);
+                if (Math.abs(time - previewUiTimeRef.current) >= 0.2 || time === 0) {
+                  previewUiTimeRef.current = time;
+                  setPreviewPlaybackTime(time);
+                }
                 previewAnimationRef.current = requestAnimationFrame(tick);
               };
               previewAnimationRef.current = requestAnimationFrame(tick);
@@ -1382,7 +1389,11 @@ export default function MotionStudio() {
               }
             }}
             onEnded={() => setPreviewPlaybackTime(audioDuration)}
-            onTimeUpdate={(event) => setPreviewPlaybackTime(event.currentTarget.currentTime)}
+            onTimeUpdate={(event) => {
+              const time = event.currentTarget.currentTime;
+              previewUiTimeRef.current = time;
+              setPreviewPlaybackTime(time);
+            }}
           />
           <div className="motion-video-controls">
             <div className="motion-video-time"><span>{formatTime(previewPlaybackTime)}</span><span>{formatTime(audioDuration)}</span></div>
@@ -1397,6 +1408,7 @@ export default function MotionStudio() {
                 const audio = videoPreviewAudioRef.current;
                 if (audio) {
                   audio.currentTime = Number(event.target.value);
+                  previewUiTimeRef.current = audio.currentTime;
                   setPreviewPlaybackTime(audio.currentTime);
                   const state = getMotionPreviewFrameState(audio.currentTime, buildMotionPreviewSchedule(images.map(() => secondsPerImage), transition, transitionDuration));
                   if (state?.kind === "clip") {
@@ -1420,7 +1432,7 @@ export default function MotionStudio() {
               }}>{videoPreviewAudioRef.current?.paused ? <Play size={18} /> : <Pause size={18} />}</button>
               <button type="button" aria-label="Restart preview" onClick={() => {
                 const audio = videoPreviewAudioRef.current;
-                if (audio) { audio.currentTime = 0; setPreviewPlaybackTime(0); void audio.play(); }
+                if (audio) { audio.currentTime = 0; previewUiTimeRef.current = 0; setPreviewPlaybackTime(0); void audio.play(); }
               }}><RefreshCw size={17} /></button>
               <button type="button" aria-label={previewMuted ? "Unmute" : "Mute"} onClick={() => setPreviewMuted((value) => !value)}>{previewMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
               <button type="button" aria-label="Close video preview" onClick={() => setPreviewOpen(false)}><X size={19} /></button>
