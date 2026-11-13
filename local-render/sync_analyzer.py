@@ -166,15 +166,13 @@ def _clip_features(image_paths: list[Path], windows: list[dict[str, Any]], batch
         inputs = processor(images=batch_images, return_tensors="pt")
         inputs = {key: value.to(device) for key, value in inputs.items()}
         with torch.inference_mode():
-            output = model.get_image_features(**inputs)
-            if torch.is_tensor(output):
-                features = output
-            elif getattr(output, "pooler_output", None) is not None:
-                features = output.pooler_output
-            elif isinstance(output, (tuple, list)) and output and torch.is_tensor(output[0]):
-                features = output[0]
-            else:
-                raise TypeError("Unsupported CLIP image output: " + type(output).__name__)
+            # Call the CLIP towers directly and apply their projection layers.
+            # This avoids Transformers-version differences in get_*_features
+            # return types (Tensor versus ModelOutput wrappers).
+            vision_output = model.vision_model(
+                pixel_values=inputs["pixel_values"], return_dict=True
+            )
+            features = model.visual_projection(vision_output.pooler_output)
             features = torch.nn.functional.normalize(features, dim=-1)
         image_vectors.append(features.cpu())
         del inputs, features, batch_images
@@ -188,15 +186,12 @@ def _clip_features(image_paths: list[Path], windows: list[dict[str, Any]], batch
                            padding=True, truncation=True, max_length=77)
         inputs = {key: value.to(device) for key, value in inputs.items()}
         with torch.inference_mode():
-            output = model.get_text_features(**inputs)
-            if torch.is_tensor(output):
-                features = output
-            elif getattr(output, "pooler_output", None) is not None:
-                features = output.pooler_output
-            elif isinstance(output, (tuple, list)) and output and torch.is_tensor(output[0]):
-                features = output[0]
-            else:
-                raise TypeError("Unsupported CLIP text output: " + type(output).__name__)
+            text_output = model.text_model(
+                input_ids=inputs["input_ids"],
+                attention_mask=inputs.get("attention_mask"),
+                return_dict=True,
+            )
+            features = model.text_projection(text_output.pooler_output)
             features = torch.nn.functional.normalize(features, dim=-1)
         text_vectors.append(features.cpu())
         del inputs, features
