@@ -114,7 +114,7 @@ export async function buildColabRenderPackage(project: StudioProject): Promise<B
     "",
     "Live workflow:",
     "1. Open GridSplit_Live_Colab_Renderer.ipynb in Colab.",
-    "2. Select a T4 GPU, run all cells, then copy the Quick Tunnel URL and token into Motion Studio.",
+        "3. Copy the displayed Quick Tunnel URL into GridSplit → Production Studio → Export & restore.",
     "",
     "GPU availability and session limits are controlled by Google. No paid API key or AI model is required."
   ].join("\n"));
@@ -160,7 +160,7 @@ export function buildColabNotebook(): Blob {
   ].join("\n");
 
   const startCode = [
-    "import base64, json, os, pathlib, re, secrets, subprocess, sys, threading, time, urllib.request",
+    "import base64, json, os, pathlib, re, subprocess, sys, threading, time, urllib.request",
     "from IPython.display import Markdown, display",
     "",
     "BUNDLE_ROOT = pathlib.Path('/content/gridsplit-colab')",
@@ -172,8 +172,6 @@ export function buildColabNotebook(): Blob {
     "(RENDER_ROOT / 'colab_server.py').write_bytes(base64.b64decode(GATEWAY_SOURCE_B64))",
     "",
     "# Generated for this runtime only. It is not embedded in the notebook or repository.",
-    "GRID_SPLIT_TOKEN = secrets.token_urlsafe(48)",
-    "os.environ['GRID_SPLIT_COLAB_TOKEN'] = GRID_SPLIT_TOKEN",
     "PORT = 8766",
     "SERVER_PROCESS = subprocess.Popen(",
     "    [sys.executable, str(RENDER_ROOT / 'colab_server.py'), '--host', '127.0.0.1', '--port', str(PORT)],",
@@ -183,7 +181,6 @@ export function buildColabNotebook(): Blob {
     "# Wait until the authenticated local API is actually healthy before tunnelling it.",
     "health_request = urllib.request.Request(",
     "    f'http://127.0.0.1:{PORT}/v1/health',",
-    "    headers={'X-GridSplit-Token': GRID_SPLIT_TOKEN},",
     ")",
     "for attempt in range(60):",
     "    if SERVER_PROCESS.poll() is not None:",
@@ -226,8 +223,7 @@ export function buildColabNotebook(): Blob {
     "print('GridSplit Colab renderer is ready.')",
     "print('GPU visible to this runtime:', GPU_NAME or 'No NVIDIA GPU detected (CPU rendering will be used)')",
     "print('Colab Quick Tunnel URL:', GRID_SPLIT_TUNNEL_URL)",
-    "print('Secure connection token:', GRID_SPLIT_TOKEN)",
-    "print('Paste the URL and token into Motion Studio → Render on Google Colab.')",
+        "3. Copy the displayed Quick Tunnel URL into GridSplit → Production Studio → Export & restore.",
     "print('Keep this Colab runtime running while GridSplit uploads and renders your project.')",
   ].join("\n");
 
@@ -236,14 +232,14 @@ export function buildColabNotebook(): Blob {
       notebookCell("markdown", [
         "# GridSplit Motion Studio · Live Colab Renderer",
         "",
-        "This notebook starts the **same FFmpeg renderer used by GridSplit's local rendering option** behind an authenticated Cloudflare Quick Tunnel.",
+        "This notebook starts the **same FFmpeg renderer used by GridSplit's local rendering option** behind a temporary Cloudflare Quick Tunnel.",
         "",
         "1. In Colab, choose **Runtime → Change runtime type → T4 GPU** when available.",
         "2. Run the notebook cells from top to bottom.",
-        "3. Copy the displayed Quick Tunnel URL and secure token into GridSplit → Motion Studio → Render on Google Colab.",
-        "4. Test the connection, then start a render. GridSplit uploads the portable project archive in retryable chunks and downloads the validated MP4 in byte ranges.",
+        "3. Copy the displayed Quick Tunnel URL into GridSplit → Production Studio → Export & restore.",
+        "4. Connect, then start a render. GridSplit uploads the portable project archive in retryable chunks and downloads the validated MP4 in byte ranges.",
         "",
-        "The notebook creates a random token for this runtime. It is not stored in the notebook or repository. The renderer binds to loopback only; only Cloudflare's tunnel exposes it. No AI API key or paid rendering service is used.",
+        "The renderer binds to loopback and accepts direct browser requests from GridSplit. No token or authentication step is required.",
         "",
         "**Keep the runtime and this tunnel process alive until the MP4 has downloaded.** Colab session limits and GPU availability are controlled by Google."
       ].join("\n")),
