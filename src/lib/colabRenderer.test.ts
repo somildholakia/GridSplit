@@ -115,7 +115,8 @@ describe("Drive Smart Sync Colab workflow", () => {
     expect(code).toContain("drive.mount('/content/drive')");
     expect(code).toContain("faster-whisper");
     expect(code).toContain("GridSplit Drive renderer");
-    expect(code).toContain("/v1/drive/render");
+    expect(code).toContain("RENDERER_SOURCE_B64");
+    expect(code).toContain("GATEWAY_SOURCE_B64");
     expect(code).toContain("cloudflared");
     expect(code).toContain("mars E1 zip.zip");
     expect(code).toContain("Mars-E1-complete-audio.wav");
