@@ -235,8 +235,8 @@ class Handler(BaseHTTPRequestHandler):
                 count = int(data.get("chunkCount", 0))
                 project_id = str(data.get("projectId", ""))
                 if size <= 0 or size > MAX_ARCHIVE or chunk_size != MAX_CHUNK:
-                    raise ValueError("Archive size or chunk size is invalid (maximum compressed archive is 1 GB).")
-                if count != (size + chunk_size - 1) // chunk_size or count > 400:
+                    raise ValueError("Archive size or chunk size is invalid (maximum compressed archive is 3 GB).")
+                if count != (size + chunk_size - 1) // chunk_size or count > 1024:
                     raise ValueError("Chunk count does not match the archive size.")
                 with UPLOADS_LOCK:
                     if len(UPLOADS) >= MAX_UPLOADS:
