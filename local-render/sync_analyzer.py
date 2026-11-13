@@ -41,9 +41,12 @@ def probe_duration(audio_path: Path) -> float:
 def extract_images(archive_path: Path, destination: Path) -> list[Path]:
     destination.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive_path) as archive:
+        infos = archive.infolist()
+        if len(infos) > MAX_IMAGES:
+            raise ValueError("The image archive contains too many ZIP entries.")
         images = []
         expanded = 0
-        for info in archive.infolist():
+        for info in infos:
             if info.is_dir():
                 continue
             relative = PurePosixPath(info.filename)
@@ -53,6 +56,11 @@ def extract_images(archive_path: Path, destination: Path) -> list[Path]:
                 continue
             if len(images) >= MAX_IMAGES:
                 raise ValueError("The image archive contains more than 10,000 images.")
+            unix_mode = (info.external_attr >> 16) & 0o170000
+            if unix_mode == 0o120000 or (info.file_size > 0 and info.compress_size == 0):
+                raise ValueError("The image archive contains an unsafe or invalid image entry.")
+            if info.compress_size and info.file_size / info.compress_size > 1000:
+                raise ValueError("The image archive contains an excessive compression ratio.")
             expanded += info.file_size
             if expanded > MAX_UNPACKED_BYTES:
                 raise ValueError("Extracted images exceed the 8 GB safety limit.")
@@ -70,26 +78,32 @@ def extract_images(archive_path: Path, destination: Path) -> list[Path]:
 def transcribe_audio(audio_path: Path, model_size: str = "small") -> tuple[list[dict[str, Any]], str]:
     from faster_whisper import WhisperModel
 
+    def collect(device: str, selected_model: str, compute_type: str):
+        model = WhisperModel(selected_model, device=device, compute_type=compute_type)
+        segments, info = model.transcribe(
+            str(audio_path), beam_size=3, vad_filter=True, word_timestamps=False,
+            condition_on_previous_text=False,
+        )
+        result = []
+        # faster-whisper yields segments lazily, so consume inside the try block
+        # to catch CUDA OOM/runtime errors and retry on CPU when necessary.
+        for segment in segments:
+            text = " ".join(str(segment.text).split())
+            if text:
+                result.append({
+                    "start": max(0.0, float(segment.start)),
+                    "end": max(float(segment.start) + 0.05, float(segment.end)),
+                    "text": text,
+                })
+        return result, str(getattr(info, "language", "unknown"))
+
     try:
-        model = WhisperModel(model_size, device="cuda", compute_type="float16")
-        device_label = "cuda"
-    except Exception:
-        model = WhisperModel("base", device="cpu", compute_type="int8")
-        device_label = "cpu"
-    segments, info = model.transcribe(
-        str(audio_path), beam_size=3, vad_filter=True, word_timestamps=False,
-        condition_on_previous_text=False,
-    )
-    result = []
-    for segment in segments:
-        text = " ".join(str(segment.text).split())
-        if text:
-            result.append({
-                "start": max(0.0, float(segment.start)),
-                "end": max(float(segment.start) + 0.05, float(segment.end)),
-                "text": text,
-            })
-    return result, str(getattr(info, "language", "unknown")) + " (" + device_label + ")"
+        result, language = collect("cuda", model_size, "float16")
+        return result, language + " (cuda)"
+    except Exception as gpu_error:
+        print("GPU transcription failed; retrying with CPU int8:", str(gpu_error)[:300], flush=True)
+        result, language = collect("cpu", "base", "int8")
+        return result, language + " (cpu)"
 
 
 def make_text_windows(segments: list[dict[str, Any]], duration: float, count: int) -> list[dict[str, Any]]:
