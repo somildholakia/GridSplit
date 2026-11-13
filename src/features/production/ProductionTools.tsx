@@ -345,7 +345,6 @@ export default function ProductionTools({ project, onUpdate, onRestoreProject }:
     } catch (error) { setNotice(error instanceof Error ? error.message : "Colab rendering failed."); }
     finally { colabAbort.current = null; setColabBusy(false); }
   };
-  const cancelRender = () => previewAbort.current?.abort();
   const cancelColabRender = () => colabAbort.current?.abort();
   const renderErrors = readyIssues.filter((issue) => issue.severity === "error");
   const renderWarnings = readyIssues.filter((issue) => issue.severity === "warning");
