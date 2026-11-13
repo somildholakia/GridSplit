@@ -368,6 +368,7 @@ export default function MotionStudio() {
     if (!previewOpen) return;
     const audio = videoPreviewAudioRef.current;
     if (audio) {
+      audioRef.current?.pause();
       setPreviewSelectedImage(false);
       previewUiTimeRef.current = 0;
       audio.pause();
