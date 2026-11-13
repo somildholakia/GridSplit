@@ -905,13 +905,15 @@ export default function MotionStudio() {
     setRendering(true);
     setJob(null);
     setColabProgress({ stage: "uploading", progress: 0, message: "Preparing the portable project archive…" });
-    setNotice("Preparing the project for authenticated upload to Google Colab…");
+    setNotice("Preparing the project for direct upload to Google Colab…");
     const controller = new AbortController();
     renderControllerRef.current = controller;
     let temporaryProject: StudioProject | null = null;
     try {
       temporaryProject = await buildRenderProject();
       const result = await renderProjectOnColab(
+        temporaryProject,
+        colabEndpoint,
         (progress) => {
           setColabProgress(progress);
           if (progress.job) setJob(progress.job);
