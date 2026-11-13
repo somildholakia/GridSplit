@@ -620,50 +620,89 @@ def render_command(project: dict, manifest: dict, root: Path) -> tuple[list[str]
         "width": width, "height": height, "fps": fps, "ffprobe": ffprobe, "encoder": encoder,
     }
 
+def _run_render_process(job_id: str, command: list[str], duration: float, message: str) -> int:
+    """Run one FFmpeg attempt while reporting real progress from FFmpeg itself."""
+    with JOBS_LOCK:
+        job = JOBS[job_id]
+        job["message"] = message
+    process = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1,
+    )
+    with JOBS_LOCK:
+        job["process"] = process
+    if process.stdout:
+        for line in process.stdout:
+            if job["cancel"].is_set():
+                process.terminate()
+                break
+            line = line.strip()
+            if line.startswith("out_time_ms="):
+                try:
+                    seconds = int(line.split("=", 1)[1]) / 1_000_000
+                    progress = min(94, max(2, int(seconds / duration * 92)))
+                    with JOBS_LOCK:
+                        job["progress"] = progress
+                except (ValueError, ZeroDivisionError):
+                    pass
+            elif line.startswith("progress=end"):
+                with JOBS_LOCK:
+                    job["progress"] = 95
+            elif line:
+                with JOBS_LOCK:
+                    job["lastLog"] = (job.get("lastLog", "") + line + "\\n")[-4000:]
+    return process.wait()
+
+
 def execute_job(job_id: str) -> None:
     with JOBS_LOCK:
         job = JOBS[job_id]
         job["status"] = "running"
         job["progress"] = 2
-        job["message"] = "Validating the local render environment and project media."
+        job["message"] = "Validating the render environment and project media."
     try:
         root = Path(job["directory"])
         command, duration, profile = render_command(job["project"], job["manifest"], root)
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-        with JOBS_LOCK:
-            job["process"] = process
-            job["message"] = "FFmpeg is rendering locally."
-        if process.stdout:
-            for line in process.stdout:
-                if job["cancel"].is_set():
-                    process.terminate()
-                    break
-                line = line.strip()
-                if line.startswith("out_time_ms="):
-                    try:
-                        seconds = int(line.split("=", 1)[1]) / 1_000_000
-                        progress = min(94, max(2, int(seconds / duration * 92)))
-                        with JOBS_LOCK:
-                            job["progress"] = progress
-                    except (ValueError, ZeroDivisionError):
-                        pass
-                elif line.startswith("progress=end"):
-                    with JOBS_LOCK:
-                        job["progress"] = 95
-                elif line:
-                    with JOBS_LOCK:
-                        job["lastLog"] = (job.get("lastLog", "") + line + "\\n")[-4000:]
-        return_code = process.wait()
+        return_code = _run_render_process(
+            job_id, command, duration,
+            "FFmpeg is rendering with " + profile["encoder"] + ".",
+        )
+
+        if job["cancel"].is_set():
+            with JOBS_LOCK:
+                job["status"] = "cancelled"
+                job["message"] = "Render was cancelled."
+            return
+
+        # An NVENC probe can pass and the real job can still fail because of
+        # driver/runtime resource limits. Retry the same archive with libx264.
+        if return_code != 0 and profile.get("encoder") == "h264_nvenc":
+            partial_output = root / "output.mp4"
+            partial_output.unlink(missing_ok=True)
+            with JOBS_LOCK:
+                job["progress"] = 2
+                job["message"] = "NVENC failed during the render. Retrying with CPU libx264."
+            job["project"].setdefault("renderProfile", {})["encoder"] = "software"
+            command, duration, profile = render_command(job["project"], job["manifest"], root)
+            return_code = _run_render_process(
+                job_id, command, duration,
+                "GPU encoding failed; retrying on CPU with libx264.",
+            )
+
         if job["cancel"].is_set():
             with JOBS_LOCK:
                 job["status"] = "cancelled"
                 job["message"] = "Render was cancelled."
             return
         if return_code != 0:
-            raise RuntimeError("FFmpeg failed. Check the imported audio formats and local codec support. " + (job.get("lastLog", "")[-1200:]))
+            raise RuntimeError(
+                "FFmpeg failed. Check the imported media and codec support. "
+                + job.get("lastLog", "")[-1200:]
+            )
+
         output = root / "output.mp4"
         if not output.is_file() or output.stat().st_size < 1024:
-            raise RuntimeError("FFmpeg completed without producing a valid MP4 output.")
+            raise RuntimeError("FFmpeg completed without producing a valid MP4.")
         probe = subprocess.run(
             [profile["ffprobe"], "-v", "error", "-show_entries",
              "format=duration,format_name:stream=codec_type,codec_name,width,height,r_frame_rate",
@@ -693,12 +732,16 @@ def execute_job(job_id: str) -> None:
         with JOBS_LOCK:
             job["status"] = "completed"
             job["progress"] = 100
-            job["message"] = "MP4 validated by ffprobe: H.264, AAC, dimensions, frame rate and duration."
+            job["message"] = (
+                "MP4 validated by ffprobe using " + profile["encoder"]
+                + ": H.264, AAC, dimensions, frame rate and duration."
+            )
             job["output"] = {
                 "filename": "output.mp4", "bytes": output.stat().st_size,
                 "durationSeconds": actual_duration, "width": profile["width"],
                 "height": profile["height"], "fps": profile["fps"],
                 "videoCodec": "h264", "audioCodec": "aac",
+                "encoder": profile["encoder"],
             }
     except Exception as error:
         with JOBS_LOCK:
@@ -708,7 +751,7 @@ def execute_job(job_id: str) -> None:
             else:
                 job["status"] = "failed"
                 job["error"] = str(error)
-                job["message"] = "Local render failed."
+                job["message"] = "Render failed."
     finally:
         with JOBS_LOCK:
             process = job.get("process")
