@@ -50,3 +50,10 @@
 .production-clip-editors .production-clip input{width:82px;font-variant-numeric:tabular-nums}
 .production-clip-editors .production-clip label{white-space:nowrap}
 @media(max-width:650px){.production-timeline-tools{align-items:stretch;flex-direction:column}.production-bulk-duration,.production-zoom-tools{width:100%}.production-zoom-tools input[type=range]{flex:1;min-width:50px}.production-bulk-duration .production-button{flex:1}.production-bulk-duration small{font-size:10px}}
+.production-sync-import{display:grid;gap:9px;padding:13px;border:1px solid #43536a;border-radius:10px;background:#1b2634}
+.production-sync-import>div:first-child{display:grid;gap:4px}
+.production-sync-import b{font-size:10px;letter-spacing:.12em;color:#b7cbed}
+.production-sync-import p,.production-sync-import small{margin:0;color:#9aa9bc;font-size:11px;line-height:1.45}
+.production-sync-controls{display:flex;gap:8px;flex-wrap:wrap}
+.production-sync-import textarea{width:100%;min-height:84px;max-height:220px;resize:vertical;box-sizing:border-box;padding:10px;border:1px solid #3b4b60;border-radius:7px;background:#101720;color:#edf3fb;font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
+.production-sync-import textarea:focus{outline:2px solid #91b9ed;outline-offset:1px}
